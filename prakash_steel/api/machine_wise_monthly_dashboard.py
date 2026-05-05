@@ -1,6 +1,10 @@
+import re
+
 import frappe
-from frappe.utils import cint
-from frappe.utils import flt, getdate
+from frappe import _
+from frappe.utils import cint, escape_html, flt, getdate
+from frappe.utils.pdf import get_pdf
+from frappe.utils.xlsxutils import make_xlsx
 
 
 MONTH_LABELS = {
@@ -202,3 +206,169 @@ def _get_rate_for_date(rate_rows, production_date):
         else:
             break
     return applicable_rate
+
+
+def _safe_export_filename_part(value):
+    return re.sub(r"[^\w\-.]+", "_", (value or "") or "")[:120] or "export"
+
+
+def _build_flat_sheet_rows(machines, rows):
+    header = [_("Month")]
+    for machine in machines:
+        header.append(f"{machine} — {_('FG Weight')}")
+        header.append(f"{machine} — {_('Amount')}")
+    header.extend([_("Total FG Weight"), _("Total Amount")])
+
+    data_rows = []
+    for row in rows:
+        out = [row.get("month") or ""]
+        total_fg = 0.0
+        total_amt = 0.0
+        for machine in machines:
+            fg = flt(row.get(f"{machine}__fg_weight"))
+            amt = flt(row.get(f"{machine}__amount"))
+            total_fg += fg
+            total_amt += amt
+            out.extend([fg, amt])
+        out.extend([flt(total_fg), flt(total_amt, 2)])
+        data_rows.append(out)
+
+    return header, data_rows
+
+
+@frappe.whitelist()
+def export_machine_wise_monthly_excel(fiscal_year=None, machine_name=None):
+    result = get_machine_wise_monthly_data(fiscal_year, machine_name)
+    machines = result.get("machines") or []
+    rows = result.get("rows") or []
+    if not machines:
+        frappe.throw(_("No data to export"))
+
+    header, data_rows = _build_flat_sheet_rows(machines, rows)
+    table_data = [header] + data_rows
+    fy = result.get("fiscal_year") or "dashboard"
+    file_name = f"Machine_Wise_Monthly_{_safe_export_filename_part(fy)}.xlsx"
+    xlsx_file = make_xlsx(table_data, _("Machine Wise Monthly"))
+
+    frappe.response["filename"] = file_name
+    frappe.response["filecontent"] = xlsx_file.getvalue()
+    frappe.response["type"] = "binary"
+    frappe.response["content_type"] = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@frappe.whitelist()
+def export_machine_wise_monthly_pdf(fiscal_year=None, machine_name=None):
+    result = get_machine_wise_monthly_data(fiscal_year, machine_name)
+    machines = result.get("machines") or []
+    rows = result.get("rows") or []
+    fy = result.get("fiscal_year") or ""
+    if not machines:
+        frappe.throw(_("No data to export"))
+
+    top_cells = [
+        f'<th rowspan="2" style="border:1px solid #333;padding:6px;background:#e9ecef;">{escape_html(_("Month"))}</th>'
+    ]
+    sub_cells = []
+    for idx, machine in enumerate(machines):
+        border_right = "border-right:2px solid #555;" if idx < len(machines) - 1 else ""
+        top_cells.append(
+            f'<th colspan="2" style="border:1px solid #333;padding:6px;background:#e9ecef;{border_right}">'
+            f"{escape_html(machine)}</th>"
+        )
+        sub_cells.append(
+            f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;">{escape_html(_("FG Weight"))}</th>'
+        )
+        sub_cells.append(
+            f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;{border_right}">'
+            f"{escape_html(_('Amount'))}</th>"
+        )
+
+    top_cells.append(
+        f'<th colspan="2" style="border:1px solid #333;padding:6px;background:#e9ecef;border-left:2px solid #555;">'
+        f"{escape_html(_('Total'))}</th>"
+    )
+    sub_cells.append(
+        '<th style="border:1px solid #333;padding:4px;background:#f1f3f5;border-left:2px solid #555;">'
+        f"{escape_html(_('FG Weight'))}</th>"
+    )
+    sub_cells.append(
+        f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;">{escape_html(_("Amount"))}</th>'
+    )
+
+    body_html = []
+    for row in rows:
+        cells = [
+            f'<td style="border:1px solid #ccc;padding:4px;text-align:left;font-weight:600;">'
+            f"{escape_html(row.get('month') or '')}</td>"
+        ]
+        total_fg = 0.0
+        total_amt = 0.0
+        for idx, machine in enumerate(machines):
+            fg = flt(row.get(f"{machine}__fg_weight"))
+            amt = flt(row.get(f"{machine}__amount"))
+            total_fg += fg
+            total_amt += amt
+            border_right = "border-right:2px solid #555;" if idx < len(machines) - 1 else ""
+            cells.append(
+                f'<td style="border:1px solid #ccc;padding:4px;text-align:center;{border_right}">'
+                f"{escape_html(str(int(round(fg))))}</td>"
+            )
+            cells.append(
+                f'<td style="border:1px solid #ccc;padding:4px;text-align:right;{border_right}">'
+                f"{escape_html(f'{flt(amt, 2):,.2f}')}</td>"
+            )
+        cells.append(
+            '<td style="border:1px solid #ccc;padding:4px;text-align:center;border-left:2px solid #555;font-weight:600;">'
+            f"{escape_html(str(int(round(total_fg))))}</td>"
+        )
+        cells.append(
+            '<td style="border:1px solid #ccc;padding:4px;text-align:right;font-weight:600;">'
+            f"{escape_html(f'{flt(total_amt, 2):,.2f}')}</td>"
+        )
+        body_html.append(f"<tr>{''.join(cells)}</tr>")
+
+    title = escape_html(_("Machine-wise Monthly Dashboard"))
+    subtitle = escape_html(_("Fiscal Year: {0}").format(fy)) if fy else ""
+    subtitle_html = f'<p class="sub">{subtitle}</p>' if subtitle else ""
+    foot = escape_html(
+        _("Values are month-wise totals from Bright Bar Production. Month order follows the fiscal year.")
+    )
+
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 12px; font-size: 9pt; }}
+        h2 {{ text-align: center; margin: 0 0 4px 0; font-size: 14pt; }}
+        .sub {{ text-align: center; color: #444; margin: 0 0 12px 0; font-size: 10pt; }}
+        table {{ border-collapse: collapse; width: 100%; }}
+        .foot {{ margin-top: 10px; font-size: 8pt; color: #555; }}
+    </style>
+</head>
+<body>
+    <h2>{title}</h2>
+    {subtitle_html}
+    <table>
+        <thead>
+            <tr>{"".join(top_cells)}</tr>
+            <tr>{"".join(sub_cells)}</tr>
+        </thead>
+        <tbody>
+            {"".join(body_html)}
+        </tbody>
+    </table>
+    <p class="foot">{foot}</p>
+</body>
+</html>
+    """
+
+    pdf_content = get_pdf(html)
+    file_name = f"Machine_Wise_Monthly_{_safe_export_filename_part(fy)}.pdf"
+    frappe.response["filename"] = file_name
+    frappe.response["filecontent"] = pdf_content
+    frappe.response["type"] = "binary"
+    frappe.response["content_type"] = "application/pdf"
