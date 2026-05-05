@@ -11,6 +11,7 @@ RECIPIENTS = [
 	"pratikshya.gochhayat@clapgrow.com",
 	"ritika@clapgrow.com",
 	"beetashoke.chakraborty@clapgrow.com",
+	"accounts@prakashsteel.com",
 ]
 
 
@@ -52,10 +53,13 @@ def _get_payment_entry_rows_for_today_till_11_am():
 			pe.posting_date AS received_date,
 			pe.paid_amount,
 			per.reference_name,
-			si.posting_date AS sales_invoice_posting_date
+			si.posting_date AS sales_invoice_posting_date,
+			c.customer_group
 		FROM `tabPayment Entry` pe
 		INNER JOIN `tabPayment Entry Reference` per
 			ON per.parent = pe.name
+		LEFT JOIN `tabCustomer` c
+			ON c.name = pe.party AND IFNULL(pe.party_type, '') = 'Customer'
 		LEFT JOIN `tabSales Invoice` si
 			ON si.name = per.reference_name
 		WHERE pe.docstatus = 1
@@ -91,6 +95,7 @@ def _prepare_axis_bank_table_rows(rows):
 		table_rows.append(
 			{
 				"particulars": row.party_name or "",
+				"group": row.customer_group or "",
 				"sales_invoice_no": row.reference_name or "",
 				"invoice_date": invoice_posting_date,
 				"received_date": received_date,
@@ -113,6 +118,7 @@ def _build_email_body(table_rows, total_amount, report_date_display):
 			f"""
 			<tr>
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["particulars"])}</td>
+				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["group"])}</td>
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["sales_invoice_no"])}</td>
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["invoice_date"])}</td>
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["received_date"])}</td>
@@ -132,6 +138,7 @@ def _build_email_body(table_rows, total_amount, report_date_display):
 			<thead>
 				<tr style="background-color:#f4f6f8;">
 					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:left;">Particulars</th>
+					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:left;">Group</th>
 					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:left;">Sales Invoice No.</th>
 					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:left;">Invoice Date</th>
 					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:left;">Received Date</th>
@@ -144,7 +151,7 @@ def _build_email_body(table_rows, total_amount, report_date_display):
 			</tbody>
 			<tfoot>
 				<tr style="font-weight:700;background-color:#fafafa;">
-					<td colspan="5" style="padding:9px 10px;border:1px solid #cfcfcf;text-align:right;">Total</td>
+					<td colspan="6" style="padding:9px 10px;border:1px solid #cfcfcf;text-align:right;">Total</td>
 					<td style="padding:9px 10px;border:1px solid #cfcfcf;text-align:right;">{fmt_money(total_amount, currency="INR")}</td>
 				</tr>
 			</tfoot>
@@ -164,16 +171,17 @@ def _build_axis_bank_excel_bytes(table_rows, total_amount, report_date_display):
 	header_font = Font(bold=True)
 	header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
 	ws.append(["Daily Payment Entry Report", report_date_display])
-	ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+	ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
 	ws["A1"].font = Font(bold=True, size=12)
 
 	ws.append([])
 	ws.append(["AXIS BANK"])
-	ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=6)
+	ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=7)
 	ws["A3"].font = Font(bold=True, size=11)
 
 	headers = [
 		"Particulars",
+		"Group",
 		"Sales Invoice No.",
 		"Invoice Date",
 		"Received Date",
@@ -191,6 +199,7 @@ def _build_axis_bank_excel_bytes(table_rows, total_amount, report_date_display):
 		ws.append(
 			[
 				r["particulars"],
+				r["group"],
 				r["sales_invoice_no"],
 				r["invoice_date"],
 				r["received_date"],
@@ -201,21 +210,22 @@ def _build_axis_bank_excel_bytes(table_rows, total_amount, report_date_display):
 
 	total_row = ws.max_row + 1
 	ws.cell(row=total_row, column=1, value="Total")
-	ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=5)
+	ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=6)
 	ws.cell(row=total_row, column=1).alignment = Alignment(horizontal="right", vertical="center")
 	ws.cell(row=total_row, column=1).font = Font(bold=True)
-	ws.cell(row=total_row, column=6, value=total_amount)
-	ws.cell(row=total_row, column=6).font = Font(bold=True)
-	ws.cell(row=total_row, column=6).number_format = "₹#,##0.00"
+	ws.cell(row=total_row, column=7, value=total_amount)
+	ws.cell(row=total_row, column=7).font = Font(bold=True)
+	ws.cell(row=total_row, column=7).number_format = "₹#,##0.00"
 
-	for row in ws.iter_rows(min_row=header_row + 1, max_row=total_row - 1, min_col=6, max_col=6):
+	for row in ws.iter_rows(min_row=header_row + 1, max_row=total_row - 1, min_col=7, max_col=7):
 		for cell in row:
 			cell.number_format = "₹#,##0.00"
 
-	for col_letter in ("A", "B", "C", "D"):
+	for col_letter in ("A", "C", "D", "E"):
 		ws.column_dimensions[col_letter].width = 22
-	ws.column_dimensions["E"].width = 10
-	ws.column_dimensions["F"].width = 16
+	ws.column_dimensions["B"].width = 18
+	ws.column_dimensions["F"].width = 10
+	ws.column_dimensions["G"].width = 16
 
 	buf = BytesIO()
 	wb.save(buf)

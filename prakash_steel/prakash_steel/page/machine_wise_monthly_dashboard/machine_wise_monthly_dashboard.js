@@ -24,6 +24,29 @@ function render_filters(state) {
                 <div style="height:20px;margin-bottom:6px;"></div>
                 <button class="btn btn-primary" id="mwm-refresh-btn" style="height:36px;padding:6px 14px;display:inline-flex;align-items:center;">${__("Refresh")}</button>
             </div>
+            <div style="min-width:140px;">
+                <div style="height:20px;margin-bottom:6px;"></div>
+                <div class="mwm-export-dropdown" style="position:relative;">
+                    <button type="button" class="btn btn-default" id="mwm-export-toggle"
+                        style="height:36px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px;border:1px solid #000;border-radius:4px;">
+                        <i class="fa fa-download"></i>
+                        <span>${__("Export")}</span>
+                        <span style="font-size:0.75rem;">▾</span>
+                    </button>
+                    <div id="mwm-export-menu" style="display:none;position:absolute;left:0;top:100%;margin-top:4px;
+                        background:#fff;border:1px solid #ced4da;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,0.12);
+                        min-width:160px;z-index:20;">
+                        <div class="mwm-export-option" data-format="excel"
+                            style="padding:10px 14px;cursor:pointer;font-size:0.9rem;border-bottom:1px solid #eee;">
+                            ${__("Excel")}
+                        </div>
+                        <div class="mwm-export-option" data-format="pdf"
+                            style="padding:10px 14px;cursor:pointer;font-size:0.9rem;">
+                            ${__("PDF")}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     `);
 
@@ -82,6 +105,19 @@ function render_filters(state) {
     }, 100);
 
     $filterBar.find("#mwm-refresh-btn").on("click", () => load_data(state));
+
+    const $exportMenu = $filterBar.find("#mwm-export-menu");
+    $filterBar.find("#mwm-export-toggle").on("click", (e) => {
+        e.stopPropagation();
+        $exportMenu.toggle();
+    });
+    $filterBar.find(".mwm-export-option").on("click", (e) => {
+        e.stopPropagation();
+        const format = $(e.currentTarget).data("format");
+        $exportMenu.hide();
+        export_machine_wise_monthly(state, format);
+    });
+    $(document).on("click.mwmExportClose", () => $exportMenu.hide());
 }
 
 function render_table_shell(state) {
@@ -206,6 +242,25 @@ function format_weight(value) {
 
 function escape_html(value) {
     return $("<div>").text(value == null ? "" : String(value)).html();
+}
+
+function export_machine_wise_monthly(state, format) {
+    const fiscal_year = state.controls.year ? state.controls.year.get_value() : null;
+    if (!fiscal_year) {
+        frappe.show_alert({ message: __("Please select a Fiscal Year before exporting."), indicator: "orange" });
+        return;
+    }
+    const machine_name = state.controls.machine_name ? state.controls.machine_name.get_value() || "" : "";
+    const method =
+        format === "excel"
+            ? "prakash_steel.api.machine_wise_monthly_dashboard.export_machine_wise_monthly_excel"
+            : "prakash_steel.api.machine_wise_monthly_dashboard.export_machine_wise_monthly_pdf";
+    const params = new URLSearchParams({
+        fiscal_year,
+        machine_name: machine_name || "",
+    });
+    const url = `/api/method/${method}?${params.toString()}`;
+    window.open(url, "_blank");
 }
 
 function th_style(is_month, add_group_separator, add_left_separator) {
