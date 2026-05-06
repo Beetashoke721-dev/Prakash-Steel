@@ -13,6 +13,10 @@ fixtures = [
 	{"doctype": "Custom Field", "filters": {"module": "Prakash Steel"}},
 ]
 
+after_migrate = [
+	"prakash_steel.utils.backfill_sales_invoice_sales_order_date.run_after_migrate",
+]
+
 # ------------------------------------------------------------------------------
 # DocType JavaScript
 # ------------------------------------------------------------------------------
