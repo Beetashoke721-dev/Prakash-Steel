@@ -8,6 +8,7 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from frappe.utils import flt, nowdate, nowtime
 from erpnext.stock.stock_ledger import get_previous_sle
 from prakash_steel.prakash_steel.api.adu import update_adu_for_sales_invoice
+from datetime import datetime
 
 
 class CustomSalesInvoice(SalesInvoice):
@@ -103,17 +104,55 @@ class CustomSalesInvoice(SalesInvoice):
 
 	def _build_other_references(self) -> str | None:
 		"""Build ordered, unique Sales Order serial list from child item rows."""
-		seen = set()
-		ordered_serials = []
+		references = self._get_ordered_sales_order_references()
+		ordered_serials = [ref["serial"] for ref in references]
+		return ", ".join(ordered_serials) if ordered_serials else None
+
+	def _get_ordered_sales_order_references(self) -> list[dict]:
+		"""Return ordered, unique references used by Other References field."""
+		seen_serials = set()
+		ordered_references = []
 
 		for item in self.get("items") or []:
 			so_name = getattr(item, "sales_order", None) or item.get("sales_order")
 			serial = self._extract_sales_order_serial(so_name)
-			if serial and serial not in seen:
-				seen.add(serial)
-				ordered_serials.append(serial)
+			if so_name and serial and serial not in seen_serials:
+				seen_serials.add(serial)
+				ordered_references.append({"serial": serial, "sales_order": so_name})
 
-		return ", ".join(ordered_serials) if ordered_serials else None
+		return ordered_references
+
+	def _build_sales_order_dates(self) -> str | None:
+		"""Build ordered, unique SO transaction dates for SOs included in Other References."""
+		references = self._get_ordered_sales_order_references()
+		ordered_so_names = [ref["sales_order"] for ref in references]
+
+		if not ordered_so_names:
+			return None
+
+		so_dates = {
+			d.name: str(d.transaction_date)
+			for d in frappe.get_all(
+				"Sales Order",
+				filters={"name": ["in", ordered_so_names]},
+				fields=["name", "transaction_date"],
+			)
+			if d.get("transaction_date")
+		}
+
+		seen_dates = set()
+		ordered_dates = []
+		for so_name in ordered_so_names:
+			transaction_date = so_dates.get(so_name)
+			if transaction_date and transaction_date not in seen_dates:
+				seen_dates.add(transaction_date)
+				try:
+					formatted_date = datetime.strptime(transaction_date, "%Y-%m-%d").strftime("%d-%m-%Y")
+				except ValueError:
+					formatted_date = transaction_date
+				ordered_dates.append(formatted_date)
+
+		return ", ".join(ordered_dates) if ordered_dates else None
 
 	def on_submit(self):
 		"""Run standard submit, set custom references, then update ADU (custom)."""
@@ -122,6 +161,10 @@ class CustomSalesInvoice(SalesInvoice):
 		other_references = self._build_other_references()
 		self.custom_other_references = other_references
 		self.db_set("custom_other_references", other_references, update_modified=False)
+
+		sales_order_dates = self._build_sales_order_dates()
+		self.custom_sales_order_date = sales_order_dates
+		self.db_set("custom_sales_order_date", sales_order_dates, update_modified=False)
 
 		try:
 			update_adu_for_sales_invoice(self)

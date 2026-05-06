@@ -51,7 +51,7 @@ def _get_payment_entry_rows_for_today_till_11_am():
 			pe.name AS payment_entry,
 			pe.party_name,
 			pe.posting_date AS received_date,
-			pe.paid_amount,
+			per.allocated_amount,
 			per.reference_name,
 			si.posting_date AS sales_invoice_posting_date,
 			c.customer_group
@@ -89,7 +89,7 @@ def _prepare_axis_bank_table_rows(rows):
 			if row.sales_invoice_posting_date and row.received_date
 			else ""
 		)
-		amount = row.paid_amount or 0
+		amount = row.allocated_amount or 0
 		total_amount += amount
 
 		table_rows.append(
