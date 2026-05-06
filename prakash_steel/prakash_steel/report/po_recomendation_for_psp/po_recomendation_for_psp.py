@@ -61,26 +61,33 @@ def _compute_order_status(delivery_date, transaction_date):
 def _non_buffer_priority(item_code, level, so_map):
 	"""
 	FIFO-allocate `level` across open SOs sorted by delivery_date ASC.
-	Return the worst order_status colour among SOs that have a shortage.
-	If no shortage anywhere → 'Green'.
+	- If any SO has shortage → return worst order_status colour of shortage SOs.
+	- If no shortage anywhere → return worst order_status colour of no-shortage SOs.
+	- If no open SOs → return ''.
 	"""
 	sos = so_map.get(item_code, [])
 	if not sos:
 		return ""
 	available = flt(level)
-	worst_priority = 0
+	worst_shortage = 0
+	worst_no_shortage = 0
 	for so in sos:
 		required = flt(so["pending_qty"])
 		allocated = min(required, available)
 		shortage = required - allocated
 		available -= allocated
+		priority = _STATUS_PRIORITY.get(so["order_status"], 0)
 		if shortage > 0:
-			priority = _STATUS_PRIORITY.get(so["order_status"], 0)
-			if priority > worst_priority:
-				worst_priority = priority
-	if worst_priority == 0:
-		return "Green"
-	return _PRIORITY_TO_COLOUR.get(worst_priority, "")
+			if priority > worst_shortage:
+				worst_shortage = priority
+		else:
+			if priority > worst_no_shortage:
+				worst_no_shortage = priority
+	if worst_shortage > 0:
+		return _PRIORITY_TO_COLOUR.get(worst_shortage, "")
+	if worst_no_shortage > 0:
+		return _PRIORITY_TO_COLOUR.get(worst_no_shortage, "")
+	return ""
 
 
 def build_calculation_breakdown_po_report(
@@ -1316,28 +1323,24 @@ def get_data(filters=None):
 				# If denominator is 0, set to None (cannot calculate)
 				on_hand_status_value = None
 
-			numeric_status = None
-			if on_hand_status_value is not None:
-				numeric_status = math.ceil(on_hand_status_value)
-
-			if numeric_status is None:
+			if on_hand_status_value is None:
 				on_hand_colour = None
-			elif numeric_status == 0:
-				on_hand_colour = "BLACK"
-			elif 1 <= numeric_status <= 34:
-				on_hand_colour = "RED"
-			elif 35 <= numeric_status <= 67:
-				on_hand_colour = "YELLOW"
-			elif 68 <= numeric_status <= 100:
-				on_hand_colour = "GREEN"
-			else:  # > 100
-				on_hand_colour = "WHITE"
-
-			# Calculate On Hand Status (rounded up value with % sign)
-			if numeric_status is not None:
-				on_hand_status = f"{int(numeric_status)}%"
-			else:
 				on_hand_status = None
+			else:
+				numeric_status = round(on_hand_status_value, 2)
+
+				if numeric_status == 0:
+					on_hand_colour = "BLACK"
+				elif 1 <= numeric_status <= 33.33:
+					on_hand_colour = "RED"
+				elif 33.34 <= numeric_status <= 66.67:
+					on_hand_colour = "YELLOW"
+				elif 66.68 <= numeric_status <= 100:
+					on_hand_colour = "GREEN"
+				else:  # > 100
+					on_hand_colour = "WHITE"
+
+				on_hand_status = f"{numeric_status:.2f}%"
 
 		# Get item name
 		item_name = item_info.get("item_name", "")
@@ -2545,7 +2548,8 @@ def get_priority_breakdown(item_code):
 	)
 
 	available = flt(level)
-	worst_priority = 0
+	worst_shortage = 0
+	worst_no_shortage = 0
 	fifo_detail = []
 	for so in so_rows:
 		required = flt(so.pending_qty)
@@ -2553,10 +2557,13 @@ def get_priority_breakdown(item_code):
 		shortage = required - allocated
 		available -= allocated
 		order_status = _compute_order_status(so.delivery_date, so.transaction_date) or ""
+		p = _STATUS_PRIORITY.get(order_status, 0)
 		if shortage > 0:
-			p = _STATUS_PRIORITY.get(order_status, 0)
-			if p > worst_priority:
-				worst_priority = p
+			if p > worst_shortage:
+				worst_shortage = p
+		else:
+			if p > worst_no_shortage:
+				worst_no_shortage = p
 		fifo_detail.append({
 			"delivery_date": str(so.delivery_date) if so.delivery_date else "",
 			"pending_qty": math.ceil(required),
@@ -2567,10 +2574,12 @@ def get_priority_breakdown(item_code):
 
 	if not so_rows:
 		own_priority = ""
-	elif worst_priority == 0:
-		own_priority = "Green"
+	elif worst_shortage > 0:
+		own_priority = _PRIORITY_TO_COLOUR.get(worst_shortage, "")
+	elif worst_no_shortage > 0:
+		own_priority = _PRIORITY_TO_COLOUR.get(worst_no_shortage, "")
 	else:
-		own_priority = _PRIORITY_TO_COLOUR.get(worst_priority, "")
+		own_priority = ""
 
 	# BOM parents — items whose default BOM has item_code as a child
 	parent_rows = frappe.db.sql(

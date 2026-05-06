@@ -6,7 +6,7 @@ const COLOUR_STYLES = {
 	Red: { bg: "#e74c3c", fg: "#fff" },
 	Yellow: { bg: "#f1c40f", fg: "#333" },
 	Green: { bg: "#27ae60", fg: "#fff" },
-	White: { bg: "#ffffff", fg: "#333", border: "1px solid #aaa" },
+	White: { bg: "#e8e8e8", fg: "#333" },
 };
 
 frappe.query_reports["Open MR for Purchase"] = {
