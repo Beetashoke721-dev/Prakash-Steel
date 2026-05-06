@@ -1600,10 +1600,8 @@ def get_data(filters=None):
 		else:
 			data.append(base_row)
 
-	# ── Priority propagation through BOM tree ──────────────────────────────────
-	# Items that are BOM children of other report items inherit the worst
-	# colour among their parents' propagated priorities (N levels deep).
-	# Root items (no parents in this report) keep their own FIFO priority.
+	# ── Priority propagation through BOM tree (N-level) ───────────────────────
+	# Phase 1: build own FIFO priority map for all report items
 	_item_priority_map = {}
 	for _row in data:
 		_ic = _row.get("item_code")
@@ -1612,35 +1610,57 @@ def get_data(filters=None):
 
 	_report_item_set = set(_item_priority_map.keys())
 	if _report_item_set:
-		if len(_report_item_set) == 1:
-			_rpt_tuple = (next(iter(_report_item_set)),)
-		else:
-			_rpt_tuple = tuple(_report_item_set)
-
-		_bom_rows = frappe.db.sql(
-			"""
-			SELECT b.item AS parent_item, bi.item_code AS child_item
-			FROM `tabBOM` b
-			INNER JOIN `tabBOM Item` bi ON bi.parent = b.name
-			WHERE b.item IN %s
-			  AND b.is_default = 1
-			  AND b.is_active = 1
-			  AND b.docstatus = 1
-			""",
-			(_rpt_tuple,),
-			as_dict=True,
-		)
-
-		# child → set of parents that are also in this report
+		# Phase 2: BFS upward — collect ALL ancestors (any depth) and
+		# build the complete child→parents map in one pass per BFS level.
 		_child_to_parents = defaultdict(set)
-		for _br in _bom_rows:
-			if _br.child_item in _report_item_set:
+		_all_items = set(_report_item_set)
+		_frontier = set(_report_item_set)
+		while _frontier:
+			_f_tuple = tuple(_frontier) if len(_frontier) > 1 else (next(iter(_frontier)),)
+			_up_rows = frappe.db.sql(
+				"""
+				SELECT b.item AS parent_item, bi.item_code AS child_item
+				FROM `tabBOM` b
+				INNER JOIN `tabBOM Item` bi ON bi.parent = b.name
+				WHERE bi.item_code IN %s
+				  AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
+				""",
+				(_f_tuple,), as_dict=True,
+			)
+			_new_parents = set()
+			for _br in _up_rows:
 				_child_to_parents[_br.child_item].add(_br.parent_item)
+				if _br.parent_item not in _all_items:
+					_new_parents.add(_br.parent_item)
+			_all_items.update(_new_parents)
+			_frontier = _new_parents  # advance to next BFS level
 
-		# Root items have no parents inside the report — stay with own FIFO priority
-		_resolved = set(_report_item_set - set(_child_to_parents.keys()))
+		# Phase 3: compute own FIFO priority for ancestors not already in the report
+		_external_items = _all_items - _report_item_set
+		if _external_items:
+			_ext_tuple = tuple(_external_items) if len(_external_items) > 1 else (next(iter(_external_items)),)
+			_ext_so_map = get_open_so_map_for_priority(list(_external_items))
+			_ext_item_rows = frappe.db.sql(
+				"SELECT item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE item_code IN %s",
+				(_ext_tuple,), as_dict=True,
+			)
+			_ext_stock_rows = frappe.db.sql(
+				"SELECT item_code, SUM(actual_qty) as stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+				(_ext_tuple,), as_dict=True,
+			)
+			_ext_stock_map = {r.item_code: flt(r.stock) for r in _ext_stock_rows}
+			for _ei in _ext_item_rows:
+				_eic = _ei.item_code
+				_esku = calculate_sku_type(_ei.custom_buffer_flag or "Non-Buffer", _ei.custom_item_type) or ""
+				_estock = _ext_stock_map.get(_eic, 0)
+				_ewip = 0 if _esku in ["RBMTA", "RBMTO"] else flt(wip_map.get(_eic, 0))
+				_epo = flt(open_po_map.get(_eic, 0))
+				_elevel = (_estock + _epo) if _esku in ["BOTO", "PTO", "TRMTO"] else (_estock + _ewip)
+				_item_priority_map[_eic] = _non_buffer_priority(_eic, _elevel, _ext_so_map)
 
-		# BFS: resolve children once all their parents are resolved
+		# Phase 4: BFS downward — propagate worst parent priority through the full tree
+		# Roots = items that have no parents in the complete ancestor set
+		_resolved = _all_items - set(_child_to_parents.keys())
 		_changed = True
 		while _changed:
 			_changed = False
@@ -1649,7 +1669,6 @@ def get_data(filters=None):
 					continue
 				if not _parents.issubset(_resolved):
 					continue
-				# Worst colour among all parents
 				_worst = 0
 				for _parent in _parents:
 					_pc = _item_priority_map.get(_parent, "")
@@ -2581,8 +2600,80 @@ def get_priority_breakdown(item_code):
 	else:
 		own_priority = ""
 
-	# BOM parents — items whose default BOM has item_code as a child
-	parent_rows = frappe.db.sql(
+	# BOM parents — N-level upward BFS to collect all ancestors
+	# Then propagate downward so each parent shows its true propagated priority.
+	_bd_child_to_parents = defaultdict(set)
+	_bd_all_items = {item_code}
+	_bd_frontier = {item_code}
+	while _bd_frontier:
+		_bd_f_tuple = tuple(_bd_frontier) if len(_bd_frontier) > 1 else (next(iter(_bd_frontier)),)
+		_bd_up = frappe.db.sql(
+			"""
+			SELECT b.item AS parent_item, bi.item_code AS child_item
+			FROM `tabBOM` b
+			INNER JOIN `tabBOM Item` bi ON bi.parent = b.name
+			WHERE bi.item_code IN %s
+			  AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
+			""",
+			(_bd_f_tuple,), as_dict=True,
+		)
+		_bd_new = set()
+		for _r in _bd_up:
+			_bd_child_to_parents[_r.child_item].add(_r.parent_item)
+			if _r.parent_item not in _bd_all_items:
+				_bd_new.add(_r.parent_item)
+		_bd_all_items.update(_bd_new)
+		_bd_frontier = _bd_new
+
+	# Compute own FIFO priority for all ancestors
+	_bd_ancestors = _bd_all_items - {item_code}
+	_bd_priority_map = {item_code: own_priority}
+	if _bd_ancestors:
+		_bd_anc_tuple = tuple(_bd_ancestors) if len(_bd_ancestors) > 1 else (next(iter(_bd_ancestors)),)
+		_bd_item_rows = frappe.db.sql(
+			"SELECT item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE item_code IN %s",
+			(_bd_anc_tuple,), as_dict=True,
+		)
+		_bd_stock_rows = frappe.db.sql(
+			"SELECT item_code, SUM(actual_qty) as stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+			(_bd_anc_tuple,), as_dict=True,
+		)
+		_bd_stock_map = {r.item_code: flt(r.stock) for r in _bd_stock_rows}
+		_bd_anc_so_map = get_open_so_map_for_priority(list(_bd_ancestors))
+		for _ai in _bd_item_rows:
+			_aic = _ai.item_code
+			_asku = calculate_sku_type(_ai.custom_buffer_flag or "Non-Buffer", _ai.custom_item_type) or ""
+			_astock = _bd_stock_map.get(_aic, 0)
+			_awip = 0 if _asku in ["RBMTA", "RBMTO"] else flt(wip_map.get(_aic, 0))
+			_apo = flt(open_po_map.get(_aic, 0))
+			_alevel = (_astock + _apo) if _asku in ["BOTO", "PTO", "TRMTO"] else (_astock + _awip)
+			_bd_priority_map[_aic] = _non_buffer_priority(_aic, _alevel, _bd_anc_so_map)
+
+	# BFS downward — propagate worst parent priority through the ancestor tree
+	_bd_resolved = _bd_all_items - set(_bd_child_to_parents.keys())
+	_bd_changed = True
+	while _bd_changed:
+		_bd_changed = False
+		for _child, _parents in _bd_child_to_parents.items():
+			if _child in _bd_resolved:
+				continue
+			if not _parents.issubset(_bd_resolved):
+				continue
+			_worst = 0
+			for _par in _parents:
+				_pc = _bd_priority_map.get(_par, "")
+				if _pc:
+					_pv = _STATUS_PRIORITY.get(_pc.upper(), 0)
+					if _pv > _worst:
+						_worst = _pv
+			_bd_priority_map[_child] = (
+				_PRIORITY_TO_COLOUR.get(_worst, "") if _worst > 0 else _bd_priority_map.get(_child, "")
+			)
+			_bd_resolved.add(_child)
+			_bd_changed = True
+
+	# Build parent_details for direct parents only (show own + propagated priority)
+	_direct_parent_codes = [r.parent_item for r in frappe.db.sql(
 		"""
 		SELECT DISTINCT b.item AS parent_item
 		FROM `tabBOM` b
@@ -2591,28 +2682,17 @@ def get_priority_breakdown(item_code):
 		  AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
 		""",
 		(item_code,), as_dict=True,
-	)
-	parent_item_codes = [r.parent_item for r in parent_rows]
-
+	)]
 	parent_details = []
-	for pic in parent_item_codes:
-		pitem = frappe.db.get_value(
-			"Item", pic, ["custom_buffer_flag", "custom_item_type"], as_dict=True
-		)
+	for pic in _direct_parent_codes:
+		pitem = frappe.db.get_value("Item", pic, ["custom_buffer_flag", "custom_item_type"], as_dict=True)
 		if not pitem:
 			continue
-		p_bf = pitem.custom_buffer_flag or "Non-Buffer"
-		p_sku = calculate_sku_type(p_bf, pitem.custom_item_type) or ""
-		p_stock_data = frappe.db.sql(
-			"SELECT SUM(actual_qty) as stock FROM `tabBin` WHERE item_code = %s",
-			(pic,), as_dict=True,
-		)
-		p_stock = flt(p_stock_data[0].stock if p_stock_data else 0)
+		p_sku = calculate_sku_type(pitem.custom_buffer_flag or "Non-Buffer", pitem.custom_item_type) or ""
+		p_stock = flt((frappe.db.sql("SELECT SUM(actual_qty) as s FROM `tabBin` WHERE item_code=%s", (pic,), as_dict=True) or [{}])[0].get("s") or 0)
 		p_wip = 0 if p_sku in ["RBMTA", "RBMTO"] else flt(wip_map.get(pic, 0))
 		p_open_po = flt(open_po_map.get(pic, 0))
 		p_level = (p_stock + p_open_po) if p_sku in ["BOTO", "PTO", "TRMTO"] else (p_stock + p_wip)
-		p_so_map = get_open_so_map_for_priority([pic])
-		p_priority = _non_buffer_priority(pic, p_level, p_so_map)
 		parent_details.append({
 			"item_code": pic,
 			"sku_type": p_sku,
@@ -2620,21 +2700,21 @@ def get_priority_breakdown(item_code):
 			"wip": math.ceil(p_wip),
 			"open_po": math.ceil(p_open_po),
 			"level": math.ceil(p_level),
-			"priority": p_priority,
+			"own_priority": _bd_priority_map.get(pic, ""),  # propagated priority of this parent
 		})
 
-	# Final priority = worst of parent priorities; own if no parents
+	# Final priority = worst of direct parents' propagated priorities; own if no parents
+	final_priority = own_priority
 	if parent_details:
 		worst = 0
 		for pd in parent_details:
-			pc = pd["priority"]
+			pc = pd["own_priority"]
 			if pc:
 				pv = _STATUS_PRIORITY.get(pc.upper(), 0)
 				if pv > worst:
 					worst = pv
-		final_priority = _PRIORITY_TO_COLOUR.get(worst, "") if worst > 0 else own_priority
-	else:
-		final_priority = own_priority
+		if worst > 0:
+			final_priority = _PRIORITY_TO_COLOUR.get(worst, "")
 
 	return {
 		"item_code": item_code,
