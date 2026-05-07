@@ -19,15 +19,13 @@ def send_daily_sales_invoice_email():
 			si.name,
 			si.customer,
 			si.grand_total,
-			si.is_return,
-			si.update_stock,
 			COALESCE(SUM(sii.qty), 0) AS total_qty,
 			(SELECT ps.payment_term FROM `tabPayment Schedule` ps WHERE ps.parent = si.name ORDER BY ps.idx LIMIT 1) AS payment_term
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		WHERE si.docstatus = 1
 		  AND si.posting_date = %s
-		GROUP BY si.name, si.customer, si.grand_total, si.is_return, si.update_stock
+		GROUP BY si.name, si.customer, si.grand_total
 		ORDER BY si.name
 		""",
 		(posting_date,),
@@ -52,13 +50,12 @@ def send_daily_sales_invoice_email():
 	# Build summary table rows
 	rows_html = ""
 	for inv in invoices:
-		display_qty = "" if inv.is_return and not inv.update_stock else int(inv.total_qty)
 		rows_html += f"""
 		<tr>
 			<td style="padding:6px 12px;border:1px solid #ddd;">{inv.name}</td>
 			<td style="padding:6px 12px;border:1px solid #ddd;">{inv.customer}</td>
 			<td style="padding:6px 12px;border:1px solid #ddd;text-align:right;">{fmt_money(inv.grand_total, currency="INR")}</td>
-			<td style="padding:6px 12px;border:1px solid #ddd;text-align:right;">{display_qty}</td>
+			<td style="padding:6px 12px;border:1px solid #ddd;text-align:right;">{int(inv.total_qty)}</td>
 			<td style="padding:6px 12px;border:1px solid #ddd;text-align:center;">{format_payment_term(inv.payment_term)}</td>
 		</tr>"""
 
