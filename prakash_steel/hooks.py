@@ -30,6 +30,7 @@ doctype_js = {
 	"Sales Order": "public/js/sales_order.js",
 	"Purchase Order": "public/js/purchase_order.js",
 	"Purchase Invoice": "public/js/purchase_invoice.js",
+	"Payment Entry": "public/js/payment_entry.js",
 	"Item": "public/js/item.js",
 	"Stock Entry": "public/js/stock_entry.js",
 	"Purchase Receipt": "public/js/purchase_receipt.js",
@@ -125,8 +126,8 @@ scheduler_events = {
 		],
 		# Sends daily Sales Invoice summary email at 1:40 PM
 		"58 23 * * *": ["prakash_steel.utils.daily_sales_invoice_email.send_daily_sales_invoice_email"],
-		# Sends yesterday Payment Entry report daily at 2:16 PM
-		"15 11 * * *": ["prakash_steel.utils.daily_payment_entry_email.send_daily_payment_entry_email"],
+		# Sends yesterday Payment Entry report daily at 1:25 PM
+		"20 14 * * *": ["prakash_steel.utils.daily_payment_entry_email.send_daily_payment_entry_email"],
 		# Captures PO Recommendation Snapshot daily at 2:06 PM
 		"00 04 * * *": [
 			"prakash_steel.po_recommendation_history.doctype.po_recommendation_snapshot.po_recommendation_snapshot.capture_daily_po_snapshot"
