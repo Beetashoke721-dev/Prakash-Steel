@@ -1910,6 +1910,7 @@ def get_open_so_map_for_mrp():
 			so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
 			AND so.docstatus = 1
 			AND IFNULL(soi.delivery_date, '1900-01-01') <= %s
+			AND IFNULL(soi.custom_closed, 0) = 0
 		GROUP BY
 			soi.item_code
 		""",
@@ -1963,6 +1964,7 @@ def get_qualified_demand_map_for_mrp():
 			so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
 			AND so.docstatus = 1
 			AND IFNULL(soi.delivery_date, '1900-01-01') <= %s
+			AND IFNULL(soi.custom_closed, 0) = 0
 		GROUP BY
 			soi.item_code
 		""",
@@ -2153,6 +2155,7 @@ def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map
 					AND soi.item_code IN %s
 					AND IFNULL(soi.delivery_date, '1900-01-01') >= %s
 					AND IFNULL(soi.delivery_date, '1900-01-01') <= %s
+					AND IFNULL(soi.custom_closed, 0) = 0
 				""",
 				(item_codes_tuple, start_date, end_date),
 				as_dict=True,
@@ -2175,6 +2178,7 @@ def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map
 					AND so.docstatus = 1
 					AND soi.item_code IN %s
 					AND IFNULL(soi.delivery_date, '1900-01-01') > %s
+					AND IFNULL(soi.custom_closed, 0) = 0
 				""",
 				(item_codes_tuple, today_date),
 				as_dict=True,
@@ -2318,6 +2322,7 @@ def get_open_po_map_for_mrp():
 		WHERE
 			po.docstatus = 1
 			AND po.status NOT IN ('Cancelled', 'Closed')
+			AND IFNULL(poi.custom_closed, 0) = 0
 		""",
 		as_dict=True,
 	)

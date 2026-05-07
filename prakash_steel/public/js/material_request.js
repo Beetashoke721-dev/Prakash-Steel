@@ -70,7 +70,7 @@ function set_last_rate_for_row(frm, cdt, cdn, item_code) {
     }
 
     frappe.call({
-        method: "prakash_steel.api.get_last_purchase_invoice_rate.get_last_purchase_invoice_rate",
+        method: "prakash_steel.api.get_last_purchase_invoice_rate.get_last_purchase_order_rate",
         args: {
             item_code: item_code,
             company: frm.doc.company || ""
