@@ -12,11 +12,7 @@ RECIPIENTS = [
 	"ritika@clapgrow.com",
 	"beetashoke.chakraborty@clapgrow.com",
 	"accounts@prakashsteel.com",
-    "adarsh@prakashsteel.com",
-    "avinash@prakashsteel.com",
-	"srimanta@prakashsteel.com",
-	"ea.adarshbagla@prakashsteel.com",
-	"soumadwipdas1@gmail.com"
+	"soumadwipdas1@gmail.com",
 ]
 
 
@@ -49,7 +45,7 @@ def send_daily_payment_entry_email():
 
 
 def _get_payment_entry_rows_for_24h_window():
-	"""Fetch Payment Entries from today's 11:15 AM to tomorrow's 11:15 AM."""
+	"""Fetch Payment Entries from yesterday's 11:15 AM to today's 11:15 AM."""
 	return frappe.db.sql(
 		"""
 		SELECT
@@ -69,8 +65,8 @@ def _get_payment_entry_rows_for_24h_window():
 			ON si.name = per.reference_name
 		WHERE pe.docstatus = 1
 		  AND pe.custom_submitted_time IS NOT NULL
-		  AND pe.custom_submitted_time >= TIMESTAMP(CURDATE(), '11:15:00')
-		  AND pe.custom_submitted_time <  DATE_ADD(TIMESTAMP(CURDATE(), '11:15:00'), INTERVAL 1 DAY)
+		  AND pe.custom_submitted_time >= DATE_SUB(TIMESTAMP(CURDATE(), '11:15:00'), INTERVAL 1 DAY)
+		  AND pe.custom_submitted_time <  TIMESTAMP(CURDATE(), '11:15:00')
 		  AND IFNULL(per.reference_name, '') != ''
 		  AND per.reference_doctype = 'Sales Invoice'
 		ORDER BY pe.name, per.idx
