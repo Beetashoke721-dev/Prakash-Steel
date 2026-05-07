@@ -107,6 +107,7 @@ doc_events = {
 		],
 	},
 	"Payment Entry": {
+		"validate": "prakash_steel.utils.payment_entry.set_invoice_date_on_references",
 		"on_submit": "prakash_steel.utils.payment_entry.set_submitted_time",
 	},
 	"Material Request": {
@@ -170,4 +171,7 @@ override_whitelisted_methods = {
 	"erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_receipt": "prakash_steel.utils.purchase_order.make_purchase_receipt",
 	# Ensure our custom_cancel_reason validation doesn't block e-Invoice cancellation
 	"india_compliance.gst_india.utils.e_invoice.cancel_e_invoice": "prakash_steel.utils.e_invoice.cancel_e_invoice",
+	# Inject custom_invoice_date (= invoice posting_date) into the reference-details
+	# response so it populates alongside due_date when a reference is picked.
+	"erpnext.accounts.doctype.payment_entry.payment_entry.get_reference_details": "prakash_steel.utils.payment_entry.get_reference_details",
 }
