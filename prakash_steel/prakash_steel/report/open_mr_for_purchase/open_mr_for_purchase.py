@@ -161,7 +161,9 @@ def _buffer_colour(level, tog, qualified_demand):
 		return "Red"
 	if level <= (2 * total) / 3:
 		return "Yellow"
-	return "Green"
+	if level <= total:
+		return "Green"
+	return "White"
 
 
 # Order-status priority: higher = worse

@@ -12,12 +12,17 @@ RECIPIENTS = [
 	"ritika@clapgrow.com",
 	"beetashoke.chakraborty@clapgrow.com",
 	"accounts@prakashsteel.com",
+    "adarsh@prakashsteel.com",
+    "avinash@prakashsteel.com",
+	"srimanta@prakashsteel.com",
+	"ea.adarshbagla@prakashsteel.com",
+	"soumadwipdas1@gmail.com"
 ]
 
 
 def send_daily_payment_entry_email():
 	"""Send Payment Entry rows submitted today (by custom_submitted_time) within the configured window."""
-	rows = _get_payment_entry_rows_for_today_till_11_am()
+	rows = _get_payment_entry_rows_for_24h_window()
 
 	if not rows:
 		return
@@ -43,8 +48,8 @@ def send_daily_payment_entry_email():
 	)
 
 
-def _get_payment_entry_rows_for_today_till_11_am():
-	"""Fetch Payment Entries submitted since yesterday 12:00 PM up to today 12:00 PM (scheduler window)."""
+def _get_payment_entry_rows_for_24h_window():
+	"""Fetch Payment Entries from today's 11:15 AM to tomorrow's 11:15 AM."""
 	return frappe.db.sql(
 		"""
 		SELECT
@@ -64,8 +69,8 @@ def _get_payment_entry_rows_for_today_till_11_am():
 			ON si.name = per.reference_name
 		WHERE pe.docstatus = 1
 		  AND pe.custom_submitted_time IS NOT NULL
-		  AND pe.custom_submitted_time >= CONCAT(CURDATE(), ' 00:00:00')
-		  AND pe.custom_submitted_time <  CONCAT(CURDATE(), ' 12:00:00')
+		  AND pe.custom_submitted_time >= TIMESTAMP(CURDATE(), '11:15:00')
+		  AND pe.custom_submitted_time <  DATE_ADD(TIMESTAMP(CURDATE(), '11:15:00'), INTERVAL 1 DAY)
 		  AND IFNULL(per.reference_name, '') != ''
 		  AND per.reference_doctype = 'Sales Invoice'
 		ORDER BY pe.name, per.idx
@@ -143,7 +148,7 @@ def _build_email_body(table_rows, total_amount, report_date_display):
 					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:left;">Invoice Date</th>
 					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:left;">Received Date</th>
 					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:center;">Due Days</th>
-					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:right;">Amount</th>
+					<th style="padding:9px 10px;border:1px solid #cfcfcf;text-align:right;">Received Amount</th>
 				</tr>
 			</thead>
 			<tbody>
