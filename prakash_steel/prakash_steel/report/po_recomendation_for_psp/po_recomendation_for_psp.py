@@ -1152,6 +1152,56 @@ def get_data(filters=None):
 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 		net_order_recommendations[item_code] = net_order_rec
 
+	# ── Include buffer items so their BOM children get parent demand ───────────
+	# Buffer items are not in this report's item set but their BOM children
+	# (RBMTO, PTO, etc.) need parent demand flowing from buffer parents.
+	_buf_rows = frappe.db.sql(
+		"""
+		SELECT name AS item_code, safety_stock AS tog,
+		       custom_item_type AS item_type, custom_buffer_flag AS buffer_flag,
+		       min_order_qty AS moq, custom_batch_size AS batch_size
+		FROM `tabItem`
+		WHERE custom_buffer_flag = 'Buffer'
+		""",
+		as_dict=True,
+	)
+	if _buf_rows:
+		_buf_codes = [r.item_code for r in _buf_rows]
+		_buf_stock_rows = frappe.db.sql(
+			"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+			(tuple(_buf_codes) if len(_buf_codes) > 1 else (_buf_codes[0],),),
+			as_dict=True,
+		)
+		_buf_stock_map = {r.item_code: flt(r.stock) for r in _buf_stock_rows}
+
+		for _br in _buf_rows:
+			_bic = _br.item_code
+			_bsku = calculate_sku_type(_br.buffer_flag or "Buffer", _br.item_type) or ""
+			_btog = flt(_br.tog or 0)
+			_bstock = flt(_buf_stock_map.get(_bic, 0))
+			_bwip = 0 if _bsku in ["RBMTA", "RBMTO"] else flt(wip_map.get(_bic, 0))
+			_bpo = flt(open_po_map.get(_bic, 0))
+			_bqd = flt(qualified_demand_map.get(_bic, 0))
+			_bmrq = flt(mrq_map.get(_bic, 0))
+			_bmoq = flt(_br.moq or 0)
+			_bbatch = flt(_br.batch_size or 0)
+
+			if _bsku in ["BOTA", "PTA"]:
+				_bbase = max(0, _btog + _bqd - _bstock - _bwip - _bpo - _bmrq)
+			else:
+				_bbase = max(0, _btog + _bqd - _bstock - _bwip - _bmrq)
+
+			_bnet = calculate_net_order_recommendation(_bbase, _bmoq, _bbatch)
+
+			if _bnet > 0:
+				# Register in maps so traverse_bom_for_parent_demand can use them
+				item_buffer_map_all[_bic] = _br.buffer_flag or "Buffer"
+				item_sku_type_map_all[_bic] = _bsku
+				item_tog_map_all[_bic] = _btog
+				moq_map_all[_bic] = _bmoq
+				batch_size_map_all[_bic] = _bbatch
+				net_order_recommendations[_bic] = _bnet
+
 	parent_demand_map_net = {}
 	parent_demand_details = {}
 
@@ -1578,7 +1628,9 @@ def get_data(filters=None):
 				normalized_bom_qty = child_bom_qty / child_bom_quantity if child_bom_quantity else 0
 				child_requirement = math.ceil(flt(or_with_moq_batch_size) * normalized_bom_qty)
 
-				child_wip = 0 if child_sku_type in ["RBMTA", "RBMTO"] else flt(wip_map.get(child_item_code, 0))
+				child_wip = (
+					0 if child_sku_type in ["RBMTA", "RBMTO"] else flt(wip_map.get(child_item_code, 0))
+				)
 				child_open_po = flt(open_po_map.get(child_item_code, 0))
 				child_wip_open_po = math.ceil(flt(child_wip) + flt(child_open_po))
 				if child_item_code not in child_wip_open_po_map:
@@ -1625,7 +1677,8 @@ def get_data(filters=None):
 				WHERE bi.item_code IN %s
 				  AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
 				""",
-				(_f_tuple,), as_dict=True,
+				(_f_tuple,),
+				as_dict=True,
 			)
 			_new_parents = set()
 			for _br in _up_rows:
@@ -1638,15 +1691,19 @@ def get_data(filters=None):
 		# Phase 3: compute own FIFO priority for ancestors not already in the report
 		_external_items = _all_items - _report_item_set
 		if _external_items:
-			_ext_tuple = tuple(_external_items) if len(_external_items) > 1 else (next(iter(_external_items)),)
+			_ext_tuple = (
+				tuple(_external_items) if len(_external_items) > 1 else (next(iter(_external_items)),)
+			)
 			_ext_so_map = get_open_so_map_for_priority(list(_external_items))
 			_ext_item_rows = frappe.db.sql(
 				"SELECT item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE item_code IN %s",
-				(_ext_tuple,), as_dict=True,
+				(_ext_tuple,),
+				as_dict=True,
 			)
 			_ext_stock_rows = frappe.db.sql(
 				"SELECT item_code, SUM(actual_qty) as stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
-				(_ext_tuple,), as_dict=True,
+				(_ext_tuple,),
+				as_dict=True,
 			)
 			_ext_stock_map = {r.item_code: flt(r.stock) for r in _ext_stock_rows}
 			for _ei in _ext_item_rows:
@@ -1678,9 +1735,7 @@ def get_data(filters=None):
 							_worst = _pv
 				# If all parents have empty priority, keep child's own FIFO priority
 				_item_priority_map[_child] = (
-					_PRIORITY_TO_COLOUR.get(_worst, "")
-					if _worst > 0
-					else _item_priority_map.get(_child, "")
+					_PRIORITY_TO_COLOUR.get(_worst, "") if _worst > 0 else _item_priority_map.get(_child, "")
 				)
 				_resolved.add(_child)
 				_changed = True
@@ -2519,9 +2574,7 @@ def get_priority_breakdown(item_code):
 	- BOM parents and their priorities
 	- Final propagated priority
 	"""
-	item = frappe.db.get_value(
-		"Item", item_code, ["custom_buffer_flag", "custom_item_type"], as_dict=True
-	)
+	item = frappe.db.get_value("Item", item_code, ["custom_buffer_flag", "custom_item_type"], as_dict=True)
 	if not item:
 		frappe.throw(f"Item {item_code} not found")
 
@@ -2532,7 +2585,8 @@ def get_priority_breakdown(item_code):
 	# Stock
 	stock_data = frappe.db.sql(
 		"SELECT SUM(actual_qty) as stock FROM `tabBin` WHERE item_code = %s",
-		(item_code,), as_dict=True,
+		(item_code,),
+		as_dict=True,
 	)
 	stock = flt(stock_data[0].stock if stock_data else 0)
 
@@ -2563,7 +2617,8 @@ def get_priority_breakdown(item_code):
 		  AND GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0)) > 0
 		ORDER BY soi.delivery_date ASC
 		""",
-		(item_code,), as_dict=True,
+		(item_code,),
+		as_dict=True,
 	)
 
 	available = flt(level)
@@ -2583,13 +2638,15 @@ def get_priority_breakdown(item_code):
 		else:
 			if p > worst_no_shortage:
 				worst_no_shortage = p
-		fifo_detail.append({
-			"delivery_date": str(so.delivery_date) if so.delivery_date else "",
-			"pending_qty": math.ceil(required),
-			"allocated": math.ceil(allocated),
-			"shortage": math.ceil(shortage),
-			"order_status": order_status,
-		})
+		fifo_detail.append(
+			{
+				"delivery_date": str(so.delivery_date) if so.delivery_date else "",
+				"pending_qty": math.ceil(required),
+				"allocated": math.ceil(allocated),
+				"shortage": math.ceil(shortage),
+				"order_status": order_status,
+			}
+		)
 
 	if not so_rows:
 		own_priority = ""
@@ -2615,7 +2672,8 @@ def get_priority_breakdown(item_code):
 			WHERE bi.item_code IN %s
 			  AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
 			""",
-			(_bd_f_tuple,), as_dict=True,
+			(_bd_f_tuple,),
+			as_dict=True,
 		)
 		_bd_new = set()
 		for _r in _bd_up:
@@ -2632,11 +2690,13 @@ def get_priority_breakdown(item_code):
 		_bd_anc_tuple = tuple(_bd_ancestors) if len(_bd_ancestors) > 1 else (next(iter(_bd_ancestors)),)
 		_bd_item_rows = frappe.db.sql(
 			"SELECT item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE item_code IN %s",
-			(_bd_anc_tuple,), as_dict=True,
+			(_bd_anc_tuple,),
+			as_dict=True,
 		)
 		_bd_stock_rows = frappe.db.sql(
 			"SELECT item_code, SUM(actual_qty) as stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
-			(_bd_anc_tuple,), as_dict=True,
+			(_bd_anc_tuple,),
+			as_dict=True,
 		)
 		_bd_stock_map = {r.item_code: flt(r.stock) for r in _bd_stock_rows}
 		_bd_anc_so_map = get_open_so_map_for_priority(list(_bd_ancestors))
@@ -2673,35 +2733,49 @@ def get_priority_breakdown(item_code):
 			_bd_changed = True
 
 	# Build parent_details for direct parents only (show own + propagated priority)
-	_direct_parent_codes = [r.parent_item for r in frappe.db.sql(
-		"""
+	_direct_parent_codes = [
+		r.parent_item
+		for r in frappe.db.sql(
+			"""
 		SELECT DISTINCT b.item AS parent_item
 		FROM `tabBOM` b
 		INNER JOIN `tabBOM Item` bi ON bi.parent = b.name
 		WHERE bi.item_code = %s
 		  AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
 		""",
-		(item_code,), as_dict=True,
-	)]
+			(item_code,),
+			as_dict=True,
+		)
+	]
 	parent_details = []
 	for pic in _direct_parent_codes:
 		pitem = frappe.db.get_value("Item", pic, ["custom_buffer_flag", "custom_item_type"], as_dict=True)
 		if not pitem:
 			continue
 		p_sku = calculate_sku_type(pitem.custom_buffer_flag or "Non-Buffer", pitem.custom_item_type) or ""
-		p_stock = flt((frappe.db.sql("SELECT SUM(actual_qty) as s FROM `tabBin` WHERE item_code=%s", (pic,), as_dict=True) or [{}])[0].get("s") or 0)
+		p_stock = flt(
+			(
+				frappe.db.sql(
+					"SELECT SUM(actual_qty) as s FROM `tabBin` WHERE item_code=%s", (pic,), as_dict=True
+				)
+				or [{}]
+			)[0].get("s")
+			or 0
+		)
 		p_wip = 0 if p_sku in ["RBMTA", "RBMTO"] else flt(wip_map.get(pic, 0))
 		p_open_po = flt(open_po_map.get(pic, 0))
 		p_level = (p_stock + p_open_po) if p_sku in ["BOTO", "PTO", "TRMTO"] else (p_stock + p_wip)
-		parent_details.append({
-			"item_code": pic,
-			"sku_type": p_sku,
-			"stock": math.ceil(p_stock),
-			"wip": math.ceil(p_wip),
-			"open_po": math.ceil(p_open_po),
-			"level": math.ceil(p_level),
-			"own_priority": _bd_priority_map.get(pic, ""),  # propagated priority of this parent
-		})
+		parent_details.append(
+			{
+				"item_code": pic,
+				"sku_type": p_sku,
+				"stock": math.ceil(p_stock),
+				"wip": math.ceil(p_wip),
+				"open_po": math.ceil(p_open_po),
+				"level": math.ceil(p_level),
+				"own_priority": _bd_priority_map.get(pic, ""),  # propagated priority of this parent
+			}
+		)
 
 	# Final priority = worst of direct parents' propagated priorities; own if no parents
 	final_priority = own_priority

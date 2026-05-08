@@ -103,7 +103,7 @@ def get_data(filters):
 	stock_map = get_stock_map(item_codes)
 	open_po_map = get_open_po_map(item_codes)
 	item_master_map = get_item_master_map(item_codes)
-	qd_map = get_qualified_demand_map(item_codes)
+	qd_map = get_qualified_demand_map(item_codes, item_master_map)
 	prev_mr_qty_map = get_previous_mr_qty_map(rows)
 	so_map = get_open_so_map(item_codes)
 
@@ -318,14 +318,16 @@ def get_item_master_map(item_codes):
 
 
 # ---------------------------------------------------------------------------
-# Qualified Demand  (till today from open Sales Orders — buffer items only)
+# Qualified Demand  (till today + spike from open Sales Orders)
 # ---------------------------------------------------------------------------
 
 
-def get_qualified_demand_map(item_codes):
+def get_qualified_demand_map(item_codes, item_master_map):
 	if not item_codes:
 		return {}
 	today = nowdate()
+
+	# Till today
 	result = frappe.db.sql(
 		"""
 		SELECT soi.item_code,
@@ -342,7 +344,90 @@ def get_qualified_demand_map(item_codes):
 		(today, item_codes),
 		as_dict=True,
 	)
-	return {r.item_code: flt(r.qd) for r in result}
+	till_today_map = {r.item_code: flt(r.qd) for r in result}
+
+	# Spike master config
+	spike_master_map = {
+		sm.item_type: {
+			"demand_horizon": flt(sm.demand_horizon),
+			"spike_threshold": flt(sm.spike_threshold),
+		}
+		for sm in frappe.get_all(
+			"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
+		)
+	}
+
+	# Spike (future SOs within demand horizon, buffer items only)
+	spike_map = _calculate_spike_map(item_codes, item_master_map, spike_master_map)
+
+	# Combine till_today + spike with threshold check
+	qd_map = {}
+	for ic in item_codes:
+		master = item_master_map.get(ic, {})
+		till_today = flt(till_today_map.get(ic, 0))
+
+		if master.get("buffer_flag") == "Buffer":
+			spike = flt(spike_map.get(ic, 0))
+			qd = till_today + spike
+			# If qd < TOG * spike_threshold%, treat as 0
+			item_type = master.get("item_type", "")
+			tog = flt(master.get("tog", 0))
+			spike_config = spike_master_map.get(item_type)
+			if spike_config and tog > 0:
+				threshold_qty = tog * spike_config["spike_threshold"] / 100
+				if qd < threshold_qty:
+					qd = 0.0
+			qd_map[ic] = qd
+		else:
+			qd_map[ic] = till_today  # Non-buffer: no spike
+
+	return qd_map
+
+
+def _calculate_spike_map(item_codes, item_master_map, spike_master_map):
+	from frappe.utils import add_days
+
+	spike_map = {ic: 0.0 for ic in item_codes}
+	today = nowdate()
+
+	# Group buffer items by item_type (only those with a spike master config)
+	items_by_type = defaultdict(list)
+	for ic in item_codes:
+		master = item_master_map.get(ic, {})
+		if master.get("buffer_flag") == "Buffer":
+			item_type = master.get("item_type", "")
+			if item_type in spike_master_map:
+				items_by_type[item_type].append(ic)
+
+	for item_type, items in items_by_type.items():
+		demand_horizon = spike_master_map[item_type]["demand_horizon"]
+		if demand_horizon <= 0:
+			continue
+
+		start_date = add_days(today, 1)
+		end_date = add_days(today, int(demand_horizon))
+
+		rows = frappe.db.sql(
+			"""
+			SELECT soi.item_code,
+			       SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0))) AS future_qty
+			FROM `tabSales Order` so
+			INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+			WHERE so.docstatus = 1
+			  AND so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
+			  AND IFNULL(soi.custom_closed, 0) = 0
+			  AND soi.item_code IN %s
+			  AND IFNULL(soi.delivery_date, '1900-01-01') >= %s
+			  AND IFNULL(soi.delivery_date, '1900-01-01') <= %s
+			GROUP BY soi.item_code
+			""",
+			(tuple(items), start_date, end_date),
+			as_dict=True,
+		)
+		for r in rows:
+			spike_map[r.item_code] = flt(r.future_qty)
+
+	return spike_map
 
 
 # ---------------------------------------------------------------------------
@@ -473,7 +558,7 @@ def get_item_breakdown(mr_name):
 	stock_map = get_stock_map(item_codes)
 	open_po_map = get_open_po_map(item_codes)
 	item_master_map = get_item_master_map(item_codes)
-	qd_map = get_qualified_demand_map(item_codes)
+	qd_map = get_qualified_demand_map(item_codes, item_master_map)
 	so_map = get_open_so_map(item_codes)
 
 	# Previous MR qty relative to this MR
