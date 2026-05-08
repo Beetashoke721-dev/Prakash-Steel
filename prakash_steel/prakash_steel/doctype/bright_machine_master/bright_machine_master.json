@@ -1,0 +1,72 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format: {item_code}",
+ "creation": "2026-05-08 12:42:55.766278",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "column_break_jest",
+  "column_break_elry",
+  "section_break_dqli",
+  "machine_details"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_dqli",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "machine_details",
+   "fieldtype": "Table",
+   "label": "Machine Details",
+   "options": "Bright Machine Master Table"
+  },
+  {
+   "fieldname": "column_break_jest",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_elry",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-08 13:18:29.033124",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Bright Machine Master",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

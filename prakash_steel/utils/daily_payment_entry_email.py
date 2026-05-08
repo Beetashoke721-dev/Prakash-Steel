@@ -56,23 +56,24 @@ def _get_payment_entry_rows_for_24h_window():
 			pe.name AS payment_entry,
 			pe.party_name,
 			pe.posting_date AS received_date,
+			pe.paid_amount,
 			per.allocated_amount,
 			per.reference_name,
 			si.posting_date AS sales_invoice_posting_date,
 			c.customer_group
 		FROM `tabPayment Entry` pe
-		INNER JOIN `tabPayment Entry Reference` per
+		LEFT JOIN `tabPayment Entry Reference` per
 			ON per.parent = pe.name
+			AND per.reference_doctype = 'Sales Invoice'
 		LEFT JOIN `tabCustomer` c
 			ON c.name = pe.party AND IFNULL(pe.party_type, '') = 'Customer'
 		LEFT JOIN `tabSales Invoice` si
 			ON si.name = per.reference_name
 		WHERE pe.docstatus = 1
+		  AND pe.payment_type = 'Receive'
 		  AND pe.custom_submitted_time IS NOT NULL
 		  AND pe.custom_submitted_time >= DATE_SUB(TIMESTAMP(CURDATE(), '11:15:00'), INTERVAL 1 DAY)
 		  AND pe.custom_submitted_time <  TIMESTAMP(CURDATE(), '11:15:00')
-		  AND IFNULL(per.reference_name, '') != ''
-		  AND per.reference_doctype = 'Sales Invoice'
 		ORDER BY pe.name, per.idx
 		""",
 		as_dict=True,
@@ -86,22 +87,22 @@ def _prepare_axis_bank_table_rows(rows):
 
 	for row in rows:
 		invoice_posting_date = (
-			formatdate(row.sales_invoice_posting_date, "dd-MM-yyyy") if row.sales_invoice_posting_date else ""
+			formatdate(row.sales_invoice_posting_date, "dd-MM-yyyy") if row.sales_invoice_posting_date else "-"
 		)
-		received_date = formatdate(row.received_date, "dd-MM-yyyy") if row.received_date else ""
+		received_date = formatdate(row.received_date, "dd-MM-yyyy") if row.received_date else "-"
 		due_days = (
 			date_diff(row.received_date, row.sales_invoice_posting_date)
 			if row.sales_invoice_posting_date and row.received_date
-			else ""
+			else "-"
 		)
-		amount = row.allocated_amount or 0
+		amount = row.allocated_amount if row.allocated_amount is not None else (row.paid_amount or 0)
 		total_amount += amount
 
 		table_rows.append(
 			{
 				"particulars": row.party_name or "",
 				"group": row.customer_group or "",
-				"sales_invoice_no": row.reference_name or "",
+				"sales_invoice_no": row.reference_name or "-",
 				"invoice_date": invoice_posting_date,
 				"received_date": received_date,
 				"due_days": due_days,
@@ -118,7 +119,6 @@ def _build_email_body(table_rows, total_amount, report_date_display):
 	table_rows_html = []
 
 	for r in table_rows:
-		due_cell = str(r["due_days"]) if r["due_days"] != "" else ""
 		table_rows_html.append(
 			f"""
 			<tr>
@@ -127,7 +127,7 @@ def _build_email_body(table_rows, total_amount, report_date_display):
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["sales_invoice_no"])}</td>
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["invoice_date"])}</td>
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;">{escape_html(r["received_date"])}</td>
-				<td style="padding:8px 10px;border:1px solid #cfcfcf;text-align:center;">{due_cell}</td>
+				<td style="padding:8px 10px;border:1px solid #cfcfcf;text-align:center;">{escape_html(str(r["due_days"]))}</td>
 				<td style="padding:8px 10px;border:1px solid #cfcfcf;text-align:right;">{r["amount_display"]}</td>
 			</tr>
 			"""
@@ -208,7 +208,7 @@ def _build_axis_bank_excel_bytes(table_rows, total_amount, report_date_display):
 				r["sales_invoice_no"],
 				r["invoice_date"],
 				r["received_date"],
-				r["due_days"] if r["due_days"] != "" else None,
+				r["due_days"],
 				r["amount"],
 			]
 		)

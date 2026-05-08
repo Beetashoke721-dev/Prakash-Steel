@@ -1,0 +1,66 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-08 12:43:38.371628",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "machine_group_name",
+  "mt_per_hour_production",
+  "column_break_yzab",
+  "is_default",
+  "column_break_wxvf"
+ ],
+ "fields": [
+  {
+   "columns": 3,
+   "fieldname": "machine_group_name",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Machine Group Name",
+   "options": "Bright Machine",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "mt_per_hour_production",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "MT per Hour Production",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_yzab",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "default": "0",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Default"
+  },
+  {
+   "fieldname": "column_break_wxvf",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-08 13:17:43.727972",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Bright Machine Master Table",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
