@@ -13,6 +13,10 @@ RECIPIENTS = [
 	"beetashoke.chakraborty@clapgrow.com",
 	"accounts@prakashsteel.com",
 	"soumadwipdas1@gmail.com",
+    "adarsh@prakashsteel.com",
+    "avinash@prakashsteel.com",
+    "srimanta@prakashsteel.com",
+    "ea.adarshbagla@prakashsteel.com"
 ]
 
 
