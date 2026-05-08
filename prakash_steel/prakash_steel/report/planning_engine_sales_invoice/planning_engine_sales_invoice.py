@@ -81,7 +81,12 @@ def get_columns():
 			"fieldtype": "Data",
 			"width": 220,
 		},
-		{"label": "Quantity", "fieldname": "qty", "fieldtype": "Float", "width": 110},
+		{
+			"label": "Quantity",
+			"fieldname": "qty",
+			"fieldtype": "Int",
+			"width": 110,
+		},
 		{"label": "Item Price", "fieldname": "item_price", "fieldtype": "Currency", "width": 120},
 	]
 
@@ -148,7 +153,7 @@ def get_data(filters):
 			si.place_of_supply,
 			i.custom_category_name AS category_name,
 			sii.item_name,
-			sii.qty,
+			ROUND(sii.qty, 0) AS qty,
 			sii.rate AS item_price
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
