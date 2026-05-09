@@ -89,7 +89,10 @@ def get_item_breakdown(item_code):
 		qty_per_row = net_order_rec
 
 	item_open_so = flt(open_so_qty_map.get(item_code, 0))
-	remaining_so_for_op_cp = max(0, item_open_so - stock - wip)
+	# Buffer: display/OP-CP uses qualified_demand (delivery_date <= today + spike)
+	# Non-buffer: display/OP-CP uses all-time open SO
+	display_open_so = qualified_demand if is_buffer else item_open_so
+	remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
 	accumulated_batch_qty = 0.0
 
 	rows = []
@@ -129,11 +132,13 @@ def get_item_breakdown(item_code):
 		else:
 			op_cp = "CP"
 
-		priority_colour = (
-			(("MTA" if sku_type == "BBMTA" else "MTO") + (op_cp or "") + (colour or "").upper())
-			if (op_cp and colour)
-			else ""
-		)
+		if colour:
+			if sku_type == "BBMTA":
+				priority_colour = "MTA" + (op_cp or "") + colour.upper()
+			else:
+				priority_colour = "MTO" + colour.upper()
+		else:
+			priority_colour = ""
 
 		rows.append(
 			{
@@ -152,7 +157,7 @@ def get_item_breakdown(item_code):
 				"remaining_so_before": math.ceil(max(0, remaining_so_for_op_cp)),
 				"op_cp": op_cp,
 				"priority_colour": priority_colour,
-				"open_so": math.ceil(item_open_so),
+				"open_so": math.ceil(display_open_so),
 				"sku_type": sku_type,
 				"is_buffer": is_buffer,
 				"net_order_rec": math.ceil(net_order_rec),
@@ -224,6 +229,7 @@ def get_columns():
 			"fieldname": "op_cp",
 			"fieldtype": "Data",
 			"width": 80,
+			"hidden": 1,
 		},
 		{
 			"label": _("MOQ"),
@@ -273,6 +279,12 @@ def get_columns():
 			"fieldname": "child_stock_soft_allocation_qty",
 			"fieldtype": "Int",
 			"width": 200,
+		},
+		{
+			"label": _("Child Stock Shortage"),
+			"fieldname": "child_stock_shortage",
+			"fieldtype": "Int",
+			"width": 160,
 		},
 		{
 			"label": _("Child SKU Type"),
@@ -460,7 +472,10 @@ def get_data(filters=None):
 				pass
 
 		item_open_so = flt(open_so_qty_map.get(item_code, 0))
-		remaining_so_for_op_cp = max(0, item_open_so - stock - wip)
+		# Buffer: open SO for display/OP-CP = qualified_demand (delivery_date <= today + spike)
+		# Non-buffer: open SO for display/OP-CP = all-time open SO (no date filter)
+		display_open_so = qualified_demand if is_buffer else item_open_so
+		remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
 		accumulated_batch_qty = 0.0
 
 		for _i in range(num_batches):
@@ -496,16 +511,16 @@ def get_data(filters=None):
 				"item_code": item_code,
 				"item_name": item_name_map[item_code],
 				"sku_type": sku_type,
-				"open_so": math.ceil(item_open_so),
+				"open_so": math.ceil(display_open_so),
 				"on_hand_stock": math.ceil(stock),
 				"on_hand_colour_priority": on_hand_colour_priority,
 				"op_cp": op_cp,
 				"priority_colour": (
-					("MTA" if sku_type == "BBMTA" else "MTO")
-					+ (op_cp or "")
-					+ (on_hand_colour_priority or "").upper()
+					("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
+					if sku_type == "BBMTA"
+					else ("MTO" + on_hand_colour_priority.upper())
 				)
-				if (op_cp and on_hand_colour_priority)
+				if on_hand_colour_priority
 				else "",
 				"or_with_moq_batch_size": math.ceil(qty_per_row),
 				"moq": math.ceil(moq),
@@ -516,6 +531,7 @@ def get_data(filters=None):
 				"child_requirement": None,
 				"child_stock": None,
 				"child_stock_soft_allocation_qty": None,
+				"child_stock_shortage": None,
 				"child_sku_type": None,
 				"child_bom_qty": None,
 				"child_bom_quantity": None,
@@ -581,6 +597,7 @@ def get_data(filters=None):
 
 		cached = {
 			"child_stock_soft_allocation_qty": math.ceil(stock_allocated),
+			"child_stock_shortage": math.ceil(stock_shortage),
 			"production_qty_based_on_child_stock": math.ceil(stock_allocated * parent_per_child),
 			"production_qty_based_on_child_stock_wip_open_po": math.ceil(total_allocated * parent_per_child),
 		}

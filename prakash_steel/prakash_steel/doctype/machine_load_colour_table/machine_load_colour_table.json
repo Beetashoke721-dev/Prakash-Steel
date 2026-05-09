@@ -1,0 +1,63 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-09 13:30:29.071663",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "colour",
+  "from_days",
+  "to_days",
+  "column_break_mysp",
+  "column_break_cepq"
+ ],
+ "fields": [
+  {
+   "columns": 4,
+   "fieldname": "colour",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Colour",
+   "options": "\nBlack\nRed\nYellow\nGreen\nWhite",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_mysp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_cepq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "from_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "From Days"
+  },
+  {
+   "columns": 2,
+   "fieldname": "to_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "To Days"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-09 13:40:31.021054",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Machine Load Colour Table",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

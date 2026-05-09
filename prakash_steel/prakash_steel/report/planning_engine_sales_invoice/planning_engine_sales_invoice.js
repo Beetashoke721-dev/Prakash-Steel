@@ -2,6 +2,31 @@
 // For license information, please see license.txt
 
 frappe.query_reports["Planning Engine Sales Invoice"] = {
+	onload: function (report) {
+		frappe.call({
+			method: "frappe.client.get_list",
+			args: {
+				doctype: "Sales Invoice",
+				fields: ["place_of_supply"],
+				filters: {
+					docstatus: 1,
+				},
+				group_by: "place_of_supply",
+				order_by: "place_of_supply asc",
+				limit_page_length: 500,
+			},
+			callback: function (r) {
+				const values = [""];
+				(r.message || []).forEach((row) => {
+					if (row.place_of_supply) values.push(row.place_of_supply);
+				});
+
+				const placeFilter = report.get_filter("place_of_supply");
+				placeFilter.df.options = values.join("\n");
+				placeFilter.refresh();
+			},
+		});
+	},
 	filters: [
 		{
 			fieldname: "financial_year",
@@ -69,12 +94,14 @@ frappe.query_reports["Planning Engine Sales Invoice"] = {
 		{
 			fieldname: "category_name",
 			label: __("Category Name"),
-			fieldtype: "Data",
+			fieldtype: "Link",
+			options: "Item Category",
 		},
 		{
 			fieldname: "place_of_supply",
 			label: __("Place of Supply"),
-			fieldtype: "Data",
+			fieldtype: "Select",
+			options: "",
 		},
 	],
 };

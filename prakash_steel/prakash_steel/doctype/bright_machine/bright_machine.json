@@ -7,7 +7,10 @@
  "engine": "InnoDB",
  "field_order": [
   "machine_group_name",
+  "oee",
   "column_break_yitz",
+  "no_of_machines",
+  "runtime",
   "column_break_txzh",
   "column_break_gepe"
  ],
@@ -30,12 +33,33 @@
   {
    "fieldname": "column_break_gepe",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "no_of_machines",
+   "fieldtype": "Int",
+   "label": "No. of Machines",
+   "reqd": 1
+  },
+  {
+   "fieldname": "oee",
+   "fieldtype": "Percent",
+   "label": "OEE",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "description": "Operting Hrs",
+   "fieldname": "runtime",
+   "fieldtype": "Float",
+   "label": "Runtime",
+   "precision": "2",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-08 13:10:09.683959",
+ "modified": "2026-05-09 10:20:42.951493",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Bright Machine",
