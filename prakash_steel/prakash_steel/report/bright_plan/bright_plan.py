@@ -629,9 +629,12 @@ def get_data(filters=None):
 
 			accumulated_batch_qty += qty_per_row
 
-	# Sort by on_hand_colour_priority severity (BLACK first, then RED, YELLOW, GREEN, WHITE, empty)
-	_colour_order = {"BLACK": 0, "RED": 1, "YELLOW": 2, "GREEN": 3, "WHITE": 4, "": 5}
-	data.sort(key=lambda r: _colour_order.get((r.get("on_hand_colour_priority") or "").upper(), 5))
+	# Sort by machine (grouped), then by priority_sequence (user-defined order from Priority Colour Sequence Master)
+	# Rows with no machine go last; rows with no sequence go last within their machine group
+	data.sort(key=lambda r: (
+		r.get("machine") or "\xff",
+		r.get("priority_sequence") if r.get("priority_sequence") is not None else 999999,
+	))
 
 	# Per-item allocation: each parent item independently allocates from actual child stock.
 	# All batch rows of the same item show the same item-level values (cached per pair).
