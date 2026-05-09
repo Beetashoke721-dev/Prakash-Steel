@@ -125,7 +125,9 @@ def get_item_breakdown(item_code):
 			reason = f"Non-buffer FIFO SO allocation at level {level:.0f}"
 			total_val = None
 
-		if qty_per_row == 0:
+		if not is_buffer:
+			op_cp = ""
+		elif qty_per_row == 0:
 			op_cp = ""
 		elif remaining_so_for_op_cp > 0:
 			op_cp = "OP"
@@ -241,7 +243,6 @@ def get_columns():
 			"fieldname": "op_cp",
 			"fieldtype": "Data",
 			"width": 80,
-			"hidden": 1,
 		},
 		{
 			"label": _("MOQ"),
@@ -557,7 +558,9 @@ def get_data(filters=None):
 			else:
 				on_hand_colour_priority = _non_buffer_priority(item_code, level, so_map_for_priority)
 
-			if qty_per_row == 0:
+			if not is_buffer:
+				op_cp = ""
+			elif qty_per_row == 0:
 				op_cp = ""
 			elif remaining_so_for_op_cp > 0:
 				op_cp = "OP"
@@ -591,7 +594,9 @@ def get_data(filters=None):
 					("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
 					if sku_type == "BBMTA"
 					else ("MTO" + on_hand_colour_priority.upper())
-				) if on_hand_colour_priority else None,
+				)
+				if on_hand_colour_priority
+				else None,
 				"or_with_moq_batch_size": math.ceil(qty_per_row),
 				"moq": math.ceil(moq),
 				"batch_size": math.ceil(batch_size),
@@ -634,10 +639,12 @@ def get_data(filters=None):
 
 	# Sort by machine (grouped), then by priority_sequence (user-defined order from Priority Colour Sequence Master)
 	# Rows with no machine go last; rows with no sequence go last within their machine group
-	data.sort(key=lambda r: (
-		r.get("machine") or "\xff",
-		r.get("priority_sequence") if r.get("priority_sequence") is not None else 999999,
-	))
+	data.sort(
+		key=lambda r: (
+			r.get("machine") or "\xff",
+			r.get("priority_sequence") if r.get("priority_sequence") is not None else 999999,
+		)
+	)
 
 	# Per-item allocation: each parent item independently allocates from actual child stock.
 	# All batch rows of the same item show the same item-level values (cached per pair).
@@ -676,7 +683,9 @@ def get_data(filters=None):
 			"child_stock_soft_allocation_qty": math.ceil(stock_allocated),
 			"child_stock_shortage": math.ceil(stock_shortage),
 			"production_qty_based_on_child_stock": prod_qty_child_stock,
-			"process_time_based_on_child_stock": round(prod_qty_child_stock / per_hour, 2) if per_hour else None,
+			"process_time_based_on_child_stock": round(prod_qty_child_stock / per_hour, 2)
+			if per_hour
+			else None,
 			"production_qty_based_on_child_stock_wip_open_po": math.ceil(total_allocated * parent_per_child),
 		}
 		allocation_cache[pair] = cached
