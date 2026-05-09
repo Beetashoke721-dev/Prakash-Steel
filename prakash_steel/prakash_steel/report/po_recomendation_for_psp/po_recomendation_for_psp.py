@@ -634,6 +634,12 @@ def get_columns(filters=None):
 					"width": 120,
 				},
 				{
+					"label": _("Total SO"),
+					"fieldname": "total_so",
+					"fieldtype": "Int",
+					"width": 120,
+				},
+				{
 					"label": _("On Hand Stock"),
 					"fieldname": "on_hand_stock",
 					"fieldtype": "Int",
@@ -692,13 +698,6 @@ def get_columns(filters=None):
 	else:
 		columns.extend(
 			[
-				{
-					"label": _("Open SO"),
-					"fieldname": "open_so",
-					"fieldtype": "Int",
-					"width": 120,
-					"hidden": 1,
-				},
 				{
 					"label": _("Total SO"),
 					"fieldname": "total_so",
@@ -1381,11 +1380,11 @@ def get_data(filters=None):
 
 				if numeric_status == 0:
 					on_hand_colour = "BLACK"
-				elif 1 <= numeric_status <= 33.33:
+				elif 0 < numeric_status <= 34:
 					on_hand_colour = "RED"
-				elif 33.34 <= numeric_status <= 66.67:
+				elif 34 < numeric_status <= 67:
 					on_hand_colour = "YELLOW"
-				elif 66.68 <= numeric_status <= 100:
+				elif 67 < numeric_status <= 100:
 					on_hand_colour = "GREEN"
 				else:  # > 100
 					on_hand_colour = "WHITE"
@@ -1493,7 +1492,8 @@ def get_data(filters=None):
 				"tog": math.ceil(flt(tog)),
 				"toy": math.ceil(flt(toy)),
 				"tor": math.ceil(flt(tor)),
-				"open_so": math.ceil(flt(open_so)),
+				"open_so": math.ceil(flt(additional_demand)),  # till_today + SOs within demand_horizon
+				"total_so": math.ceil(flt(open_so)),  # All open SOs (no date filter)
 				"on_hand_stock": math.ceil(flt(on_hand_stock)),
 				"wip": math.ceil(flt(wip)),  # WIP value only
 				"open_po": math.ceil(flt(open_po)),  # Open PO value only
@@ -1524,7 +1524,7 @@ def get_data(filters=None):
 				"open_subcon_po": math.ceil(flt(open_subcon_po)),  # Open Subcon PO value
 				"additional_demand": math.ceil(flt(additional_demand)),
 				"qualify_demand": math.ceil(flt(qualify_demand)),  # Qualified Demand
-				"open_so_qualified": math.ceil(flt(qualify_demand)),
+				"open_so_qualified": math.ceil(flt(open_so)),  # Same as total_so (no date filter)
 				"priority": _non_buffer_priority(
 					item_code,
 					on_hand_stock + (open_po if sku_type in ["BOTO", "PTO", "TRMTO"] else wip),

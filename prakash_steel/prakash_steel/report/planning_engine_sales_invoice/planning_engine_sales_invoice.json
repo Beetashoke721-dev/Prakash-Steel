@@ -71,16 +71,18 @@
   },
   {
    "fieldname": "category_name",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "Category Name",
    "mandatory": 0,
+   "options": "Item Category",
    "wildcard_filter": 0
   },
   {
    "fieldname": "place_of_supply",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "label": "Place of Supply",
    "mandatory": 0,
+   "options": "",
    "wildcard_filter": 0
   }
  ],
