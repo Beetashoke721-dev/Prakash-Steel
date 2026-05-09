@@ -2,6 +2,16 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe.utils import flt
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
+	calculate_net_order_recommendation,
+	calculate_spike_map,
+	get_mrq_map,
+	get_qualified_demand_for_item,
+	get_qualified_demand_map,
+	get_stock_map,
+	get_wip_map,
+)
 
 
 def execute(filters=None):
@@ -28,31 +38,168 @@ def get_columns():
 			"label": "Net Prod Load (Days)",
 			"fieldname": "net_prod_load",
 			"fieldtype": "Float",
+			"precision": 2,
 			"width": 180,
 		},
 		{
 			"label": "Net Order Load (Days)",
 			"fieldname": "net_order_load",
 			"fieldtype": "Float",
+			"precision": 2,
 			"width": 180,
 		},
 	]
 
 
 def get_data():
+	# 1. Fetch all Bright Machine records
 	machines = frappe.get_all(
 		"Bright Machine",
-		fields=["machine_group_name", "no_of_machines"],
+		fields=["machine_group_name", "no_of_machines", "oee", "runtime"],
 		order_by="machine_group_name asc",
 	)
+	if not machines:
+		return []
 
+	# 2. Build machine details map keyed by machine_group_name
+	machine_detail_map = {
+		m.machine_group_name: {
+			"no_of_machines": flt(m.no_of_machines) or 1,
+			"oee": flt(m.oee) or 0,
+			"runtime": flt(m.runtime) or 0,
+		}
+		for m in machines
+	}
+
+	# 3. Get item -> machine mapping from Bright Machine Master (default row only)
+	machine_rows = frappe.db.sql(
+		"""
+		SELECT bmm.item_code, bmmt.machine_group_name
+		FROM `tabBright Machine Master` bmm
+		INNER JOIN `tabBright Machine Master Table` bmmt ON bmmt.parent = bmm.name
+		WHERE bmmt.is_default = 1
+		""",
+		as_dict=True,
+	)
+	# item_code -> machine_group_name
+	item_machine_map = {r.item_code: r.machine_group_name for r in machine_rows}
+
+	# 4. Fetch all BB items
+	bb_items = frappe.db.sql(
+		"""
+		SELECT
+			i.name as item_code,
+			i.custom_buffer_flag as buffer_flag,
+			i.custom_item_type as item_type,
+			i.safety_stock as tog,
+			i.min_order_qty as moq,
+			i.custom_batch_size as batch_size
+		FROM `tabItem` i
+		WHERE i.custom_item_type = 'BB'
+		""",
+		as_dict=True,
+	)
+	if not bb_items:
+		return _build_zero_rows(machines)
+
+	item_codes = set(item.item_code for item in bb_items)
+	item_buffer_map = {}
+	item_type_map = {}
+	item_tog_map = {}
+	moq_map = {}
+	batch_size_map = {}
+
+	for item in bb_items:
+		ic = item.item_code
+		item_buffer_map[ic] = item.buffer_flag or "Non-Buffer"
+		item_type_map[ic] = item.item_type
+		item_tog_map[ic] = flt(item.tog or 0)
+		moq_map[ic] = flt(item.moq or 0)
+		batch_size_map[ic] = flt(item.batch_size or 0)
+
+	# 5. Fetch shared maps (same as bright_plan)
+	stock_map = get_stock_map(item_codes)
+	wip_map = get_wip_map()
+	mrq_map = get_mrq_map()
+	till_today_map, spike_map = get_qualified_demand_map()
+
+	spike_master_records = frappe.get_all(
+		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
+	)
+	spike_master_map = {
+		sm.item_type: {
+			"demand_horizon": flt(sm.demand_horizon),
+			"spike_threshold": flt(sm.spike_threshold),
+		}
+		for sm in spike_master_records
+	}
+	calculated_spike_map = calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map)
+	spike_map.update(calculated_spike_map)
+
+	# 6. For each item, compute net_order_rec grouped by machine (same formula as bright_plan)
+	machine_net_req_map = {m.machine_group_name: 0.0 for m in machines}
+
+	for item_code in item_codes:
+		machine_group = item_machine_map.get(item_code)
+		if not machine_group or machine_group not in machine_net_req_map:
+			continue
+
+		is_buffer = item_buffer_map[item_code] == "Buffer"
+		stock = flt(stock_map.get(item_code, 0))
+		wip = flt(wip_map.get(item_code, 0))
+		mrq = flt(mrq_map.get(item_code, 0))
+		tog = item_tog_map[item_code]
+		moq = moq_map[item_code]
+		batch_size = batch_size_map[item_code]
+
+		qualified_demand, _, _ = get_qualified_demand_for_item(
+			item_code, till_today_map, spike_map, item_buffer_map, item_tog_map, item_type_map, spike_master_map
+		)
+		qualified_demand = flt(qualified_demand)
+
+		if is_buffer:
+			base_order_rec = max(0.0, tog + qualified_demand - stock - wip - mrq)
+		else:
+			base_order_rec = max(0.0, qualified_demand - stock - wip - mrq)
+
+		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
+		machine_net_req_map[machine_group] += net_order_rec
+
+	# 7. Build output rows
 	data = []
 	for m in machines:
+		mgn = m.machine_group_name
+		detail = machine_detail_map[mgn]
+		no_of_machines = detail["no_of_machines"]
+		oee = detail["oee"]
+		runtime = detail["runtime"]
+		total_net_req = machine_net_req_map.get(mgn, 0.0)
+
+		# effective hours per machine per day = runtime * (oee / 100)
+		effective_runtime = runtime * (oee / 100.0) if oee else 0
+
+		if effective_runtime and no_of_machines:
+			net_prod_load = round((total_net_req / effective_runtime) / no_of_machines, 2)
+		else:
+			net_prod_load = 0
+
 		data.append({
-			"machine_name": m.machine_group_name,
-			"no_of_machines": m.no_of_machines,
-			"net_prod_load": 0,
+			"machine_name": mgn,
+			"no_of_machines": int(no_of_machines),
+			"net_prod_load": net_prod_load,
 			"net_order_load": 0,
 		})
 
 	return data
+
+
+def _build_zero_rows(machines):
+	return [
+		{
+			"machine_name": m.machine_group_name,
+			"no_of_machines": m.no_of_machines,
+			"net_prod_load": 0,
+			"net_order_load": 0,
+		}
+		for m in machines
+	]
