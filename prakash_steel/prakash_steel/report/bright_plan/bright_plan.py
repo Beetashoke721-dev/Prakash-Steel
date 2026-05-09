@@ -89,7 +89,10 @@ def get_item_breakdown(item_code):
 		qty_per_row = net_order_rec
 
 	item_open_so = flt(open_so_qty_map.get(item_code, 0))
-	remaining_so_for_op_cp = max(0, item_open_so - stock - wip)
+	# Buffer: display/OP-CP uses qualified_demand (delivery_date <= today + spike)
+	# Non-buffer: display/OP-CP uses all-time open SO
+	display_open_so = qualified_demand if is_buffer else item_open_so
+	remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
 	accumulated_batch_qty = 0.0
 
 	rows = []
@@ -152,7 +155,7 @@ def get_item_breakdown(item_code):
 				"remaining_so_before": math.ceil(max(0, remaining_so_for_op_cp)),
 				"op_cp": op_cp,
 				"priority_colour": priority_colour,
-				"open_so": math.ceil(item_open_so),
+				"open_so": math.ceil(display_open_so),
 				"sku_type": sku_type,
 				"is_buffer": is_buffer,
 				"net_order_rec": math.ceil(net_order_rec),
@@ -460,7 +463,10 @@ def get_data(filters=None):
 				pass
 
 		item_open_so = flt(open_so_qty_map.get(item_code, 0))
-		remaining_so_for_op_cp = max(0, item_open_so - stock - wip)
+		# Buffer: open SO for display/OP-CP = qualified_demand (delivery_date <= today + spike)
+		# Non-buffer: open SO for display/OP-CP = all-time open SO (no date filter)
+		display_open_so = qualified_demand if is_buffer else item_open_so
+		remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
 		accumulated_batch_qty = 0.0
 
 		for _i in range(num_batches):
@@ -496,7 +502,7 @@ def get_data(filters=None):
 				"item_code": item_code,
 				"item_name": item_name_map[item_code],
 				"sku_type": sku_type,
-				"open_so": math.ceil(item_open_so),
+				"open_so": math.ceil(display_open_so),
 				"on_hand_stock": math.ceil(stock),
 				"on_hand_colour_priority": on_hand_colour_priority,
 				"op_cp": op_cp,
