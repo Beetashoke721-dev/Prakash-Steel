@@ -9,6 +9,7 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 	get_mrq_map,
 	get_qualified_demand_for_item,
 	get_qualified_demand_map,
+	get_sales_order_qty_map,
 	get_stock_map,
 	get_wip_map,
 )
@@ -136,8 +137,11 @@ def get_data():
 	calculated_spike_map = calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map)
 	spike_map.update(calculated_spike_map)
 
-	# 6. For each item, compute net_order_rec grouped by machine (same formula as bright_plan)
+	open_so_qty_map = get_sales_order_qty_map({})
+
+	# 6. For each item, compute net_order_rec (prod load) and open_so - stock (order load)
 	machine_net_req_map = {m.machine_group_name: 0.0 for m in machines}
+	machine_order_load_map = {m.machine_group_name: 0.0 for m in machines}
 
 	for item_code in item_codes:
 		machine_group = item_machine_map.get(item_code)
@@ -157,13 +161,17 @@ def get_data():
 		)
 		qualified_demand = flt(qualified_demand)
 
+		# Net prod load: uses production order recommendation (wip/mrq/moq factored in)
 		if is_buffer:
 			base_order_rec = max(0.0, tog + qualified_demand - stock - wip - mrq)
 		else:
 			base_order_rec = max(0.0, qualified_demand - stock - wip - mrq)
-
 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 		machine_net_req_map[machine_group] += net_order_rec
+
+		# Net order load: open_so - stock (buffer uses qualified_demand as open_so)
+		display_open_so = qualified_demand if is_buffer else flt(open_so_qty_map.get(item_code, 0))
+		machine_order_load_map[machine_group] += max(0.0, display_open_so - stock)
 
 	# 7. Build output rows
 	data = []
@@ -178,16 +186,20 @@ def get_data():
 		# effective hours per machine per day = runtime * (oee / 100)
 		effective_runtime = runtime * (oee / 100.0) if oee else 0
 
+		total_order_req = machine_order_load_map.get(mgn, 0.0)
+
 		if effective_runtime and no_of_machines:
 			net_prod_load = round((total_net_req / effective_runtime) / no_of_machines, 2)
+			net_order_load = round((total_order_req / effective_runtime) / no_of_machines, 2)
 		else:
 			net_prod_load = 0
+			net_order_load = 0
 
 		data.append({
 			"machine_name": mgn,
 			"no_of_machines": int(no_of_machines),
 			"net_prod_load": net_prod_load,
-			"net_order_load": 0,
+			"net_order_load": net_order_load,
 		})
 
 	return data
