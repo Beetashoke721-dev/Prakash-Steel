@@ -265,6 +265,7 @@ def get_columns():
 			"label": _("Process Time based on Child Stock"),
 			"fieldname": "process_time_based_on_child_stock",
 			"fieldtype": "Float",
+			"precision": 2,
 			"width": 220,
 		},
 		{
@@ -314,12 +315,14 @@ def get_columns():
 			"label": _("Per Hour Production"),
 			"fieldname": "per_hour_production",
 			"fieldtype": "Float",
+			"precision": 2,
 			"width": 160,
 		},
 		{
 			"label": _("Process Time"),
 			"fieldname": "process_time",
 			"fieldtype": "Float",
+			"precision": 2,
 			"width": 130,
 		},
 	]
