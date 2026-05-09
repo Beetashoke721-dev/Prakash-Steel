@@ -28,7 +28,8 @@ frappe.query_reports["Planning Engine RM Production"] = {
 		{
 			fieldname: "category_name",
 			label: __("Category Name"),
-			fieldtype: "Data",
+			fieldtype: "Link",
+			options: "Item Category",
 		},
 		{
 			fieldname: "production_plan",

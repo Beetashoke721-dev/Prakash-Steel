@@ -39,9 +39,10 @@
   },
   {
    "fieldname": "category_name",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "Category Name",
    "mandatory": 0,
+   "options": "Item Category",
    "wildcard_filter": 0
   },
   {
