@@ -132,11 +132,13 @@ def get_item_breakdown(item_code):
 		else:
 			op_cp = "CP"
 
-		priority_colour = (
-			(("MTA" if sku_type == "BBMTA" else "MTO") + (op_cp or "") + (colour or "").upper())
-			if (op_cp and colour)
-			else ""
-		)
+		if colour:
+			if sku_type == "BBMTA":
+				priority_colour = "MTA" + (op_cp or "") + colour.upper()
+			else:
+				priority_colour = "MTO" + colour.upper()
+		else:
+			priority_colour = ""
 
 		rows.append(
 			{
@@ -227,6 +229,7 @@ def get_columns():
 			"fieldname": "op_cp",
 			"fieldtype": "Data",
 			"width": 80,
+			"hidden": 1,
 		},
 		{
 			"label": _("MOQ"),
@@ -276,6 +279,12 @@ def get_columns():
 			"fieldname": "child_stock_soft_allocation_qty",
 			"fieldtype": "Int",
 			"width": 200,
+		},
+		{
+			"label": _("Child Stock Shortage"),
+			"fieldname": "child_stock_shortage",
+			"fieldtype": "Int",
+			"width": 160,
 		},
 		{
 			"label": _("Child SKU Type"),
@@ -507,11 +516,11 @@ def get_data(filters=None):
 				"on_hand_colour_priority": on_hand_colour_priority,
 				"op_cp": op_cp,
 				"priority_colour": (
-					("MTA" if sku_type == "BBMTA" else "MTO")
-					+ (op_cp or "")
-					+ (on_hand_colour_priority or "").upper()
+					("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
+					if sku_type == "BBMTA"
+					else ("MTO" + on_hand_colour_priority.upper())
 				)
-				if (op_cp and on_hand_colour_priority)
+				if on_hand_colour_priority
 				else "",
 				"or_with_moq_batch_size": math.ceil(qty_per_row),
 				"moq": math.ceil(moq),
@@ -522,6 +531,7 @@ def get_data(filters=None):
 				"child_requirement": None,
 				"child_stock": None,
 				"child_stock_soft_allocation_qty": None,
+				"child_stock_shortage": None,
 				"child_sku_type": None,
 				"child_bom_qty": None,
 				"child_bom_quantity": None,
@@ -587,6 +597,7 @@ def get_data(filters=None):
 
 		cached = {
 			"child_stock_soft_allocation_qty": math.ceil(stock_allocated),
+			"child_stock_shortage": math.ceil(stock_shortage),
 			"production_qty_based_on_child_stock": math.ceil(stock_allocated * parent_per_child),
 			"production_qty_based_on_child_stock_wip_open_po": math.ceil(total_allocated * parent_per_child),
 		}
