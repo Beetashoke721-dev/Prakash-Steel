@@ -417,7 +417,7 @@ def calculate_initial_order_recommendation(
 		else:
 			order_rec = max(0, tog + qualified_demand - stock - wip)
 	else:
-		qualified_demand = flt(qualified_demand_map.get(item_code, 0))
+		qualified_demand = flt(open_so_map.get(item_code, 0))  # all-time open SO for non-buffer
 		sku_type = item_sku_type_map.get(item_code)
 		open_po = flt(open_po_map.get(item_code, 0))
 
@@ -464,9 +464,9 @@ def calculate_final_order_recommendation(
 
 		order_rec = max(0, base_order_rec - mrq)
 	else:
-		qualified_demand = flt(qualified_demand_map.get(item_code, 0))
+		open_so = flt(open_so_map.get(item_code, 0))  # all-time open SO for non-buffer
 		parent_demand = flt(parent_demand_map.get(item_code, 0))
-		requirement = qualified_demand + parent_demand
+		requirement = open_so + parent_demand
 		sku_type = item_sku_type_map.get(item_code)
 		open_po = flt(open_po_map.get(item_code, 0))
 
@@ -1135,7 +1135,7 @@ def get_data(filters=None):
 			item_sku_type_map_all,
 			initial_stock_map,
 			wip_map,
-			qualified_demand_map,  # Pass qualified_demand_map as open_so_map (function uses qualified_demand for non-buffer items)
+			so_qty_map,           # all-time open SO for non-buffer; qualified_demand used for buffer
 			qualified_demand_map,
 			open_po_map,
 			mrq_map,
@@ -1220,7 +1220,7 @@ def get_data(filters=None):
 				parent_demand_details,
 				global_visited_items,
 				item_groups_cache,
-				qualified_demand_map,
+				so_qty_map,  # all-time open SO (used for non-buffer children; buffer children use qualified_demand_map via is_child_buffer branch)
 				initial_stock_map,
 				wip_map,
 				open_po_map,
@@ -1245,7 +1245,7 @@ def get_data(filters=None):
 			item_sku_type_map_all,
 			initial_stock_map,
 			wip_map,
-			qualified_demand_map,
+			so_qty_map,           # all-time open SO for non-buffer; qualified_demand used for buffer
 			qualified_demand_map,
 			open_po_map,
 			mrq_map,
