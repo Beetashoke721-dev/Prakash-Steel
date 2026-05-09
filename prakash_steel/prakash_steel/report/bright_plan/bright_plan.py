@@ -182,6 +182,12 @@ def execute(filters=None):
 def get_columns():
 	return [
 		{
+			"label": _("Machine"),
+			"fieldname": "machine",
+			"fieldtype": "Data",
+			"width": 130,
+		},
+		{
 			"label": _("Item Code"),
 			"fieldname": "item_code",
 			"fieldtype": "Link",
@@ -250,6 +256,12 @@ def get_columns():
 			"width": 220,
 		},
 		{
+			"label": _("Process Time based on Child Stock"),
+			"fieldname": "process_time_based_on_child_stock",
+			"fieldtype": "Float",
+			"width": 220,
+		},
+		{
 			"label": _("Prod Qty based on Child Stock+WIP/Open PO"),
 			"fieldname": "production_qty_based_on_child_stock_wip_open_po",
 			"fieldtype": "Int",
@@ -290,6 +302,18 @@ def get_columns():
 			"label": _("Child SKU Type"),
 			"fieldname": "child_sku_type",
 			"fieldtype": "Data",
+			"width": 130,
+		},
+		{
+			"label": _("Per Hour Production"),
+			"fieldname": "per_hour_production",
+			"fieldtype": "Float",
+			"width": 160,
+		},
+		{
+			"label": _("Process Time"),
+			"fieldname": "process_time",
+			"fieldtype": "Float",
 			"width": 130,
 		},
 	]
@@ -508,6 +532,7 @@ def get_data(filters=None):
 			remaining_so_for_op_cp -= qty_per_row
 
 			base_row = {
+				"machine": None,
 				"item_code": item_code,
 				"item_name": item_name_map[item_code],
 				"sku_type": sku_type,
@@ -526,6 +551,7 @@ def get_data(filters=None):
 				"moq": math.ceil(moq),
 				"batch_size": math.ceil(batch_size),
 				"production_qty_based_on_child_stock": None,
+				"process_time_based_on_child_stock": None,
 				"production_qty_based_on_child_stock_wip_open_po": None,
 				"child_item_code": None,
 				"child_requirement": None,
@@ -536,6 +562,8 @@ def get_data(filters=None):
 				"child_bom_qty": None,
 				"child_bom_quantity": None,
 				"child_wip_open_po": None,
+				"per_hour_production": None,
+				"process_time": None,
 			}
 
 			if child_items:
