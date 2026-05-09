@@ -182,6 +182,12 @@ def execute(filters=None):
 def get_columns():
 	return [
 		{
+			"label": _("Machine"),
+			"fieldname": "machine",
+			"fieldtype": "Data",
+			"width": 130,
+		},
+		{
 			"label": _("Item Code"),
 			"fieldname": "item_code",
 			"fieldtype": "Link",
@@ -225,6 +231,12 @@ def get_columns():
 			"width": 160,
 		},
 		{
+			"label": _("Priority Sequence"),
+			"fieldname": "priority_sequence",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
 			"label": _("OP/CP"),
 			"fieldname": "op_cp",
 			"fieldtype": "Data",
@@ -247,6 +259,13 @@ def get_columns():
 			"label": _("Prod Qty based on Child Stock"),
 			"fieldname": "production_qty_based_on_child_stock",
 			"fieldtype": "Int",
+			"width": 220,
+		},
+		{
+			"label": _("Process Time based on Child Stock"),
+			"fieldname": "process_time_based_on_child_stock",
+			"fieldtype": "Float",
+			"precision": 2,
 			"width": 220,
 		},
 		{
@@ -290,6 +309,20 @@ def get_columns():
 			"label": _("Child SKU Type"),
 			"fieldname": "child_sku_type",
 			"fieldtype": "Data",
+			"width": 130,
+		},
+		{
+			"label": _("Per Hour Production"),
+			"fieldname": "per_hour_production",
+			"fieldtype": "Float",
+			"precision": 2,
+			"width": 160,
+		},
+		{
+			"label": _("Process Time"),
+			"fieldname": "process_time",
+			"fieldtype": "Float",
+			"precision": 2,
 			"width": 130,
 		},
 	]
@@ -361,6 +394,31 @@ def get_data(filters=None):
 
 	# For BBMTO priority calculation
 	so_map_for_priority = get_open_so_map_for_priority(list(item_codes))
+
+	# Build machine map: item_code -> {machine, per_hour_production} from default row
+	machine_rows = frappe.db.sql(
+		"""
+		SELECT bmm.item_code, bmmt.machine_group_name, bmmt.mt_per_hour_production
+		FROM `tabBright Machine Master` bmm
+		INNER JOIN `tabBright Machine Master Table` bmmt ON bmmt.parent = bmm.name
+		WHERE bmmt.is_default = 1
+		""",
+		as_dict=True,
+	)
+	machine_map = {
+		r.item_code: {
+			"machine": r.machine_group_name,
+			"per_hour_production": flt(r.mt_per_hour_production),
+		}
+		for r in machine_rows
+	}
+
+	# Build priority sequence map: priority_colour value -> sequence number
+	priority_seq_rows = frappe.db.sql(
+		"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
+		as_dict=True,
+	)
+	priority_seq_map = {r.priority_colour: r.sequence for r in priority_seq_rows}
 
 	# Build base rows
 	data = []
@@ -508,6 +566,13 @@ def get_data(filters=None):
 			remaining_so_for_op_cp -= qty_per_row
 
 			base_row = {
+				"machine": (machine_map.get(item_code) or {}).get("machine"),
+				"per_hour_production": (machine_map.get(item_code) or {}).get("per_hour_production"),
+				"process_time": (
+					round(qty_per_row / flt((machine_map.get(item_code) or {}).get("per_hour_production")), 2)
+					if (machine_map.get(item_code) or {}).get("per_hour_production")
+					else None
+				),
 				"item_code": item_code,
 				"item_name": item_name_map[item_code],
 				"sku_type": sku_type,
@@ -522,10 +587,16 @@ def get_data(filters=None):
 				)
 				if on_hand_colour_priority
 				else "",
+				"priority_sequence": priority_seq_map.get(
+					("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
+					if sku_type == "BBMTA"
+					else ("MTO" + on_hand_colour_priority.upper())
+				) if on_hand_colour_priority else None,
 				"or_with_moq_batch_size": math.ceil(qty_per_row),
 				"moq": math.ceil(moq),
 				"batch_size": math.ceil(batch_size),
 				"production_qty_based_on_child_stock": None,
+				"process_time_based_on_child_stock": None,
 				"production_qty_based_on_child_stock_wip_open_po": None,
 				"child_item_code": None,
 				"child_requirement": None,
@@ -561,9 +632,12 @@ def get_data(filters=None):
 
 			accumulated_batch_qty += qty_per_row
 
-	# Sort by on_hand_colour_priority severity (BLACK first, then RED, YELLOW, GREEN, WHITE, empty)
-	_colour_order = {"BLACK": 0, "RED": 1, "YELLOW": 2, "GREEN": 3, "WHITE": 4, "": 5}
-	data.sort(key=lambda r: _colour_order.get((r.get("on_hand_colour_priority") or "").upper(), 5))
+	# Sort by machine (grouped), then by priority_sequence (user-defined order from Priority Colour Sequence Master)
+	# Rows with no machine go last; rows with no sequence go last within their machine group
+	data.sort(key=lambda r: (
+		r.get("machine") or "\xff",
+		r.get("priority_sequence") if r.get("priority_sequence") is not None else 999999,
+	))
 
 	# Per-item allocation: each parent item independently allocates from actual child stock.
 	# All batch rows of the same item show the same item-level values (cached per pair).
@@ -595,10 +669,14 @@ def get_data(filters=None):
 		child_bom_quantity = flt(row.get("child_bom_quantity", 1.0)) or 1.0
 		parent_per_child = (child_bom_quantity / child_bom_qty) if child_bom_qty else 0
 
+		prod_qty_child_stock = math.ceil(stock_allocated * parent_per_child)
+		per_hour = flt(row.get("per_hour_production") or 0)
+
 		cached = {
 			"child_stock_soft_allocation_qty": math.ceil(stock_allocated),
 			"child_stock_shortage": math.ceil(stock_shortage),
-			"production_qty_based_on_child_stock": math.ceil(stock_allocated * parent_per_child),
+			"production_qty_based_on_child_stock": prod_qty_child_stock,
+			"process_time_based_on_child_stock": round(prod_qty_child_stock / per_hour, 2) if per_hour else None,
 			"production_qty_based_on_child_stock_wip_open_po": math.ceil(total_allocated * parent_per_child),
 		}
 		allocation_cache[pair] = cached
