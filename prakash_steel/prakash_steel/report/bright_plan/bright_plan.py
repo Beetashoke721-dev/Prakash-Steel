@@ -410,6 +410,13 @@ def get_data(filters=None):
 		for r in machine_rows
 	}
 
+	# Build priority sequence map: priority_colour value -> sequence number
+	priority_seq_rows = frappe.db.sql(
+		"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
+		as_dict=True,
+	)
+	priority_seq_map = {r.priority_colour: r.sequence for r in priority_seq_rows}
+
 	# Build base rows
 	data = []
 	child_stock_map = {}
@@ -577,7 +584,11 @@ def get_data(filters=None):
 				)
 				if on_hand_colour_priority
 				else "",
-				"priority_sequence": None,
+				"priority_sequence": priority_seq_map.get(
+					("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
+					if sku_type == "BBMTA"
+					else ("MTO" + on_hand_colour_priority.upper())
+				) if on_hand_colour_priority else None,
 				"or_with_moq_batch_size": math.ceil(qty_per_row),
 				"moq": math.ceil(moq),
 				"batch_size": math.ceil(batch_size),
