@@ -1,0 +1,56 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-09 13:18:50.584924",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "priority_colour",
+  "sequence",
+  "column_break_ncmm",
+  "column_break_beyp"
+ ],
+ "fields": [
+  {
+   "columns": 4,
+   "fieldname": "priority_colour",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Priority Colour",
+   "options": "Priority Colour",
+   "reqd": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sequence",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ncmm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_beyp",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-09 13:20:19.174543",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Priority Colour Seq Master Table",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
