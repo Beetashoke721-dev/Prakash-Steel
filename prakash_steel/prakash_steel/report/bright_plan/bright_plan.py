@@ -243,6 +243,7 @@ def get_columns():
 			"fieldname": "op_cp",
 			"fieldtype": "Data",
 			"width": 80,
+			"hidden": 0,
 		},
 		{
 			"label": _("MOQ"),
