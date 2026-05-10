@@ -468,6 +468,9 @@ def get_data(filters=None):
 			num_batches = 1
 			qty_per_row = net_order_rec
 
+		if net_order_rec == 0:
+			continue
+
 		# Get BOM child items (fetched once per parent item)
 		bom = get_default_bom(item_code)
 		child_items = []
