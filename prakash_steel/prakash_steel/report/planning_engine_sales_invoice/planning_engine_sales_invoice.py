@@ -56,6 +56,7 @@ def get_columns():
 			"fieldtype": "Link",
 			"options": "Sales Order",
 			"width": 170,
+			"align": "left",
 		},
 		{
 			"label": "Customer Name",
@@ -86,8 +87,15 @@ def get_columns():
 			"fieldname": "qty",
 			"fieldtype": "Int",
 			"width": 110,
+			"align": "left",
 		},
-		{"label": "Item Price", "fieldname": "item_price", "fieldtype": "Currency", "width": 120},
+		{
+			"label": "Item Price",
+			"fieldname": "item_price",
+			"fieldtype": "Currency",
+			"width": 120,
+			"align": "left",
+		},
 	]
 
 
@@ -123,6 +131,9 @@ def get_data(filters):
 
 	if filters.get("company"):
 		conditions.append("si.company = %(company)s")
+
+	if filters.get("sales_invoice"):
+		conditions.append("si.name = %(sales_invoice)s")
 
 	if filters.get("customer"):
 		conditions.append("si.customer = %(customer)s")

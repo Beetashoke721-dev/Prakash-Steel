@@ -2,6 +2,23 @@
 // For license information, please see license.txt
 
 frappe.query_reports["Planning Engine Sales Invoice"] = {
+	formatter: function (value, row, column, data, default_formatter) {
+		const fname = column.fieldname || column.id;
+		// Int/Currency formatters wrap in text-align:right; inline skips that wrapper.
+		if (fname === "qty" || fname === "item_price") {
+			const formatted = frappe.format(value, column, {
+				for_print: false,
+				always_show_decimals: true,
+				inline: true,
+			}, data);
+			return `<div style="text-align:left;width:100%">${formatted ?? ""}</div>`;
+		}
+		if (fname === "sales_order_number") {
+			const formatted = default_formatter(value, row, column, data);
+			return `<div style="text-align:left;width:100%">${formatted ?? ""}</div>`;
+		}
+		return default_formatter(value, row, column, data);
+	},
 	onload: function (report) {
 		frappe.call({
 			method: "frappe.client.get_list",
@@ -72,6 +89,12 @@ frappe.query_reports["Planning Engine Sales Invoice"] = {
 			fieldtype: "Link",
 			options: "Company",
 			default: frappe.defaults.get_user_default("Company"),
+		},
+		{
+			fieldname: "sales_invoice",
+			label: __("Sales Invoice"),
+			fieldtype: "Link",
+			options: "Sales Invoice",
 		},
 		{
 			fieldname: "customer",
