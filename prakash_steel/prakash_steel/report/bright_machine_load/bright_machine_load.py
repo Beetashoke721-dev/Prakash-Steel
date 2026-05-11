@@ -47,7 +47,7 @@ def get_machine_breakdown(machine_group_name):
 	# Items mapped to this machine (default row)
 	machine_rows = frappe.db.sql(
 		"""
-		SELECT bmm.item_code
+		SELECT bmm.item_code, bmmt.mt_per_hour_production
 		FROM `tabBright Machine Master` bmm
 		INNER JOIN `tabBright Machine Master Table` bmmt ON bmmt.parent = bmm.name
 		WHERE bmmt.is_default = 1 AND bmmt.machine_group_name = %s
@@ -56,6 +56,7 @@ def get_machine_breakdown(machine_group_name):
 		as_dict=True,
 	)
 	item_codes_for_machine = [r.item_code for r in machine_rows]
+	item_kg_per_hour_map = {r.item_code: flt(r.mt_per_hour_production) for r in machine_rows}
 	if not item_codes_for_machine:
 		return {
 			"machine": machine_group_name,
@@ -116,10 +117,11 @@ def get_machine_breakdown(machine_group_name):
 	open_so_qty_map = get_sales_order_qty_map({})
 
 	item_rows = []
-	total_prod_req = 0.0
-	total_order_req = 0.0
+	total_prod_hours = 0.0
+	total_order_hours = 0.0
 
 	for item_code in sorted(item_codes):
+		kg_per_hour = item_kg_per_hour_map.get(item_code, 0.0)
 		is_buffer = item_buffer_map[item_code] == "Buffer"
 		stock = flt(stock_map.get(item_code, 0))
 		wip = flt(wip_map.get(item_code, 0))
@@ -142,8 +144,11 @@ def get_machine_breakdown(machine_group_name):
 		display_open_so = qualified_demand if is_buffer else flt(open_so_qty_map.get(item_code, 0))
 		order_req = max(0.0, display_open_so - stock)
 
-		total_prod_req += net_order_rec
-		total_order_req += order_req
+		prod_hours = round(net_order_rec / kg_per_hour, 4) if kg_per_hour else 0
+		order_hours = round(order_req / kg_per_hour, 4) if kg_per_hour else 0
+
+		total_prod_hours += prod_hours
+		total_order_hours += order_hours
 
 		item_rows.append({
 			"item_code": item_code,
@@ -159,10 +164,13 @@ def get_machine_breakdown(machine_group_name):
 			"base_order_rec": round(base_order_rec),
 			"net_order_rec": round(net_order_rec),
 			"order_req": round(order_req),
+			"kg_per_hour": kg_per_hour,
+			"prod_hours": round(prod_hours, 2),
+			"order_hours": round(order_hours, 2),
 		})
 
-	net_prod_load = round((total_prod_req / effective_runtime) / no_of_machines, 2) if effective_runtime and no_of_machines else 0
-	net_order_load = round((total_order_req / effective_runtime) / no_of_machines, 2) if effective_runtime and no_of_machines else 0
+	net_prod_load = round((total_prod_hours / effective_runtime) / no_of_machines, 2) if effective_runtime and no_of_machines else 0
+	net_order_load = round((total_order_hours / effective_runtime) / no_of_machines, 2) if effective_runtime and no_of_machines else 0
 
 	return {
 		"machine": machine_group_name,
@@ -171,8 +179,8 @@ def get_machine_breakdown(machine_group_name):
 		"runtime": runtime,
 		"effective_runtime": round(effective_runtime, 2),
 		"items": item_rows,
-		"total_prod_req": round(total_prod_req),
-		"total_order_req": round(total_order_req),
+		"total_prod_hours": round(total_prod_hours, 2),
+		"total_order_hours": round(total_order_hours, 2),
 		"net_prod_load": net_prod_load,
 		"net_order_load": net_order_load,
 	}
@@ -238,15 +246,15 @@ def get_data():
 	# 3. Get item -> machine mapping from Bright Machine Master (default row only)
 	machine_rows = frappe.db.sql(
 		"""
-		SELECT bmm.item_code, bmmt.machine_group_name
+		SELECT bmm.item_code, bmmt.machine_group_name, bmmt.mt_per_hour_production
 		FROM `tabBright Machine Master` bmm
 		INNER JOIN `tabBright Machine Master Table` bmmt ON bmmt.parent = bmm.name
 		WHERE bmmt.is_default = 1
 		""",
 		as_dict=True,
 	)
-	# item_code -> machine_group_name
 	item_machine_map = {r.item_code: r.machine_group_name for r in machine_rows}
+	item_kg_per_hour_map = {r.item_code: flt(r.mt_per_hour_production) for r in machine_rows}
 
 	# 4. Fetch all BB items
 	bb_items = frappe.db.sql(
@@ -302,13 +310,19 @@ def get_data():
 
 	open_so_qty_map = get_sales_order_qty_map({})
 
-	# 6. For each item, compute net_order_rec (prod load) and open_so - stock (order load)
-	machine_net_req_map = {m.machine_group_name: 0.0 for m in machines}
-	machine_order_load_map = {m.machine_group_name: 0.0 for m in machines}
+	# 6. For each item, compute process hours per machine
+	# prod hours = net_order_rec / kg_per_hour  (production order rec based)
+	# order hours = (open_so - stock) / kg_per_hour  (open so based)
+	machine_prod_hours_map = {m.machine_group_name: 0.0 for m in machines}
+	machine_order_hours_map = {m.machine_group_name: 0.0 for m in machines}
 
 	for item_code in item_codes:
 		machine_group = item_machine_map.get(item_code)
-		if not machine_group or machine_group not in machine_net_req_map:
+		if not machine_group or machine_group not in machine_prod_hours_map:
+			continue
+
+		kg_per_hour = item_kg_per_hour_map.get(item_code, 0.0)
+		if not kg_per_hour:
 			continue
 
 		is_buffer = item_buffer_map[item_code] == "Buffer"
@@ -324,17 +338,18 @@ def get_data():
 		)
 		qualified_demand = flt(qualified_demand)
 
-		# Net prod load: uses production order recommendation (wip/mrq/moq factored in)
+		# Prod hours: net order rec / kg_per_hour
 		if is_buffer:
 			base_order_rec = max(0.0, tog + qualified_demand - stock - wip - mrq)
 		else:
 			base_order_rec = max(0.0, qualified_demand - stock - wip - mrq)
 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
-		machine_net_req_map[machine_group] += net_order_rec
+		machine_prod_hours_map[machine_group] += net_order_rec / kg_per_hour
 
-		# Net order load: open_so - stock (buffer uses qualified_demand as open_so)
+		# Order hours: (open_so - stock) / kg_per_hour
 		display_open_so = qualified_demand if is_buffer else flt(open_so_qty_map.get(item_code, 0))
-		machine_order_load_map[machine_group] += max(0.0, display_open_so - stock)
+		order_req = max(0.0, display_open_so - stock)
+		machine_order_hours_map[machine_group] += order_req / kg_per_hour
 
 	# 7. Build output rows
 	data = []
@@ -344,16 +359,15 @@ def get_data():
 		no_of_machines = detail["no_of_machines"]
 		oee = detail["oee"]
 		runtime = detail["runtime"]
-		total_net_req = machine_net_req_map.get(mgn, 0.0)
+		total_prod_hours = machine_prod_hours_map.get(mgn, 0.0)
+		total_order_hours = machine_order_hours_map.get(mgn, 0.0)
 
 		# effective hours per machine per day = runtime * (oee / 100)
 		effective_runtime = runtime * (oee / 100.0) if oee else 0
 
-		total_order_req = machine_order_load_map.get(mgn, 0.0)
-
 		if effective_runtime and no_of_machines:
-			net_prod_load = round((total_net_req / effective_runtime) / no_of_machines, 2)
-			net_order_load = round((total_order_req / effective_runtime) / no_of_machines, 2)
+			net_prod_load = round((total_prod_hours / effective_runtime) / no_of_machines, 2)
+			net_order_load = round((total_order_hours / effective_runtime) / no_of_machines, 2)
 		else:
 			net_prod_load = 0
 			net_order_load = 0
