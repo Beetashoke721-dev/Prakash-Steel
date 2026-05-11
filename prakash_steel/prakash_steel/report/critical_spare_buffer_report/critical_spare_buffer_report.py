@@ -139,4 +139,5 @@ def get_data():
 			"net_order_recommendation": net_order_recommendation,
 		})
 
+	data.sort(key=lambda x: float(x["on_hand_status"].rstrip("%")))
 	return data
