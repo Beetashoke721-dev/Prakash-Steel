@@ -1,0 +1,142 @@
+# Copyright (c) 2026, Beetashoke Chakraborty and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe import _
+from frappe.utils import flt
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
+	get_mrq_map,
+	get_open_po_map,
+	get_stock_map,
+)
+
+
+def execute(filters=None):
+	columns = get_columns()
+	data = get_data()
+	return columns, data
+
+
+def get_columns():
+	return [
+		{
+			"label": _("Item Code"),
+			"fieldname": "item_code",
+			"fieldtype": "Link",
+			"options": "Item",
+			"width": 150,
+		},
+		{
+			"label": _("Item Name"),
+			"fieldname": "item_name",
+			"fieldtype": "Data",
+			"width": 200,
+		},
+		{
+			"label": _("TOG"),
+			"fieldname": "tog",
+			"fieldtype": "Int",
+			"width": 100,
+		},
+		{
+			"label": _("On Hand Stock"),
+			"fieldname": "on_hand_stock",
+			"fieldtype": "Float",
+			"precision": 2,
+			"width": 120,
+		},
+		{
+			"label": _("On Order"),
+			"fieldname": "on_order",
+			"fieldtype": "Float",
+			"precision": 2,
+			"width": 100,
+		},
+		{
+			"label": _("Order Recommendation"),
+			"fieldname": "order_recommendation",
+			"fieldtype": "Float",
+			"precision": 2,
+			"width": 160,
+		},
+		{
+			"label": _("On Hand Status"),
+			"fieldname": "on_hand_status",
+			"fieldtype": "Data",
+			"width": 120,
+		},
+		{
+			"label": _("On Hand Colour"),
+			"fieldname": "on_hand_colour",
+			"fieldtype": "Data",
+			"width": 120,
+		},
+		{
+			"label": _("MOQ"),
+			"fieldname": "moq",
+			"fieldtype": "Int",
+			"width": 80,
+		},
+		{
+			"label": _("Net Order Recommendation"),
+			"fieldname": "net_order_recommendation",
+			"fieldtype": "Float",
+			"precision": 2,
+			"width": 180,
+		},
+	]
+
+
+def get_data():
+	items = frappe.db.get_all(
+		"Item",
+		filters={"custom_item_type": "CS", "disabled": 0},
+		fields=["name as item_code", "item_name", "safety_stock as tog", "min_order_qty as moq"],
+	)
+
+	if not items:
+		return []
+
+	item_codes = {d.item_code for d in items}
+	stock_map = get_stock_map(item_codes)
+	open_po_map = get_open_po_map()
+	mrq_map = get_mrq_map()
+
+	data = []
+	for item in items:
+		item_code = item.item_code
+		tog = flt(item.tog)
+		on_hand_stock = flt(stock_map.get(item_code, 0))
+		on_order = flt(open_po_map.get(item_code, 0))
+		mrq = flt(mrq_map.get(item_code, 0))
+		order_recommendation = tog - on_hand_stock - on_order - mrq
+		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
+		on_hand_status = f"{on_hand_status_value:.2f}%"
+		moq = flt(item.moq)
+		net_order_recommendation = max(order_recommendation, moq)
+
+		if on_hand_status_value == 0:
+			on_hand_colour = "BLACK"
+		elif 0 < on_hand_status_value <= 34:
+			on_hand_colour = "RED"
+		elif 34 < on_hand_status_value <= 67:
+			on_hand_colour = "YELLOW"
+		elif 67 < on_hand_status_value <= 100:
+			on_hand_colour = "GREEN"
+		else:
+			on_hand_colour = "WHITE"
+
+		data.append({
+			"item_code": item_code,
+			"item_name": item.item_name,
+			"tog": tog,
+			"on_hand_stock": on_hand_stock,
+			"on_order": on_order,
+			"order_recommendation": order_recommendation,
+			"on_hand_status": on_hand_status,
+			"on_hand_colour": on_hand_colour,
+			"moq": moq,
+			"net_order_recommendation": net_order_recommendation,
+		})
+
+	return data
