@@ -109,7 +109,7 @@ def get_data():
 		on_hand_stock = flt(stock_map.get(item_code, 0))
 		on_order = flt(open_po_map.get(item_code, 0))
 		mrq = flt(mrq_map.get(item_code, 0))
-		order_recommendation = tog - on_hand_stock - on_order - mrq
+		order_recommendation = max(0, tog - on_hand_stock - on_order - mrq)
 		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
 		on_hand_status = f"{on_hand_status_value:.2f}%"
 		moq = flt(item.moq)
