@@ -46,6 +46,14 @@
    "wildcard_filter": 0
   },
   {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "mandatory": 0,
+   "options": "Sales Invoice",
+   "wildcard_filter": 0
+  },
+  {
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
