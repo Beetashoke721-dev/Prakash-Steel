@@ -126,18 +126,20 @@ def get_data():
 		else:
 			on_hand_colour = "WHITE"
 
-		data.append({
-			"item_code": item_code,
-			"item_name": item.item_name,
-			"tog": tog,
-			"on_hand_stock": on_hand_stock,
-			"on_order": on_order,
-			"order_recommendation": order_recommendation,
-			"on_hand_status": on_hand_status,
-			"on_hand_colour": on_hand_colour,
-			"moq": moq,
-			"net_order_recommendation": net_order_recommendation,
-		})
+		data.append(
+			{
+				"item_code": item_code,
+				"item_name": item.item_name,
+				"tog": tog,
+				"on_hand_stock": on_hand_stock,
+				"on_order": on_order,
+				"order_recommendation": order_recommendation,
+				"on_hand_status": on_hand_status,
+				"on_hand_colour": on_hand_colour,
+				"moq": moq,
+				"net_order_recommendation": net_order_recommendation,
+			}
+		)
 
 	data.sort(key=lambda x: float(x["on_hand_status"].rstrip("%")))
 	return data
