@@ -61,8 +61,9 @@ function show_machine_breakdown(d) {
 
 	// Per-item table
 	const hdrs = [
-		"Item Code", "SKU Type", "Open SO", "Stock", "WIP", "MRQ", "TOG",
-		"Qual. Demand", "MOQ", "Batch Size", "Base OR", "Net OR (Prod)", "Order Req (Order Load)"
+		"Item Code", "SKU Type", "Kg/Hr", "Open SO", "Stock", "WIP", "MRQ", "TOG",
+		"Qual. Demand", "MOQ", "Batch Size", "Base OR", "Net OR", "Prod Hrs (OR/Kg·Hr)",
+		"Order Req", "Order Hrs (Req/Kg·Hr)"
 	].map(h => `<th style="padding:5px 8px;border-bottom:2px solid #ddd;white-space:nowrap;font-size:11px;text-align:right;">${h}</th>`).join("");
 
 	const tbody = (d.items || []).map(r => {
@@ -70,6 +71,7 @@ function show_machine_breakdown(d) {
 		return `<tr style="border-bottom:1px solid #eee;">
 			<td style="padding:4px 8px;font-size:12px;font-weight:bold;white-space:nowrap;">${frappe.utils.escape_html(r.item_code)}</td>
 			<td style="padding:4px 8px;font-size:12px;text-align:center;"><span style="background:${sku_bg};padding:1px 6px;border-radius:3px;">${r.sku_type}</span></td>
+			<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:bold;">${fmt(r.kg_per_hour)}</td>
 			<td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt(r.open_so)}</td>
 			<td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt(r.stock)}</td>
 			<td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt(r.wip)}</td>
@@ -79,31 +81,34 @@ function show_machine_breakdown(d) {
 			<td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt(r.moq)}</td>
 			<td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt(r.batch_size)}</td>
 			<td style="padding:4px 8px;font-size:12px;text-align:right;color:#888;">${fmt(r.base_order_rec)}</td>
-			<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:bold;color:#1a6;">${fmt(r.net_order_rec)}</td>
-			<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:bold;color:#e65;">${fmt(r.order_req)}</td>
+			<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:bold;">${fmt(r.net_order_rec)}</td>
+			<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:bold;color:#1a6;">${fmt(r.prod_hours)}</td>
+			<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:bold;">${fmt(r.order_req)}</td>
+			<td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:bold;color:#e65;">${fmt(r.order_hours)}</td>
 		</tr>`;
 	}).join("");
 
 	// Totals row
 	const totals_row = `
 		<tr style="background:#f0f4ff;font-weight:bold;border-top:2px solid #aac;">
-			<td colspan="11" style="padding:5px 8px;font-size:12px;text-align:right;">TOTAL</td>
-			<td style="padding:5px 8px;font-size:12px;text-align:right;color:#1a6;">${fmt(d.total_prod_req)}</td>
-			<td style="padding:5px 8px;font-size:12px;text-align:right;color:#e65;">${fmt(d.total_order_req)}</td>
+			<td colspan="13" style="padding:5px 8px;font-size:12px;text-align:right;">TOTAL HOURS</td>
+			<td style="padding:5px 8px;font-size:12px;text-align:right;color:#1a6;">${fmt(d.total_prod_hours)}</td>
+			<td style="padding:5px 8px;font-size:12px;text-align:right;"></td>
+			<td style="padding:5px 8px;font-size:12px;text-align:right;color:#e65;">${fmt(d.total_order_hours)}</td>
 		</tr>`;
 
 	// Final calculation
 	const calc = `
 		<div style="display:flex;gap:24px;margin-top:16px;font-size:13px;flex-wrap:wrap;">
-			<div style="background:#e8f5e9;padding:12px 20px;border-radius:6px;border:1px solid #a5d6a7;min-width:220px;">
+			<div style="background:#e8f5e9;padding:12px 20px;border-radius:6px;border:1px solid #a5d6a7;min-width:240px;">
 				<div style="font-size:11px;color:#555;margin-bottom:4px;">NET PROD LOAD (Days)</div>
 				<div style="font-size:22px;font-weight:bold;color:#2e7d32;">${fmt(d.net_prod_load)}</div>
-				<div style="font-size:11px;color:#777;margin-top:4px;">(${fmt(d.total_prod_req)} &divide; ${fmt(d.effective_runtime)}) &divide; ${fmt(d.no_of_machines)}</div>
+				<div style="font-size:11px;color:#777;margin-top:4px;">(${fmt(d.total_prod_hours)} hrs &divide; ${fmt(d.effective_runtime)}) &divide; ${fmt(d.no_of_machines)}</div>
 			</div>
-			<div style="background:#fff3e0;padding:12px 20px;border-radius:6px;border:1px solid #ffcc80;min-width:220px;">
+			<div style="background:#fff3e0;padding:12px 20px;border-radius:6px;border:1px solid #ffcc80;min-width:240px;">
 				<div style="font-size:11px;color:#555;margin-bottom:4px;">NET ORDER LOAD (Days)</div>
 				<div style="font-size:22px;font-weight:bold;color:#e65100;">${fmt(d.net_order_load)}</div>
-				<div style="font-size:11px;color:#777;margin-top:4px;">(${fmt(d.total_order_req)} &divide; ${fmt(d.effective_runtime)}) &divide; ${fmt(d.no_of_machines)}</div>
+				<div style="font-size:11px;color:#777;margin-top:4px;">(${fmt(d.total_order_hours)} hrs &divide; ${fmt(d.effective_runtime)}) &divide; ${fmt(d.no_of_machines)}</div>
 			</div>
 		</div>`;
 

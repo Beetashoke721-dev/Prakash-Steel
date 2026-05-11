@@ -186,7 +186,8 @@ def get_columns():
 		{
 			"label": _("Machine"),
 			"fieldname": "machine",
-			"fieldtype": "Data",
+			"fieldtype": "Link",
+			"options": "Bright Machine",
 			"width": 130,
 		},
 		{
@@ -208,6 +209,12 @@ def get_columns():
 			"fieldtype": "Int",
 			"width": 120,
 		},
+		# {
+		# 	"label": _("Last 3 Month Sale"),
+		# 	"fieldname": "last_3month_sale",
+		# 	"fieldtype": "Int",
+		# 	"width": 150,
+		# },
 		{
 			"label": _("On Hand Stock"),
 			"fieldname": "on_hand_stock",
@@ -422,6 +429,22 @@ def get_data(filters=None):
 	)
 	priority_seq_map = {r.priority_colour: r.sequence for r in priority_seq_rows}
 
+	# Last 3 month sale map: item_code -> sum of (qty - delivered_qty) from submitted Sales Invoices
+	last_3month_rows = frappe.db.sql(
+		"""
+		SELECT
+			sii.item_code,
+			SUM(GREATEST(0, sii.qty - IFNULL(sii.delivered_qty, 0))) AS sale_qty
+		FROM `tabSales Invoice Item` sii
+		INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+		WHERE si.docstatus = 1
+			AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+		GROUP BY sii.item_code
+		""",
+		as_dict=True,
+	)
+	last_3month_sale_map = {r.item_code: math.ceil(flt(r.sale_qty)) for r in last_3month_rows}
+
 	# Build base rows
 	data = []
 	child_stock_map = {}
@@ -584,6 +607,7 @@ def get_data(filters=None):
 				"item_name": item_name_map[item_code],
 				"sku_type": sku_type,
 				"open_so": math.ceil(display_open_so),
+				"last_3month_sale": last_3month_sale_map.get(item_code, 0),
 				"on_hand_stock": math.ceil(stock),
 				"on_hand_colour_priority": on_hand_colour_priority,
 				"op_cp": op_cp,
@@ -680,8 +704,16 @@ def get_data(filters=None):
 		child_bom_quantity = flt(row.get("child_bom_quantity", 1.0)) or 1.0
 		parent_per_child = (child_bom_quantity / child_bom_qty) if child_bom_qty else 0
 
-		prod_qty_child_stock = math.ceil(stock_allocated * parent_per_child)
+		net_order_recommendation = math.ceil(flt(row.get("or_with_moq_batch_size", 0)))
 		per_hour = flt(row.get("per_hour_production") or 0)
+
+		prod_qty_child_stock = math.ceil(stock_allocated * parent_per_child)
+		# Cap at net order recommendation — can't produce more than what's actually needed
+		prod_qty_child_stock = min(prod_qty_child_stock, net_order_recommendation)
+
+		prod_qty_child_stock_wip = math.ceil(total_allocated * parent_per_child)
+		# Cap at net order recommendation — can't produce more than what's actually needed
+		prod_qty_child_stock_wip = min(prod_qty_child_stock_wip, net_order_recommendation)
 
 		cached = {
 			"child_stock_soft_allocation_qty": math.ceil(stock_allocated),
@@ -690,7 +722,7 @@ def get_data(filters=None):
 			"process_time_based_on_child_stock": round(prod_qty_child_stock / per_hour, 2)
 			if per_hour
 			else None,
-			"production_qty_based_on_child_stock_wip_open_po": math.ceil(total_allocated * parent_per_child),
+			"production_qty_based_on_child_stock_wip_open_po": prod_qty_child_stock_wip,
 		}
 		allocation_cache[pair] = cached
 		row.update(cached)
