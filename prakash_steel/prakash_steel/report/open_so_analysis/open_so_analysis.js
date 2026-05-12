@@ -12,6 +12,10 @@
 // For license information, please see license.txt
 
 frappe.query_reports["Open SO Analysis"] = {
+	onload: function (report) {
+		report.set_filter_value("order_fullkit_status", ["Partial", "Full-kit"]);
+	},
+
 	filters: [
 		{
 			fieldname: "company",
@@ -87,6 +91,24 @@ frappe.query_reports["Open SO Analysis"] = {
 				];
 				let options = [];
 				for (let option of status) {
+					options.push({
+						value: option,
+						label: __(option),
+						description: "",
+					});
+				}
+				return options;
+			},
+		},
+		{
+			fieldname: "order_fullkit_status",
+			label: __("Order Full Kit Status"),
+			fieldtype: "MultiSelectList",
+			default: ["Partial", "Full-kit"],
+			get_data: function (txt) {
+				let statuses = ["Pending", "Partial", "Full-kit"];
+				let options = [];
+				for (let option of statuses) {
 					options.push({
 						value: option,
 						label: __(option),

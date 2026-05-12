@@ -77,9 +77,10 @@ def get_columns():
 			"width": 160,
 		},
 		{
-			"label": "Item Name",
-			"fieldname": "item_name",
-			"fieldtype": "Data",
+			"label": "Item Code",
+			"fieldname": "item_code",
+			"fieldtype": "Link",
+			"options": "Item",
 			"width": 220,
 		},
 		{
@@ -163,7 +164,7 @@ def get_data(filters):
 			si.customer_name AS customer_name,
 			si.place_of_supply,
 			i.custom_category_name AS category_name,
-			sii.item_name,
+			sii.item_code,
 			ROUND(sii.qty, 0) AS qty,
 			sii.rate AS item_price
 		FROM `tabSales Invoice` si

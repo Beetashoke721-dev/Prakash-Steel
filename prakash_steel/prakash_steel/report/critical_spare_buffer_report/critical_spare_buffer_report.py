@@ -53,6 +53,13 @@ def get_columns():
 			"width": 100,
 		},
 		{
+			"label": _("MRQ"),
+			"fieldname": "mrq",
+			"fieldtype": "Float",
+			"precision": 2,
+			"width": 100,
+		},
+		{
 			"label": _("Order Recommendation"),
 			"fieldname": "order_recommendation",
 			"fieldtype": "Float",
@@ -132,6 +139,7 @@ def get_data():
 				"item_name": item.item_name,
 				"tog": tog,
 				"on_hand_stock": on_hand_stock,
+				"mrq": mrq,
 				"on_order": on_order,
 				"order_recommendation": order_recommendation,
 				"on_hand_status": on_hand_status,
