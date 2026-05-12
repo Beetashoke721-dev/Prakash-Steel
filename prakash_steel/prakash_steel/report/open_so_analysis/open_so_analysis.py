@@ -395,6 +395,12 @@ def prepare_data(data, so_elapsed_time, filters):
 		so_name = row.get("sales_order")
 		row["order_fullkit"] = so_fullkit_map.get(so_name, "Pending")
 
+	# Filter by Order Full Kit Status (default: Partial + Full-kit, excludes Pending)
+	order_fullkit_status = filters.get("order_fullkit_status")
+	if not (order_fullkit_status and isinstance(order_fullkit_status, list) and len(order_fullkit_status) > 0):
+		order_fullkit_status = ["Partial", "Full-kit"]
+	data = [row for row in data if row.get("order_fullkit") in order_fullkit_status]
+
 	chart_data = prepare_chart_data(pending, completed)
 
 	if filters.get("group_by_so"):
