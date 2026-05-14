@@ -23,9 +23,9 @@ def execute(filters=None):
 	if not data:
 		return [], [], None, []
 
-	data, chart_data = prepare_data(data, so_elapsed_time, filters)
+	data, _ = prepare_data(data, so_elapsed_time, filters)
 
-	return columns, data, None, chart_data
+	return columns, data, None, None
 
 
 def validate_filters(filters):
@@ -179,8 +179,6 @@ def calculate_sku_type(buffer_flag, item_type):
 
 
 def prepare_data(data, so_elapsed_time, filters):
-	completed, pending = 0, 0
-
 	# Filter out rows where pending_qty (qty_to_deliver) is 0 or negative
 	# Only show items that still need to be delivered (Open SO items)
 	# Also filter out rows where sales order status is "Closed" or "Cancelled"
@@ -213,10 +211,6 @@ def prepare_data(data, so_elapsed_time, filters):
 		sales_order_map = {}
 
 	for row in data:
-		# sum data for chart
-		completed += row["billed_amount"]
-		pending += row["pending_amount"]
-
 		# Convert quantity fields to integers
 		row["qty"] = int(flt(row.get("qty", 0)))
 		row["delivered_qty"] = int(flt(row.get("delivered_qty", 0)))
@@ -401,25 +395,13 @@ def prepare_data(data, so_elapsed_time, filters):
 		order_fullkit_status = ["Partial", "Full-kit"]
 	data = [row for row in data if row.get("order_fullkit") in order_fullkit_status]
 
-	chart_data = prepare_chart_data(pending, completed)
-
 	if filters.get("group_by_so"):
 		data = []
 		for so in sales_order_map:
 			data.append(sales_order_map[so])
-		return data, chart_data
+		return data, None
 
-	return data, chart_data
-
-
-def prepare_chart_data(pending, completed):
-	labels = [_("Amount to Bill"), _("Billed Amount")]
-
-	return {
-		"data": {"labels": labels, "datasets": [{"values": [pending, completed]}]},
-		"type": "donut",
-		"height": 300,
-	}
+	return data, None
 
 
 def get_columns(filters):
