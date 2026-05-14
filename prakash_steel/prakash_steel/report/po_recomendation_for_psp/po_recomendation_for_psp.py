@@ -1853,7 +1853,11 @@ def get_data(filters=None):
 			child_bom_quantity = flt(row.get("child_bom_quantity", 1.0)) or 1.0
 			parent_per_child_factor = (child_bom_quantity / child_bom_qty) if child_bom_quantity else 0
 
+			net_order_recommendation = flt(row.get("or_with_moq_batch_size", 0))
+
 			production_qty_based_on_child_stock = math.ceil(flt(stock_allocated) * parent_per_child_factor)
+			# Cap at net order recommendation — can't produce more than what's actually needed
+			production_qty_based_on_child_stock = min(production_qty_based_on_child_stock, math.ceil(net_order_recommendation))
 			row["production_qty_based_on_child_stock"] = production_qty_based_on_child_stock
 
 			remaining_requirement_after_stock = stock_shortage
@@ -1863,7 +1867,6 @@ def get_data(filters=None):
 
 			row["child_wip_open_po_soft_allocation_qty"] = math.ceil(wip_open_po_allocated)
 			row["child_wip_open_po_shortage"] = math.ceil(wip_open_po_shortage)
-			net_order_recommendation = flt(row.get("or_with_moq_batch_size", 0))
 
 			if flt(net_order_recommendation) == 0:
 				row["child_wip_open_po_full_kit_status"] = None
@@ -1878,6 +1881,8 @@ def get_data(filters=None):
 			production_qty_based_on_child_stock_wip_open_po = math.ceil(
 				total_allocated * parent_per_child_factor
 			)
+			# Cap at net order recommendation — can't produce more than what's actually needed
+			production_qty_based_on_child_stock_wip_open_po = min(production_qty_based_on_child_stock_wip_open_po, math.ceil(net_order_recommendation))
 			row["production_qty_based_on_child_stock_wip_open_po"] = (
 				production_qty_based_on_child_stock_wip_open_po
 			)
