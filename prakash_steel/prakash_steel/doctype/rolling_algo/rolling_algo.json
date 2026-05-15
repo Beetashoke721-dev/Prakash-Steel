@@ -30,6 +30,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Item Code",
+   "link_filters": "[[\"Item\",\"custom_item_type\",\"!=\",\"BB\"]]",
    "options": "Item",
    "reqd": 1
   },
@@ -139,7 +140,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-15 12:51:34.293441",
+ "modified": "2026-05-15 16:05:21.273268",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Rolling Algo",
