@@ -2,11 +2,11 @@
 // For license information, please see license.txt
 
 const COLOUR_STYLES = {
-	Black:  { bg: "#222",     fg: "#fff"  },
-	Red:    { bg: "#e74c3c",  fg: "#fff"  },
-	Yellow: { bg: "#f1c40f",  fg: "#333"  },
-	Green:  { bg: "#27ae60",  fg: "#fff"  },
-	White:  { bg: "#f0f0f0",  fg: "#333"  },
+	Black: { bg: "#222", fg: "#fff" },
+	Red: { bg: "#e74c3c", fg: "#fff" },
+	Yellow: { bg: "#f1c40f", fg: "#333" },
+	Green: { bg: "#27ae60", fg: "#fff" },
+	White: { bg: "#f0f0f0", fg: "#333" },
 };
 
 frappe.query_reports["Rolled Plan"] = {
@@ -93,7 +93,7 @@ function so_fifo_table(rows) {
 	if (!rows || !rows.length)
 		return `<em style="color:#aaa;font-size:11px;">No open SOs</em>`;
 
-	const hdrs = ["Delivery Date","Qty to Deliver","Allocated","Shortage","Available After","Order Status"]
+	const hdrs = ["Delivery Date", "Qty to Deliver", "Allocated", "Shortage", "Available After", "Order Status"]
 		.map(h => `<th style="padding:4px 8px;border-bottom:1px solid #ccc;font-size:11px;text-align:left;">${h}</th>`)
 		.join("");
 
@@ -119,7 +119,7 @@ function parent_fifo_table(rows) {
 	if (!rows || !rows.length)
 		return `<em style="color:#aaa;font-size:11px;">No parent BOM batches</em>`;
 
-	const hdrs = ["Priority Seq","Priority Colour","OP/CP","Parent Item","Level Before","Batch Qty","Child Req","Allocated","Shortage","Available After","Colour"]
+	const hdrs = ["Priority Seq", "Priority Colour", "OP/CP", "Parent Item", "Level Before", "Batch Qty", "Child Req", "Allocated", "Shortage", "Available After", "Colour"]
 		.map(h => `<th style="padding:4px 8px;border-bottom:1px solid #ccc;font-size:11px;text-align:left;">${h}</th>`)
 		.join("");
 
@@ -151,14 +151,14 @@ function show_breakdown_dialog(d) {
 
 	// Header summary
 	html += kv_table([
-		["Item Code",   `<b>${frappe.utils.escape_html(d.item_code)}</b> — ${frappe.utils.escape_html(d.item_name || "")}`],
-		["SKU Type",    d.sku_type],
+		["Item Code", `<b>${frappe.utils.escape_html(d.item_code)}</b> — ${frappe.utils.escape_html(d.item_name || "")}`],
+		["SKU Type", d.sku_type],
 		["Buffer Flag", d.buffer_flag],
-		["Stock",       d.stock],
-		["Open MRQ",    d.mrq],
+		["Stock", d.stock],
+		["Open MRQ", d.mrq],
 		["Level (S+MRQ)", `<b>${d.level}</b>`],
-		["TOG",         d.tog],
-		["Final Colour",colour_badge(d.colour)],
+		["TOG", d.tog],
+		["Final Colour", colour_badge(d.colour)],
 	]);
 
 	if (d.detail_type === "buffer") {
@@ -167,10 +167,10 @@ function show_breakdown_dialog(d) {
 		const pct = d.total > 0 ? `${Math.round(d.level / d.total * 100)}%` : "N/A";
 		html += kv_table([
 			["Till Today Demand", d.till_today],
-			["Spike",             d.spike],
-			["Qualified Demand",  d.qualified_demand],
-			["Total (TOG + QD)",  d.total],
-			["Level / Total",     pct],
+			["Spike", d.spike],
+			["Qualified Demand", d.qualified_demand],
+			["Total (TOG + QD)", d.total],
+			["Level / Total", pct],
 			["≤ 1/3 → Red, ≤ 2/3 → Yellow, ≤ 1 → Green, > 1 → White", ""],
 		]);
 	} else {
