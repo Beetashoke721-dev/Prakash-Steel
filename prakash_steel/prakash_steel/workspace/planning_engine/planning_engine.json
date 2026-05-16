@@ -1,0 +1,269 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"p_14y26G3I\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"Q8fQvz_Wi3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine\",\"col\":4}},{\"id\":\"LaS_JUlxLb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine Master\",\"col\":4}},{\"id\":\"x1CkjVFxAf\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Colour Weightage Master\",\"col\":4}},{\"id\":\"O5-4ofYR7P\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour\",\"col\":4}},{\"id\":\"BvCHpBPAkY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour Sequence Master\",\"col\":4}},{\"id\":\"JzzkrJGCSA\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Machine Load Colour Master\",\"col\":4}},{\"id\":\"hLcJIjEQH5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rolling Algo\",\"col\":4}},{\"id\":\"q5wHB2klBR\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"W_MyEfNOZd\",\"type\":\"card\",\"data\":{\"card_name\":\"Buffer Reports\",\"col\":3}},{\"id\":\"Vwuw1s_qnN\",\"type\":\"card\",\"data\":{\"card_name\":\"Non Buffer Reports\",\"col\":3}},{\"id\":\"ATL6AvoO4H\",\"type\":\"card\",\"data\":{\"card_name\":\"Trend Reports\",\"col\":3}},{\"id\":\"6xGcFTcfXV\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":3}},{\"id\":\"Q9z4KO6hIy\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"bcy5sZHzDu\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboard</b></span>\",\"col\":12}},{\"id\":\"KA4aZcZgPy\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Planning Engine Dashboard\",\"col\":4}}]",
+ "creation": "2026-05-15 13:01:04.636013",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "milestone",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Planning Engine",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buffer Reports",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "BBMTA",
+   "link_count": 0,
+   "link_to": "BBMTA",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "RBMTA",
+   "link_count": 0,
+   "link_to": "RBMTA",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "BOTA",
+   "link_count": 0,
+   "link_to": "BOTA",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "PTA",
+   "link_count": 0,
+   "link_to": "PTA",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "TRMTA",
+   "link_count": 0,
+   "link_to": "TRMTA",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Non Buffer Reports",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "BBMTO",
+   "link_count": 0,
+   "link_to": "BBMTO",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "RBMTO",
+   "link_count": 0,
+   "link_to": "RBMTO",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "BOTO",
+   "link_count": 0,
+   "link_to": "BOTO",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "PTO",
+   "link_count": 0,
+   "link_to": "PTO",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "TRMTO",
+   "link_count": 0,
+   "link_to": "TRMTO",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Trend Reports",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Category wise Trend Report",
+   "link_count": 0,
+   "link_to": "Category wise Trend Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "SKU wise Trend Report",
+   "link_count": 0,
+   "link_to": "SKU wise Trend Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Other Reports",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Planning Engine Sales Invoice",
+   "link_count": 0,
+   "link_to": "Planning Engine Sales Invoice",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Planning Engine RM Production",
+   "link_count": 0,
+   "link_to": "Planning Engine RM Production",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-05-15 13:21:04.242137",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Planning Engine",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 10.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Planning Engine Dashboard",
+   "link_to": "prakash-steel-planni",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Bright Machine",
+   "link_to": "Bright Machine",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Machine Load Colour Master",
+   "link_to": "Machine Load Colour Master",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Rolling Algo",
+   "link_to": "Rolling Algo",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Bright Machine Master",
+   "link_to": "Bright Machine Master",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Colour Weightage Master",
+   "link_to": "Colour Weightage Master",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Priority Colour",
+   "link_to": "Priority Colour",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Priority Colour Sequence Master",
+   "link_to": "Priority Colour Sequence Master",
+   "type": "DocType"
+  }
+ ],
+ "title": "Planning Engine"
+}
