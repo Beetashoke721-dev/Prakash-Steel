@@ -155,8 +155,7 @@ function show_breakdown_dialog(d) {
 		["SKU Type", d.sku_type],
 		["Buffer Flag", d.buffer_flag],
 		["Stock", d.stock],
-		["Open MRQ", d.mrq],
-		["Level (S+MRQ)", `<b>${d.level}</b>`],
+		["Level (Stock)", `<b>${d.level}</b>`],
 		["TOG", d.tog],
 		["Final Colour", colour_badge(d.colour)],
 	]);
