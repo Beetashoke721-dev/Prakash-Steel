@@ -1,0 +1,1291 @@
+# import math
+# from collections import defaultdict
+
+# import frappe
+# from frappe import _
+# from frappe.utils import date_diff, flt, nowdate
+
+# from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
+# 	calculate_net_order_recommendation,
+# 	calculate_sku_type,
+# 	calculate_spike_map,
+# 	get_mrq_map,
+# 	get_open_po_map,
+# 	get_qualified_demand_for_item,
+# 	get_qualified_demand_map,
+# 	get_sales_order_qty_map,
+# 	get_stock_map,
+# 	get_wip_map,
+# )
+
+
+# def execute(filters=None):
+# 	columns = get_columns()
+# 	data = get_data(filters)
+# 	return columns, data
+
+
+# def _buffer_colour(level, tog, qualified_demand):
+# 	total = flt(tog) + flt(qualified_demand)
+# 	if level == 0:
+# 		return "Black"
+# 	if total <= 0:
+# 		return ""
+# 	if level <= total / 3:
+# 		return "Red"
+# 	if level <= (2 * total) / 3:
+# 		return "Yellow"
+# 	if level <= total:
+# 		return "Green"
+# 	return "White"
+
+
+# _COLOUR_RANK = {"Black": 5, "Red": 4, "Yellow": 3, "Green": 2, "White": 1}
+# _RANK_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
+
+
+# def _compute_order_status(delivery_date, transaction_date):
+# 	"""Mirror of Open SO Analysis order_status logic."""
+# 	if not delivery_date:
+# 		return None
+# 	today = nowdate()
+# 	remaining_days = date_diff(delivery_date, today)
+# 	lead_time = date_diff(delivery_date, transaction_date) if transaction_date else None
+# 	if lead_time:
+# 		buffer_pct = (flt(remaining_days) / flt(lead_time)) * 100
+# 	else:
+# 		buffer_pct = flt(remaining_days) * 100
+# 	numeric = math.ceil(buffer_pct)
+# 	if numeric < 0:
+# 		return "BLACK"
+# 	if numeric <= 34:
+# 		return "RED"
+# 	if numeric <= 67:
+# 		return "YELLOW"
+# 	if numeric <= 100:
+# 		return "GREEN"
+# 	return "WHITE"
+
+
+# def get_rbmto_so_detail_map(item_codes):
+# 	"""Returns {item_code: [{pending_qty, colour}, ...]} sorted delivery_date ASC for FIFO."""
+# 	if not item_codes:
+# 		return {}
+# 	t = tuple(item_codes) if len(item_codes) > 1 else (next(iter(item_codes)),)
+# 	rows = frappe.db.sql(
+# 		"""
+# 		SELECT soi.item_code, so.transaction_date, soi.delivery_date,
+# 		       GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0)) AS pending_qty
+# 		FROM `tabSales Order Item` soi
+# 		INNER JOIN `tabSales Order` so ON so.name = soi.parent
+# 		WHERE so.docstatus = 1
+# 		  AND so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
+# 		  AND IFNULL(soi.custom_closed, 0) = 0
+# 		  AND soi.item_code IN %s
+# 		  AND GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0)) > 0
+# 		ORDER BY soi.delivery_date ASC
+# 		""",
+# 		(t,),
+# 		as_dict=True,
+# 	)
+# 	result = defaultdict(list)
+# 	for r in rows:
+# 		status = _compute_order_status(r.delivery_date, r.transaction_date)
+# 		colour = status.capitalize() if status else ""
+# 		result[r.item_code].append({"pending_qty": flt(r.pending_qty), "colour": colour})
+# 	return result
+
+
+# def get_parent_bom_map(item_codes):
+# 	"""Returns {child_item_code: [{parent_item, bom_qty, bom_quantity}, ...]} from default BOMs."""
+# 	if not item_codes:
+# 		return {}
+# 	t = tuple(item_codes) if len(item_codes) > 1 else (next(iter(item_codes)),)
+# 	rows = frappe.db.sql(
+# 		"""
+# 		SELECT b.item AS parent_item, bi.item_code AS child_item,
+# 		       bi.qty AS bom_qty, b.quantity AS bom_quantity
+# 		FROM `tabBOM Item` bi
+# 		INNER JOIN `tabBOM` b ON b.name = bi.parent
+# 		WHERE b.is_default = 1 AND b.docstatus = 1
+# 		  AND bi.item_code IN %s
+# 		""",
+# 		(t,),
+# 		as_dict=True,
+# 	)
+# 	result = defaultdict(list)
+# 	for r in rows:
+# 		result[r.child_item].append(
+# 			{
+# 				"parent_item": r.parent_item,
+# 				"bom_qty": flt(r.bom_qty),
+# 				"bom_quantity": flt(r.bom_quantity) or 1.0,
+# 			}
+# 		)
+# 	return result
+
+
+# def _build_parent_batches(stock, wip, tog, qd, is_buffer, net_order_rec, batch_size, moq, priority_seq_map):
+# 	"""
+# 	Generate production batch list for a parent BB item, mirroring bright_plan logic.
+# 	Returns list of {batch_qty, level_before, colour, op_cp, priority_colour, priority_sequence}.
+# 	"""
+# 	if net_order_rec <= 0:
+# 		return []
+
+# 	if moq == 0 and batch_size > 0 and net_order_rec > batch_size:
+# 		num_batches = round(net_order_rec / batch_size)
+# 		qty_per_row = flt(batch_size)
+# 	else:
+# 		num_batches = 1
+# 		qty_per_row = flt(net_order_rec)
+
+# 	if qty_per_row <= 0:
+# 		return []
+
+# 	# For buffer BB parents, display_open_so = qualified_demand (same as bright_plan)
+# 	display_open_so = flt(qd) if is_buffer else 0.0
+# 	remaining_so_for_op_cp = max(0.0, display_open_so - flt(stock) - flt(wip))
+# 	accumulated = 0.0
+# 	sku_type = "BBMTA" if is_buffer else "BBMTO"
+
+# 	batches = []
+# 	for _i in range(num_batches):
+# 		level = flt(stock) + flt(wip) + accumulated
+# 		colour = _buffer_colour(level, tog, qd) if is_buffer else ""
+# 		op_cp = ""
+# 		if is_buffer and qty_per_row > 0:
+# 			op_cp = "OP" if remaining_so_for_op_cp > 0 else "CP"
+# 		if colour:
+# 			pc_str = ("MTA" + op_cp + colour.upper()) if sku_type == "BBMTA" else ("MTO" + colour.upper())
+# 		else:
+# 			pc_str = ""
+# 		pri_seq = priority_seq_map.get(pc_str, 999999)
+# 		batches.append(
+# 			{
+# 				"batch_qty": qty_per_row,
+# 				"level_before": level,
+# 				"colour": colour,
+# 				"op_cp": op_cp,
+# 				"priority_colour": pc_str,
+# 				"priority_sequence": pri_seq,
+# 			}
+# 		)
+# 		remaining_so_for_op_cp -= qty_per_row
+# 		accumulated += qty_per_row
+# 	return batches
+
+
+# def _rbmto_colour(level, own_so_list, parent_so_fifo_list):
+# 	"""
+# 	RBMTO colour:
+# 	1. FIFO through own open SOs sorted by delivery_date ASC — stop at first shortage.
+# 	2. FIFO remaining through parent SOs sorted by priority_sequence ASC — stop at first shortage.
+# 	   Each parent SO entry has child_req = ceil(parent_pending_qty * bom_qty / bom_quantity).
+# 	If no shortage anywhere → "".
+# 	"""
+# 	available = flt(level)
+
+# 	# Step 1: own SO FIFO — stop and return colour at first SO with a shortage
+# 	for so in own_so_list:
+# 		required = flt(so["pending_qty"])
+# 		allocated = min(required, available)
+# 		shortage = required - allocated
+# 		available -= allocated
+# 		if shortage > 0:
+# 			return so["colour"] or ""
+
+# 	# Step 2: parent SO FIFO (pre-sorted by priority_sequence ASC)
+# 	# Each entry is one parent SO; stop and return its colour at first shortage
+# 	for entry in parent_so_fifo_list:
+# 		child_req = entry["child_req"]
+# 		allocated = min(child_req, available)
+# 		shortage = child_req - allocated
+# 		available -= allocated
+# 		if shortage > 0:
+# 			return entry["colour"] or ""
+
+# 	return ""
+
+
+# def get_columns():
+# 	return [
+# 		{
+# 			"label": _("Item Code"),
+# 			"fieldname": "item_code",
+# 			"fieldtype": "Link",
+# 			"options": "Item",
+# 			"width": 150,
+# 		},
+# 		{
+# 			"label": _("Item Name"),
+# 			"fieldname": "item_name",
+# 			"fieldtype": "Data",
+# 			"width": 200,
+# 		},
+# 		{
+# 			"label": _("Colour"),
+# 			"fieldname": "colour",
+# 			"fieldtype": "Data",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("Net Order Recommendation"),
+# 			"fieldname": "net_order_recommendation",
+# 			"fieldtype": "Int",
+# 			"width": 200,
+# 		},
+# 		{
+# 			"label": _("SKU Type"),
+# 			"fieldname": "sku_type",
+# 			"fieldtype": "Data",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("Item Type"),
+# 			"fieldname": "item_type",
+# 			"fieldtype": "Data",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("TOG"),
+# 			"fieldname": "tog",
+# 			"fieldtype": "Int",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("TOG Subgroup %"),
+# 			"fieldname": "tog_subgroup_pct",
+# 			"fieldtype": "Float",
+# 			"precision": 2,
+# 			"width": 140,
+# 		},
+# 		{
+# 			"label": _("Last Rolled Date"),
+# 			"fieldname": "last_rolled_date",
+# 			"fieldtype": "Date",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Last Rolled Qty"),
+# 			"fieldname": "last_rolled_qty",
+# 			"fieldtype": "Float",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Last 3 Months Sale"),
+# 			"fieldname": "last_3_months_sale",
+# 			"fieldtype": "Float",
+# 			"width": 150,
+# 		},
+# 		{
+# 			"label": _("Last 3 Months Consumption"),
+# 			"fieldname": "last_3_months_consumption",
+# 			"fieldtype": "Float",
+# 			"width": 180,
+# 		},
+# 		{
+# 			"label": _("Last 1 Month Sale"),
+# 			"fieldname": "last_1_month_sale",
+# 			"fieldtype": "Float",
+# 			"width": 140,
+# 		},
+# 		{
+# 			"label": _("Last 1 Month Consumption"),
+# 			"fieldname": "last_1_month_consumption",
+# 			"fieldtype": "Float",
+# 			"width": 170,
+# 		},
+# 		{
+# 			"label": _("On Hand Stock"),
+# 			"fieldname": "on_hand_stock",
+# 			"fieldtype": "Float",
+# 			"precision": 2,
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Net Qty"),
+# 			"fieldname": "net_qty",
+# 			"fieldtype": "Float",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("Sub Grp"),
+# 			"fieldname": "sub_grp",
+# 			"fieldtype": "Data",
+# 			"width": 120,
+# 		},
+# 		{
+# 			"label": _("Shape"),
+# 			"fieldname": "shape",
+# 			"fieldtype": "Data",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("Subgrp+Shape"),
+# 			"fieldname": "subgrp_shape",
+# 			"fieldtype": "Data",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Weightage Value"),
+# 			"fieldname": "weightage_value",
+# 			"fieldtype": "Float",
+# 			"width": 140,
+# 		},
+# 		{
+# 			"label": _("Prod Qty Based on Child Stock"),
+# 			"fieldname": "prod_qty_based_on_child_stock",
+# 			"fieldtype": "Float",
+# 			"width": 200,
+# 		},
+# 		{
+# 			"label": _("Prod Qty Based on Child Stock+WIP/Open PO"),
+# 			"fieldname": "prod_qty_based_on_child_stock_wip_open_po",
+# 			"fieldtype": "Float",
+# 			"width": 260,
+# 		},
+# 		{
+# 			"label": _("Child Item Code"),
+# 			"fieldname": "child_item_code",
+# 			"fieldtype": "Link",
+# 			"options": "Item",
+# 			"width": 150,
+# 		},
+# 		{
+# 			"label": _("Child Requirement"),
+# 			"fieldname": "child_requirement",
+# 			"fieldtype": "Float",
+# 			"width": 150,
+# 		},
+# 		{
+# 			"label": _("Child Stock"),
+# 			"fieldname": "child_stock",
+# 			"fieldtype": "Float",
+# 			"width": 110,
+# 		},
+# 		{
+# 			"label": _("Child Stock Allocation"),
+# 			"fieldname": "child_stock_allocation",
+# 			"fieldtype": "Float",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Child Shortage"),
+# 			"fieldname": "child_shortage",
+# 			"fieldtype": "Float",
+# 			"width": 120,
+# 		},
+# 		{
+# 			"label": _("Child Item Open PO"),
+# 			"fieldname": "child_item_open_po",
+# 			"fieldtype": "Float",
+# 			"width": 150,
+# 		},
+# 		{
+# 			"label": _("First Parent Item"),
+# 			"fieldname": "first_parent_item",
+# 			"fieldtype": "Link",
+# 			"options": "Item",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("First Parent Item Stock"),
+# 			"fieldname": "first_parent_item_stock",
+# 			"fieldtype": "Float",
+# 			"width": 180,
+# 		},
+# 		{
+# 			"label": _("Second Parent Item"),
+# 			"fieldname": "second_parent_item",
+# 			"fieldtype": "Link",
+# 			"options": "Item",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Second Parent Item Stock"),
+# 			"fieldname": "second_parent_item_stock",
+# 			"fieldtype": "Float",
+# 			"width": 180,
+# 		},
+# 		{
+# 			"label": _("Third Parent Item"),
+# 			"fieldname": "third_parent_item",
+# 			"fieldtype": "Link",
+# 			"options": "Item",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Third Parent Item Stock"),
+# 			"fieldname": "third_parent_item_stock",
+# 			"fieldtype": "Float",
+# 			"width": 180,
+# 		},
+# 	]
+
+
+# def get_data(filters=None):
+# 	if not filters:
+# 		filters = {}
+
+# 	# Fetch all RB items
+# 	rb_items = frappe.db.sql(
+# 		"""
+# 		SELECT
+# 			i.name as item_code,
+# 			i.item_name,
+# 			i.custom_item_type as item_type,
+# 			i.custom_buffer_flag as buffer_flag,
+# 			i.safety_stock as tog,
+# 			i.min_order_qty as moq,
+# 			i.custom_batch_size as batch_size,
+# 			i.custom_sub_group_new_name as sub_grp,
+# 			i.custom_shape as shape
+# 		FROM `tabItem` i
+# 		WHERE i.custom_item_type = 'RB'
+# 		""",
+# 		as_dict=True,
+# 	)
+
+# 	if not rb_items:
+# 		return []
+
+# 	item_codes = set(item.item_code for item in rb_items)
+# 	item_codes_tuple = tuple(item_codes) if len(item_codes) > 1 else (next(iter(item_codes)),)
+
+# 	# Build lookup maps
+# 	item_buffer_map = {}
+# 	item_type_map = {}
+# 	item_tog_map = {}
+# 	item_info_map = {}
+# 	for item in rb_items:
+# 		item_buffer_map[item.item_code] = item.buffer_flag or "Non-Buffer"
+# 		item_type_map[item.item_code] = item.item_type
+# 		item_tog_map[item.item_code] = flt(item.tog or 0)
+# 		item_info_map[item.item_code] = item
+
+# 	stock_map = get_stock_map(item_codes)
+# 	mrq_map = get_mrq_map()
+
+# 	# Last rolled date and qty from most recent submitted Finish Weight doc per item
+# 	last_rolled_rows = frappe.db.sql(
+# 		"""
+# 		SELECT fw.item_code, fw.posting_date, fw.finish_weight
+# 		FROM `tabFinish Weight` fw
+# 		INNER JOIN (
+# 			SELECT item_code, MAX(posting_date) AS max_date
+# 			FROM `tabFinish Weight`
+# 			WHERE docstatus = 1 AND item_code IN %s
+# 			GROUP BY item_code
+# 		) latest ON fw.item_code = latest.item_code AND fw.posting_date = latest.max_date
+# 		WHERE fw.docstatus = 1
+# 		""",
+# 		(item_codes_tuple,),
+# 		as_dict=True,
+# 	)
+# 	last_rolled_map = {}
+# 	for r in last_rolled_rows:
+# 		existing = last_rolled_map.get(r.item_code)
+# 		if not existing or r.posting_date > existing["last_rolled_date"]:
+# 			last_rolled_map[r.item_code] = {
+# 				"last_rolled_date": r.posting_date,
+# 				"last_rolled_qty": flt(r.finish_weight),
+# 			}
+# 	open_po_map = get_open_po_map()
+# 	so_qty_map = get_sales_order_qty_map(filters)
+
+# 	# Last 3 months consumption (90 days) from Bright Bar Production
+# 	last_3month_consumption_rows = frappe.db.sql(
+# 		"""
+# 		SELECT
+# 			bbp.raw_material AS item_code,
+# 			SUM(bbp.actual_rm_consumption) AS consumption_qty
+# 		FROM `tabBright Bar Production` bbp
+# 		WHERE bbp.docstatus = 1
+# 			AND bbp.production_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+# 			AND bbp.raw_material IN %s
+# 		GROUP BY bbp.raw_material
+# 		""",
+# 		(item_codes_tuple,),
+# 		as_dict=True,
+# 	)
+# 	last_3month_consumption_map = {r.item_code: flt(r.consumption_qty) for r in last_3month_consumption_rows}
+
+# 	# Last 1 month consumption (30 days) from Bright Bar Production
+# 	last_1month_consumption_rows = frappe.db.sql(
+# 		"""
+# 		SELECT
+# 			bbp.raw_material AS item_code,
+# 			SUM(bbp.actual_rm_consumption) AS consumption_qty
+# 		FROM `tabBright Bar Production` bbp
+# 		WHERE bbp.docstatus = 1
+# 			AND bbp.production_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+# 			AND bbp.raw_material IN %s
+# 		GROUP BY bbp.raw_material
+# 		""",
+# 		(item_codes_tuple,),
+# 		as_dict=True,
+# 	)
+# 	last_1month_consumption_map = {r.item_code: flt(r.consumption_qty) for r in last_1month_consumption_rows}
+
+# 	# Last 3 months sale (90 days) — same logic as bright_plan
+# 	last_3month_rows = frappe.db.sql(
+# 		"""
+# 		SELECT
+# 			sii.item_code,
+# 			SUM(sii.qty) AS sale_qty
+# 		FROM `tabSales Invoice Item` sii
+# 		INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+# 		WHERE si.docstatus = 1
+# 			AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+# 			AND sii.item_code IN %s
+# 		GROUP BY sii.item_code
+# 		""",
+# 		(item_codes_tuple,),
+# 		as_dict=True,
+# 	)
+# 	last_3month_sale_map = {r.item_code: flt(r.sale_qty) for r in last_3month_rows}
+
+# 	# Last 1 month sale (30 days) — same query, shorter interval
+# 	last_1month_rows = frappe.db.sql(
+# 		"""
+# 		SELECT
+# 			sii.item_code,
+# 			SUM(sii.qty) AS sale_qty
+# 		FROM `tabSales Invoice Item` sii
+# 		INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+# 		WHERE si.docstatus = 1
+# 			AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+# 			AND sii.item_code IN %s
+# 		GROUP BY sii.item_code
+# 		""",
+# 		(item_codes_tuple,),
+# 		as_dict=True,
+# 	)
+# 	last_1month_sale_map = {r.item_code: flt(r.sale_qty) for r in last_1month_rows}
+
+# 	till_today_map, spike_map_base = get_qualified_demand_map()
+# 	calculated_spike_map = calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map)
+# 	spike_map_base.update(calculated_spike_map)
+
+# 	spike_master_records = frappe.get_all(
+# 		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
+# 	)
+# 	spike_master_map = {
+# 		sm.item_type: {"demand_horizon": flt(sm.demand_horizon), "spike_threshold": flt(sm.spike_threshold)}
+# 		for sm in spike_master_records
+# 	}
+
+# 	qualified_demand_map = {}
+# 	for item_code in item_codes:
+# 		qualified_demand, _, _ = get_qualified_demand_for_item(
+# 			item_code,
+# 			till_today_map,
+# 			spike_map_base,
+# 			item_buffer_map,
+# 			item_tog_map,
+# 			item_type_map,
+# 			spike_master_map,
+# 		)
+# 		qualified_demand_map[item_code] = qualified_demand
+
+# 	# Build RBMTO colour data — own SO FIFO + parent BOM FIFO
+# 	rbmto_codes = {ic for ic in item_codes if item_buffer_map.get(ic) != "Buffer"}
+# 	rbmto_so_detail_map = {}
+# 	parent_bom_map = {}
+# 	parent_data_map = {}
+# 	child_parent_so_fifo = defaultdict(list)
+
+# 	if rbmto_codes:
+# 		rbmto_so_detail_map = get_rbmto_so_detail_map(rbmto_codes)
+# 		parent_bom_map = get_parent_bom_map(rbmto_codes)
+
+# 		all_parent_codes = {p["parent_item"] for plist in parent_bom_map.values() for p in plist}
+# 		if all_parent_codes:
+# 			parent_tuple = (
+# 				tuple(all_parent_codes) if len(all_parent_codes) > 1 else (next(iter(all_parent_codes)),)
+# 			)
+
+# 			# Parent item master
+# 			parent_master_rows = frappe.db.sql(
+# 				"""
+# 				SELECT name AS item_code,
+# 				       custom_buffer_flag AS buffer_flag,
+# 				       custom_item_type AS item_type,
+# 				       safety_stock AS tog,
+# 				       min_order_qty AS moq,
+# 				       custom_batch_size AS batch_size
+# 				FROM `tabItem`
+# 				WHERE name IN %s
+# 				""",
+# 				(parent_tuple,),
+# 				as_dict=True,
+# 			)
+# 			p_master_map = {r.item_code: r for r in parent_master_rows}
+# 			p_buffer_map = {r.item_code: r.buffer_flag or "Non-Buffer" for r in parent_master_rows}
+# 			p_type_map = {r.item_code: r.item_type or "" for r in parent_master_rows}
+# 			p_tog_map = {r.item_code: flt(r.tog or 0) for r in parent_master_rows}
+
+# 			# Spike for BB parent items
+# 			bb_spike_map = calculate_spike_map(all_parent_codes, p_buffer_map, p_type_map, p_tog_map)
+# 			parent_spike_map = dict(spike_map_base)
+# 			parent_spike_map.update(bb_spike_map)
+
+# 			# Parent stock and WIP
+# 			parent_stock_map = get_stock_map(all_parent_codes)
+# 			parent_wip_map = get_wip_map()
+
+# 			# Priority sequence master
+# 			priority_seq_rows = frappe.db.sql(
+# 				"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
+# 				as_dict=True,
+# 			)
+# 			priority_seq_map = {r.priority_colour: r.sequence for r in priority_seq_rows}
+
+# 			for ic in all_parent_codes:
+# 				master = p_master_map.get(ic)
+# 				if not master:
+# 					continue
+# 				is_buf = p_buffer_map[ic] == "Buffer"
+# 				tog_p = p_tog_map[ic]
+# 				stock_p = flt(parent_stock_map.get(ic, 0))
+# 				wip_p = flt(parent_wip_map.get(ic, 0))
+# 				mrq_p = flt(mrq_map.get(ic, 0))
+# 				moq_p = flt(master.moq or 0)
+# 				bs_p = flt(master.batch_size or 0)
+
+# 				qd_p, _, _ = get_qualified_demand_for_item(
+# 					ic,
+# 					till_today_map,
+# 					parent_spike_map,
+# 					p_buffer_map,
+# 					p_tog_map,
+# 					p_type_map,
+# 					spike_master_map,
+# 				)
+# 				qd_p = flt(qd_p)
+
+# 				if is_buf:
+# 					base_rec = max(0, tog_p + qd_p - stock_p - wip_p - mrq_p)
+# 				else:
+# 					base_rec = max(0, qd_p - stock_p - wip_p - mrq_p)
+# 				net_rec = calculate_net_order_recommendation(base_rec, moq_p, bs_p)
+
+# 				parent_data_map[ic] = {
+# 					"net_order_rec": net_rec,
+# 					"stock": stock_p,
+# 					"wip": wip_p,
+# 					"tog": tog_p,
+# 					"qd": qd_p,
+# 					"is_buffer": is_buf,
+# 					"batch_size": bs_p,
+# 					"moq": moq_p,
+# 				}
+
+# 		# Build per-child-item flat batch FIFO list using bright_plan incremental logic
+# 		for child_ic in rbmto_codes:
+# 			flat = []
+# 			for p in parent_bom_map.get(child_ic, []):
+# 				parent_item = p["parent_item"]
+# 				pd = parent_data_map.get(parent_item)
+# 				if not pd:
+# 					continue
+# 				bom_ratio = p["bom_qty"] / (p["bom_quantity"] or 1.0)
+# 				batches = _build_parent_batches(
+# 					pd["stock"],
+# 					pd["wip"],
+# 					pd["tog"],
+# 					pd["qd"],
+# 					pd["is_buffer"],
+# 					pd["net_order_rec"],
+# 					pd["batch_size"],
+# 					pd["moq"],
+# 					priority_seq_map,
+# 				)
+# 				for batch in batches:
+# 					child_req = math.ceil(batch["batch_qty"] * bom_ratio)
+# 					flat.append(
+# 						{
+# 							"parent_item": parent_item,
+# 							"batch_qty": batch["batch_qty"],
+# 							"level_before": batch["level_before"],
+# 							"child_req": child_req,
+# 							"colour": batch["colour"],
+# 							"priority_colour": batch["priority_colour"],
+# 							"priority_sequence": batch["priority_sequence"],
+# 							"op_cp": batch["op_cp"],
+# 						}
+# 					)
+# 			flat.sort(key=lambda x: x["priority_sequence"])
+# 			child_parent_so_fifo[child_ic] = flat
+
+# 	# Fetch colour weightage map from Single DocType
+# 	colour_weightage_rows = frappe.get_all(
+# 		"Colour Weightage Master Table",
+# 		filters={"parent": "Colour Weightage Master"},
+# 		fields=["colour", "weightage"],
+# 	)
+# 	colour_weightage_map = {r.colour: flt(r.weightage) for r in colour_weightage_rows}
+
+# 	data = []
+# 	for item_code in sorted(item_codes):
+# 		item = item_info_map[item_code]
+# 		buffer_flag = item_buffer_map[item_code]
+# 		sku_type = calculate_sku_type(buffer_flag, item_type_map[item_code])
+
+# 		# Only include RBMTA and RBMTO
+# 		if sku_type not in ("RBMTA", "RBMTO"):
+# 			continue
+
+# 		is_buffer = buffer_flag == "Buffer"
+# 		tog = item_tog_map[item_code]
+# 		stock = flt(stock_map.get(item_code, 0))
+# 		mrq = flt(mrq_map.get(item_code, 0))
+# 		moq = flt(item.moq or 0)
+# 		batch_size = flt(item.batch_size or 0)
+
+# 		# WIP is excluded for RBMTA and RBMTO
+
+# 		if is_buffer:
+# 			# RBMTA: TOG + qualified_demand - stock - MRQ
+# 			qualified_demand = flt(qualified_demand_map.get(item_code, 0))
+# 			base_order_rec = tog + qualified_demand - stock - mrq
+# 		else:
+# 			# RBMTO: open_so - stock - MRQ
+# 			open_so = flt(so_qty_map.get(item_code, 0))
+# 			base_order_rec = open_so - stock - mrq
+
+# 		base_order_rec = max(0, base_order_rec)
+# 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
+
+# 		# Colour — level = stock + open MR pending qty (WIP = 0)
+# 		level = stock + mrq
+# 		if is_buffer:
+# 			colour = _buffer_colour(level, tog, flt(qualified_demand_map.get(item_code, 0)))
+# 		else:
+# 			colour = _rbmto_colour(
+# 				level,
+# 				rbmto_so_detail_map.get(item_code, []),
+# 				child_parent_so_fifo.get(item_code, []),
+# 			)
+
+# 		data.append(
+# 			{
+# 				"item_code": item_code,
+# 				"item_name": item.item_name,
+# 				"colour": colour,
+# 				"net_order_recommendation": math.ceil(flt(net_order_rec)),
+# 				"sku_type": sku_type,
+# 				"item_type": item_type_map[item_code],
+# 				"tog": math.ceil(flt(tog)),
+# 				"tog_subgroup_pct": None,
+# 				"last_rolled_date": last_rolled_map.get(item_code, {}).get("last_rolled_date"),
+# 				"last_rolled_qty": last_rolled_map.get(item_code, {}).get("last_rolled_qty"),
+# 				"last_3_months_sale": last_3month_sale_map.get(item_code, 0),
+# 				"last_3_months_consumption": last_3month_consumption_map.get(item_code, 0),
+# 				"last_1_month_sale": last_1month_sale_map.get(item_code, 0),
+# 				"last_1_month_consumption": last_1month_consumption_map.get(item_code, 0),
+# 				"on_hand_stock": flt(stock),
+# 				"net_qty": None,
+# 				"sub_grp": item.sub_grp or "",
+# 				"shape": item.shape or "",
+# 				"subgrp_shape": " ".join(filter(None, [item.sub_grp, item.shape])),
+# 				"weightage_value": math.ceil(flt(net_order_rec)) * colour_weightage_map.get(colour, 0),
+# 				"prod_qty_based_on_child_stock": None,
+# 				"prod_qty_based_on_child_stock_wip_open_po": None,
+# 				"child_item_code": None,
+# 				"child_requirement": None,
+# 				"child_stock": None,
+# 				"child_stock_allocation": None,
+# 				"child_shortage": None,
+# 				"child_item_open_po": None,
+# 				"first_parent_item": None,
+# 				"first_parent_item_stock": None,
+# 				"second_parent_item": None,
+# 				"second_parent_item_stock": None,
+# 				"third_parent_item": None,
+# 				"third_parent_item_stock": None,
+# 			}
+# 		)
+
+# 	# --- TOG Subgroup % ---
+# 	subgrp_tog_sum = defaultdict(float)
+# 	for row in data:
+# 		subgrp_tog_sum[row["subgrp_shape"]] += flt(row["tog"])
+# 	for row in data:
+# 		group_sum = subgrp_tog_sum.get(row["subgrp_shape"], 0)
+# 		row["tog_subgroup_pct"] = round((flt(row["tog"]) / group_sum) * 100, 2) if group_sum else None
+
+# 	# --- Child BOM expansion with FIFO allocation ---
+
+# 	# Fetch default BOMs for items with net_order_recommendation > 0
+# 	bom_children_map = {}  # {item_code: [{item_code, bom_qty, bom_quantity}, ...]}
+# 	items_with_rec = [r["item_code"] for r in data if r.get("net_order_recommendation", 0) > 0]
+# 	if items_with_rec:
+# 		bom_parent_tuple = tuple(items_with_rec) if len(items_with_rec) > 1 else (items_with_rec[0],)
+# 		bom_rows = frappe.db.sql(
+# 			"""
+# 			SELECT b.item AS parent_item, bi.item_code AS child_item,
+# 			       bi.qty AS bom_qty, b.quantity AS bom_quantity
+# 			FROM `tabBOM Item` bi
+# 			INNER JOIN `tabBOM` b ON b.name = bi.parent
+# 			WHERE b.is_default = 1 AND b.docstatus = 1
+# 			  AND b.item IN %s
+# 			""",
+# 			(bom_parent_tuple,),
+# 			as_dict=True,
+# 		)
+# 		for r in bom_rows:
+# 			bom_children_map.setdefault(r.parent_item, []).append(
+# 				{
+# 					"item_code": r.child_item,
+# 					"bom_qty": flt(r.bom_qty),
+# 					"bom_quantity": flt(r.bom_quantity) or 1.0,
+# 				}
+# 			)
+
+# 	# Gather all unique child item codes
+# 	all_child_codes = {c["item_code"] for children in bom_children_map.values() for c in children}
+
+# 	child_stock_map_bom = {}
+# 	child_item_sku_map = {}
+# 	if all_child_codes:
+# 		child_tuple = tuple(all_child_codes) if len(all_child_codes) > 1 else (next(iter(all_child_codes)),)
+
+# 		# Child stock
+# 		child_stock_rows = frappe.db.sql(
+# 			"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+# 			(child_tuple,),
+# 			as_dict=True,
+# 		)
+# 		child_stock_map_bom = {r.item_code: math.ceil(flt(r.stock)) for r in child_stock_rows}
+
+# 		# Child SKU types (to determine WIP eligibility)
+# 		child_item_rows = frappe.db.sql(
+# 			"SELECT name AS item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE name IN %s",
+# 			(child_tuple,),
+# 			as_dict=True,
+# 		)
+# 		for r in child_item_rows:
+# 			child_item_sku_map[r.item_code] = calculate_sku_type(
+# 				r.custom_buffer_flag or "Non-Buffer", r.custom_item_type
+# 			)
+
+# 		# Top-3 parent items per child item (default BOM first, then by creation ASC)
+# 		parent_bom_rows = frappe.db.sql(
+# 			"""
+# 			SELECT bi.item_code AS child_item, b.item AS parent_item,
+# 			       b.is_default, b.creation
+# 			FROM `tabBOM Item` bi
+# 			INNER JOIN `tabBOM` b ON b.name = bi.parent
+# 			WHERE bi.item_code IN %s AND b.docstatus = 1
+# 			ORDER BY bi.item_code, b.is_default DESC, b.creation ASC
+# 			""",
+# 			(child_tuple,),
+# 			as_dict=True,
+# 		)
+# 		# Group and keep top 3 per child
+# 		child_top3_parents_map = {}  # {child_item_code: [parent_item, ...]} max 3
+# 		for r in parent_bom_rows:
+# 			lst = child_top3_parents_map.setdefault(r.child_item, [])
+# 			if len(lst) < 3:
+# 				lst.append(r.parent_item)
+
+# 		# Fetch stock for all unique parent items found
+# 		all_top3_parent_codes = {p for lst in child_top3_parents_map.values() for p in lst}
+# 		top3_parent_stock_map = {}
+# 		if all_top3_parent_codes:
+# 			tp_tuple = (
+# 				tuple(all_top3_parent_codes)
+# 				if len(all_top3_parent_codes) > 1
+# 				else (next(iter(all_top3_parent_codes)),)
+# 			)
+# 			tp_stock_rows = frappe.db.sql(
+# 				"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+# 				(tp_tuple,),
+# 				as_dict=True,
+# 			)
+# 			top3_parent_stock_map = {r.item_code: flt(r.stock) for r in tp_stock_rows}
+# 	else:
+# 		child_top3_parents_map = {}
+# 		top3_parent_stock_map = {}
+
+# 	child_wip_map = get_wip_map()
+
+# 	# Sort by colour priority descending (Black first = most urgent → allocated first)
+# 	data.sort(key=lambda r: _COLOUR_RANK.get(r.get("colour", ""), 0), reverse=True)
+
+# 	# FIFO pools
+# 	remaining_child_stock_fifo = {ic: flt(child_stock_map_bom.get(ic, 0)) for ic in all_child_codes}
+# 	remaining_child_wip_open_po_fifo = {}
+
+# 	expanded_data = []
+# 	for row in data:
+# 		item_code = row["item_code"]
+# 		children = bom_children_map.get(item_code, [])
+# 		net_or = flt(row.get("net_order_recommendation", 0))
+
+# 		if not children:
+# 			expanded_data.append(row)
+# 			continue
+
+# 		for child_info in children:
+# 			child_ic = child_info["item_code"]
+# 			bom_qty = child_info["bom_qty"]
+# 			bom_quantity = child_info["bom_quantity"]
+
+# 			child_requirement = math.ceil(net_or * (bom_qty / bom_quantity))
+# 			child_stock_val = child_stock_map_bom.get(child_ic, 0)
+# 			child_open_po = flt(open_po_map.get(child_ic, 0))
+
+# 			child_sku = child_item_sku_map.get(child_ic, "")
+# 			child_wip = 0 if child_sku in ("RBMTA", "RBMTO") else flt(child_wip_map.get(child_ic, 0))
+# 			child_wip_open_po = math.ceil(child_wip + child_open_po)
+
+# 			# FIFO: stock allocation
+# 			available_stock = flt(remaining_child_stock_fifo.get(child_ic, 0))
+# 			stock_allocated = min(child_requirement, available_stock)
+# 			stock_shortage = child_requirement - stock_allocated
+# 			remaining_child_stock_fifo[child_ic] = available_stock - stock_allocated
+
+# 			# FIFO: WIP + Open PO allocation on remaining shortage
+# 			if child_ic not in remaining_child_wip_open_po_fifo:
+# 				remaining_child_wip_open_po_fifo[child_ic] = flt(child_wip_open_po)
+# 			available_wip_open_po = remaining_child_wip_open_po_fifo[child_ic]
+# 			wip_open_po_allocated = min(stock_shortage, available_wip_open_po)
+# 			remaining_child_wip_open_po_fifo[child_ic] = available_wip_open_po - wip_open_po_allocated
+
+# 			parent_per_child_factor = (bom_quantity / bom_qty) if bom_qty else 0
+# 			total_allocated = stock_allocated + wip_open_po_allocated
+
+# 			prod_qty_stock = min(
+# 				math.ceil(flt(stock_allocated) * parent_per_child_factor), math.ceil(net_or)
+# 			)
+# 			prod_qty_wip = min(
+# 				math.ceil(flt(total_allocated) * parent_per_child_factor), math.ceil(net_or)
+# 			)
+
+# 			new_row = row.copy()
+# 			new_row["child_item_code"] = child_ic
+# 			new_row["child_requirement"] = child_requirement
+# 			new_row["child_stock"] = child_stock_val
+# 			new_row["child_stock_allocation"] = math.ceil(stock_allocated)
+# 			new_row["child_shortage"] = math.ceil(stock_shortage)
+# 			new_row["child_item_open_po"] = math.ceil(child_open_po)
+# 			new_row["prod_qty_based_on_child_stock"] = prod_qty_stock
+# 			new_row["prod_qty_based_on_child_stock_wip_open_po"] = prod_qty_wip
+
+# 			# Top-3 parent items for this child item
+# 			top3 = child_top3_parents_map.get(child_ic, [])
+# 			keys = [
+# 				("first_parent_item", "first_parent_item_stock"),
+# 				("second_parent_item", "second_parent_item_stock"),
+# 				("third_parent_item", "third_parent_item_stock"),
+# 			]
+# 			for i, (pk, sk) in enumerate(keys):
+# 				if i < len(top3):
+# 					new_row[pk] = top3[i]
+# 					new_row[sk] = top3_parent_stock_map.get(top3[i], 0)
+# 				else:
+# 					new_row[pk] = None
+# 					new_row[sk] = None
+
+# 			expanded_data.append(new_row)
+
+# 	return expanded_data
+
+
+# # ---------------------------------------------------------------------------
+# # Whitelist API — Item Colour Breakdown
+# # ---------------------------------------------------------------------------
+
+
+# @frappe.whitelist()
+# def get_item_colour_breakdown(item_code):
+# 	"""
+# 	Returns full colour computation detail for an RB item.
+# 	RBMTA → buffer_colour breakdown.
+# 	RBMTO → own SO FIFO detail + parent BOM FIFO detail.
+# 	"""
+# 	item_doc = frappe.db.get_value(
+# 		"Item",
+# 		item_code,
+# 		[
+# 			"name",
+# 			"item_name",
+# 			"custom_item_type",
+# 			"custom_buffer_flag",
+# 			"safety_stock",
+# 			"min_order_qty",
+# 			"custom_batch_size",
+# 		],
+# 		as_dict=True,
+# 	)
+# 	if not item_doc or item_doc.custom_item_type != "RB":
+# 		frappe.throw(f"Item {item_code} is not an RB item.")
+
+# 	buffer_flag = item_doc.custom_buffer_flag or "Non-Buffer"
+# 	item_type = item_doc.custom_item_type
+# 	is_buffer = buffer_flag == "Buffer"
+# 	tog = flt(item_doc.safety_stock or 0)
+# 	sku_type = calculate_sku_type(buffer_flag, item_type)
+
+# 	stock_data = frappe.db.sql(
+# 		"SELECT SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code = %s",
+# 		(item_code,),
+# 		as_dict=True,
+# 	)
+# 	stock = flt(stock_data[0].stock if stock_data else 0)
+# 	mrq_map_all = get_mrq_map()
+# 	mrq = flt(mrq_map_all.get(item_code, 0))
+# 	level = stock + mrq
+
+# 	item_buffer_map = {item_code: buffer_flag}
+# 	item_type_map = {item_code: item_type}
+# 	item_tog_map = {item_code: tog}
+
+# 	till_today_map, spike_map_base = get_qualified_demand_map()
+# 	spike_master_records = frappe.get_all(
+# 		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
+# 	)
+# 	spike_master_map = {
+# 		sm.item_type: {"demand_horizon": flt(sm.demand_horizon), "spike_threshold": flt(sm.spike_threshold)}
+# 		for sm in spike_master_records
+# 	}
+# 	calculated_spike = calculate_spike_map({item_code}, item_buffer_map, item_type_map, item_tog_map)
+# 	spike_map_base.update(calculated_spike)
+
+# 	qualified_demand, till_today, spike = get_qualified_demand_for_item(
+# 		item_code,
+# 		till_today_map,
+# 		spike_map_base,
+# 		item_buffer_map,
+# 		item_tog_map,
+# 		item_type_map,
+# 		spike_master_map,
+# 	)
+# 	qualified_demand = flt(qualified_demand)
+
+# 	result = {
+# 		"item_code": item_code,
+# 		"item_name": item_doc.item_name,
+# 		"sku_type": sku_type,
+# 		"buffer_flag": buffer_flag,
+# 		"stock": stock,
+# 		"mrq": mrq,
+# 		"level": level,
+# 		"tog": tog,
+# 	}
+
+# 	if is_buffer:
+# 		colour = _buffer_colour(level, tog, qualified_demand)
+# 		total = tog + qualified_demand
+# 		result.update(
+# 			{
+# 				"detail_type": "buffer",
+# 				"qualified_demand": qualified_demand,
+# 				"till_today": flt(till_today),
+# 				"spike": flt(spike),
+# 				"total": total,
+# 				"colour": colour,
+# 			}
+# 		)
+# 	else:
+# 		# Fetch own SOs with delivery_date for display
+# 		own_so_rows = frappe.db.sql(
+# 			"""
+# 			SELECT soi.delivery_date, so.transaction_date,
+# 			       GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0)) AS pending_qty
+# 			FROM `tabSales Order Item` soi
+# 			INNER JOIN `tabSales Order` so ON so.name = soi.parent
+# 			WHERE so.docstatus = 1
+# 			  AND so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
+# 			  AND IFNULL(soi.custom_closed, 0) = 0
+# 			  AND soi.item_code = %s
+# 			  AND GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0)) > 0
+# 			ORDER BY soi.delivery_date ASC
+# 			""",
+# 			(item_code,),
+# 			as_dict=True,
+# 		)
+
+# 		available = level
+# 		own_so_fifo = []
+# 		for r in own_so_rows:
+# 			required = flt(r.pending_qty)
+# 			allocated = min(required, available)
+# 			so_shortage = required - allocated
+# 			available -= allocated
+# 			status = _compute_order_status(r.delivery_date, r.transaction_date)
+# 			colour_so = status.capitalize() if status else ""
+# 			own_so_fifo.append(
+# 				{
+# 					"delivery_date": str(r.delivery_date) if r.delivery_date else "",
+# 					"pending_qty": required,
+# 					"allocated": allocated,
+# 					"shortage": so_shortage,
+# 					"available_after": available,
+# 					"order_status": colour_so,
+# 				}
+# 			)
+
+# 		# Parent BOM FIFO — production batch iteration (same logic as bright_plan)
+# 		parent_bom_list = get_parent_bom_map({item_code}).get(item_code, [])
+# 		parent_fifo = []
+
+# 		if parent_bom_list:
+# 			all_parent_codes = {p["parent_item"] for p in parent_bom_list}
+# 			parent_tuple = (
+# 				tuple(all_parent_codes) if len(all_parent_codes) > 1 else (next(iter(all_parent_codes)),)
+# 			)
+
+# 			parent_rows = frappe.db.sql(
+# 				"""SELECT name AS item_code, custom_buffer_flag AS buffer_flag,
+# 				          custom_item_type AS item_type, safety_stock AS tog,
+# 				          min_order_qty AS moq, custom_batch_size AS batch_size
+# 				   FROM `tabItem` WHERE name IN %s""",
+# 				(parent_tuple,),
+# 				as_dict=True,
+# 			)
+# 			p_master_map = {r.item_code: r for r in parent_rows}
+# 			p_buffer_map = {r.item_code: r.buffer_flag or "Non-Buffer" for r in parent_rows}
+# 			p_type_map = {r.item_code: r.item_type or "" for r in parent_rows}
+# 			p_tog_map = {r.item_code: flt(r.tog or 0) for r in parent_rows}
+
+# 			bb_spike = calculate_spike_map(all_parent_codes, p_buffer_map, p_type_map, p_tog_map)
+# 			parent_spike_map = dict(spike_map_base)
+# 			parent_spike_map.update(bb_spike)
+
+# 			p_stock_rows = frappe.db.sql(
+# 				"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+# 				(parent_tuple,),
+# 				as_dict=True,
+# 			)
+# 			p_stock_map = {r.item_code: flt(r.stock) for r in p_stock_rows}
+# 			p_wip_map = get_wip_map()
+
+# 			priority_seq_rows = frappe.db.sql(
+# 				"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
+# 				as_dict=True,
+# 			)
+# 			priority_seq_map = {r.priority_colour: r.sequence for r in priority_seq_rows}
+
+# 			p_data = {}
+# 			for ic in all_parent_codes:
+# 				master = p_master_map.get(ic)
+# 				if not master:
+# 					continue
+# 				is_buf = p_buffer_map[ic] == "Buffer"
+# 				tog_p = p_tog_map[ic]
+# 				stock_p = flt(p_stock_map.get(ic, 0))
+# 				wip_p = flt(p_wip_map.get(ic, 0))
+# 				mrq_p = flt(mrq_map_all.get(ic, 0))
+# 				moq_p = flt(master.moq or 0)
+# 				bs_p = flt(master.batch_size or 0)
+
+# 				qd_p, _, _ = get_qualified_demand_for_item(
+# 					ic,
+# 					till_today_map,
+# 					parent_spike_map,
+# 					p_buffer_map,
+# 					p_tog_map,
+# 					p_type_map,
+# 					spike_master_map,
+# 				)
+# 				qd_p = flt(qd_p)
+
+# 				if is_buf:
+# 					base_rec = max(0, tog_p + qd_p - stock_p - wip_p - mrq_p)
+# 				else:
+# 					base_rec = max(0, qd_p - stock_p - wip_p - mrq_p)
+# 				net_rec = calculate_net_order_recommendation(base_rec, moq_p, bs_p)
+
+# 				p_data[ic] = {
+# 					"stock": stock_p,
+# 					"wip": wip_p,
+# 					"tog": tog_p,
+# 					"qd": qd_p,
+# 					"is_buffer": is_buf,
+# 					"net_order_rec": net_rec,
+# 					"batch_size": bs_p,
+# 					"moq": moq_p,
+# 				}
+
+# 			# Build flat batch list (same logic as bright_plan) and run FIFO
+# 			flat = []
+# 			for p in parent_bom_list:
+# 				parent_item = p["parent_item"]
+# 				pd = p_data.get(parent_item)
+# 				if not pd:
+# 					continue
+# 				bom_ratio = p["bom_qty"] / (p["bom_quantity"] or 1.0)
+# 				batches = _build_parent_batches(
+# 					pd["stock"],
+# 					pd["wip"],
+# 					pd["tog"],
+# 					pd["qd"],
+# 					pd["is_buffer"],
+# 					pd["net_order_rec"],
+# 					pd["batch_size"],
+# 					pd["moq"],
+# 					priority_seq_map,
+# 				)
+# 				for batch in batches:
+# 					child_req = math.ceil(batch["batch_qty"] * bom_ratio)
+# 					flat.append(
+# 						{
+# 							"parent_item": parent_item,
+# 							"batch_qty": batch["batch_qty"],
+# 							"level_before": batch["level_before"],
+# 							"priority_colour": batch["priority_colour"],
+# 							"priority_sequence": batch["priority_sequence"],
+# 							"op_cp": batch["op_cp"],
+# 							"colour": batch["colour"],
+# 							"child_req": child_req,
+# 						}
+# 					)
+# 			flat.sort(key=lambda x: x["priority_sequence"])
+
+# 			for entry in flat:
+# 				child_req = entry["child_req"]
+# 				allocated = min(child_req, available)
+# 				shortage = child_req - allocated
+# 				available -= allocated
+# 				parent_fifo.append(
+# 					{
+# 						"parent_item": entry["parent_item"],
+# 						"priority_sequence": entry["priority_sequence"],
+# 						"priority_colour": entry["priority_colour"],
+# 						"op_cp": entry["op_cp"],
+# 						"level_before": math.ceil(entry["level_before"]),
+# 						"batch_qty": math.ceil(entry["batch_qty"]),
+# 						"child_req": child_req,
+# 						"allocated": math.ceil(allocated),
+# 						"shortage": math.ceil(shortage),
+# 						"available_after": math.ceil(available),
+# 						"order_status": entry["colour"],
+# 					}
+# 				)
+
+# 		# Determine final colour: first shortage in own SOs, then first shortage in parent SOs
+# 		final_colour = ""
+# 		for entry in own_so_fifo:
+# 			if entry["shortage"] > 0:
+# 				final_colour = entry["order_status"]
+# 				break
+# 		if not final_colour:
+# 			for entry in parent_fifo:
+# 				if entry["shortage"] > 0:
+# 					final_colour = entry["order_status"]
+# 					break
+
+# 		result.update(
+# 			{
+# 				"detail_type": "non_buffer",
+# 				"colour": final_colour,
+# 				"own_so_fifo": own_so_fifo,
+# 				"parent_fifo": parent_fifo,
+# 			}
+# 		)
+
+# 	return result

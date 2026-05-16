@@ -1,0 +1,69 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-15 16:50:41.048319",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "instructions",
+  "items",
+  "fc_solver"
+ ],
+ "fields": [
+  {
+   "fieldname": "instructions",
+   "fieldtype": "HTML",
+   "label": "Instructions",
+   "options": "<p>Add Purchase Receipts below, choose the correct <b>Freight Payable By</b> (PSP or Vendor/Party), then click <b>Apply Freight Corrections</b>. Works for draft and submitted receipts.</p>"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Purchase Receipts",
+   "options": "PR FC Solver Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fc_solver",
+   "fieldtype": "Button",
+   "label": "Apply Freight Corrections"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_virtual": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-05-15 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "pr fc solver",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
