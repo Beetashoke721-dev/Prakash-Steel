@@ -388,6 +388,60 @@ def get_columns():
 			"width": 110,
 		},
 		{
+			"label": _("Extra Qty"),
+			"fieldname": "extra_qty",
+			"fieldtype": "Float",
+			"width": 110,
+		},
+		{
+			"label": _("Excess Qty"),
+			"fieldname": "excess_qty",
+			"fieldtype": "Float",
+			"width": 110,
+		},
+		{
+			"label": _("Excess Qty/TOG"),
+			"fieldname": "excess_qty_tog",
+			"fieldtype": "Float",
+			"width": 130,
+		},
+		{
+			"label": _("TOG%"),
+			"fieldname": "tog_pct",
+			"fieldtype": "Float",
+			"width": 90,
+		},
+		{
+			"label": _("Calc Excess Qty"),
+			"fieldname": "calc_excess_qty",
+			"fieldtype": "Float",
+			"width": 130,
+		},
+		{
+			"label": _("Net Calc Excess Qty"),
+			"fieldname": "net_calc_excess_qty",
+			"fieldtype": "Float",
+			"width": 160,
+		},
+		{
+			"label": _("Net Calc TOG%"),
+			"fieldname": "net_calc_tog_pct",
+			"fieldtype": "Float",
+			"width": 130,
+		},
+		{
+			"label": _("New Excess Qty"),
+			"fieldname": "new_excess_qty",
+			"fieldtype": "Float",
+			"width": 130,
+		},
+		{
+			"label": _("New Excess/TOG"),
+			"fieldname": "new_excess_tog",
+			"fieldtype": "Float",
+			"width": 130,
+		},
+		{
 			"label": _("Subgroup Weightage Value"),
 			"fieldname": "subgroup_weightage_value",
 			"fieldtype": "Float",
@@ -795,9 +849,10 @@ def get_data(filters=None):
 							"priority_colour": batch["priority_colour"],
 							"priority_sequence": batch["priority_sequence"],
 							"op_cp": batch["op_cp"],
+							"tog": pd["tog"],
 						}
 					)
-			flat.sort(key=lambda x: x["priority_sequence"])
+			flat.sort(key=lambda x: (x["priority_sequence"], -flt(x["tog"])))
 			child_parent_so_fifo[child_ic] = flat
 
 	# Fetch colour weightage map from Single DocType
@@ -884,6 +939,15 @@ def get_data(filters=None):
 				"subgrp_hours_setup": None,
 				"subgrp_hours_shortage": None,
 				"extra_hours": None,
+				"extra_qty": None,
+				"excess_qty": None,
+				"excess_qty_tog": None,
+				"tog_pct": None,
+				"calc_excess_qty": None,
+				"net_calc_excess_qty": None,
+				"net_calc_tog_pct": None,
+				"new_excess_qty": None,
+				"new_excess_tog": None,
 				"subgroup_weightage_value": None,
 				"group_count": None,
 				"weightage_value": math.ceil(flt(net_order_rec)) * colour_weightage_map.get(colour, 0),
@@ -937,7 +1001,13 @@ def get_data(filters=None):
 		row["subgrp_hours_setup"] = subgrp_hrs_sum.get(row["sub_grp"]) or None
 		final_hrs = subgrp_final_hrs_sum.get(row["sub_grp"], 0)
 		setup_hrs = subgrp_hrs_sum.get(row["sub_grp"], 0)
-		row["subgrp_hours_shortage"] = max(0, final_hrs - setup_hrs)
+		shortage = max(0, final_hrs - setup_hrs)
+		row["subgrp_hours_shortage"] = shortage
+		if row.get("sku_type") == "RBMTA":
+			tog_pct = flt(row.get("tog_subgroup_pct") or 0)
+			row["extra_hours"] = round((tog_pct * shortage) / 100, 3)
+		else:
+			row["extra_hours"] = 0
 
 	# --- Child BOM expansion with FIFO allocation ---
 
@@ -1361,9 +1431,10 @@ def get_item_colour_breakdown(item_code):
 							"op_cp": batch["op_cp"],
 							"colour": batch["colour"],
 							"child_req": child_req,
+							"tog": pd["tog"],
 						}
 					)
-			flat.sort(key=lambda x: x["priority_sequence"])
+			flat.sort(key=lambda x: (x["priority_sequence"], -flt(x["tog"])))
 
 			for entry in flat:
 				batch_qty = entry["batch_qty"]
