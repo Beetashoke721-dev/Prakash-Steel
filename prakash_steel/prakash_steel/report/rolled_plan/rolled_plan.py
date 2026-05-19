@@ -176,6 +176,41 @@ def _build_parent_batches(stock, wip, tog, qd, is_buffer, net_order_rec, batch_s
 	return batches
 
 
+_COLOUR_PRIORITY = {"Black": 5, "Red": 4, "Yellow": 3, "Green": 2, "White": 1}
+_PRIORITY_TO_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
+
+
+def _rbmto_on_hand_colour(level, own_so_list):
+	"""
+	RBMTO on-hand colour (mirrors po_recomendation _non_buffer_priority):
+	FIFO-allocate `level` across own SOs sorted by delivery_date ASC.
+	- If any SO has shortage → return worst colour of shortage SOs.
+	- If no shortage → return worst colour of no-shortage SOs.
+	"""
+	if not own_so_list:
+		return ""
+	available = flt(level)
+	worst_shortage = 0
+	worst_no_shortage = 0
+	for so in own_so_list:
+		required = flt(so["pending_qty"])
+		allocated = min(required, available)
+		shortage = required - allocated
+		available -= allocated
+		priority = _COLOUR_PRIORITY.get(so["colour"], 0)
+		if shortage > 0:
+			if priority > worst_shortage:
+				worst_shortage = priority
+		else:
+			if priority > worst_no_shortage:
+				worst_no_shortage = priority
+	if worst_shortage > 0:
+		return _PRIORITY_TO_COLOUR.get(worst_shortage, "")
+	if worst_no_shortage > 0:
+		return _PRIORITY_TO_COLOUR.get(worst_no_shortage, "")
+	return ""
+
+
 def _rbmto_colour(level, own_so_list, parent_so_fifo_list):
 	"""
 	RBMTO colour:
@@ -228,6 +263,12 @@ def get_columns():
 			"fieldname": "colour",
 			"fieldtype": "Data",
 			"width": 100,
+		},
+		{
+			"label": _("On Hand Colour"),
+			"fieldname": "on_hand_colour",
+			"fieldtype": "Data",
+			"width": 130,
 		},
 		{
 			"label": _("Net Order Recommendation"),
@@ -410,6 +451,18 @@ def get_columns():
 			"fieldname": "tog_pct",
 			"fieldtype": "Float",
 			"width": 90,
+		},
+		{
+			"label": _("Allocated Hours"),
+			"fieldname": "allocated_hours",
+			"fieldtype": "Float",
+			"width": 130,
+		},
+		{
+			"label": _("Total Allocated Qty"),
+			"fieldname": "total_allocated_qty",
+			"fieldtype": "Float",
+			"width": 160,
 		},
 		{
 			"label": _("Calc Excess Qty"),
@@ -894,8 +947,8 @@ def get_data(filters=None):
 		base_order_rec = max(0, base_order_rec)
 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 
-		if net_order_rec <= 0:
-			continue
+		# if net_order_rec <= 0:
+		# 	continue
 
 		# Colour — level = stock only (MRQ excluded)
 		level = stock
@@ -913,6 +966,7 @@ def get_data(filters=None):
 				"item_code": item_code,
 				"item_name": item.item_name,
 				"colour": colour,
+				"on_hand_colour": None,
 				"net_order_recommendation": math.ceil(flt(net_order_rec)),
 				"sku_type": sku_type,
 				"item_type": item_type_map[item_code],
@@ -935,7 +989,9 @@ def get_data(filters=None):
 				"subgrp_count": None,
 				"subgroup_qty": None,
 				"per_hour_qty": per_hour_qty_map.get(item_code) or None,
-				"hrs_work": (flt(net_order_rec) / per_hour_qty_map[item_code]) if per_hour_qty_map.get(item_code) else None,
+				"hrs_work": (flt(net_order_rec) / per_hour_qty_map[item_code])
+				if per_hour_qty_map.get(item_code)
+				else None,
 				"subgrp_hours_setup": None,
 				"subgrp_hours_shortage": None,
 				"extra_hours": None,
@@ -943,6 +999,8 @@ def get_data(filters=None):
 				"excess_qty": None,
 				"excess_qty_tog": None,
 				"tog_pct": None,
+				"allocated_hours": None,
+				"total_allocated_qty": None,
 				"calc_excess_qty": None,
 				"net_calc_excess_qty": None,
 				"net_calc_tog_pct": None,
@@ -974,7 +1032,9 @@ def get_data(filters=None):
 		subgrp_tog_sum[row["subgrp_shape"]] += flt(row["tog"])
 	for row in data:
 		group_sum = subgrp_tog_sum.get(row["subgrp_shape"], 0)
-		row["tog_subgroup_pct"] = round((flt(row["tog"]) / group_sum) * 100, 2) if group_sum else None
+		tog_pct_val = round((flt(row["tog"]) / group_sum) * 100, 2) if group_sum else None
+		row["tog_subgroup_pct"] = tog_pct_val
+		row["tog_pct"] = tog_pct_val
 
 	# --- Weightage Value aggregations ---
 	subgrp_wv_sum = defaultdict(float)
@@ -1005,9 +1065,60 @@ def get_data(filters=None):
 		row["subgrp_hours_shortage"] = shortage
 		if row.get("sku_type") == "RBMTA":
 			tog_pct = flt(row.get("tog_subgroup_pct") or 0)
-			row["extra_hours"] = round((tog_pct * shortage) / 100, 3)
+			extra_hrs = round((tog_pct * shortage) / 100, 3)
+			row["extra_hours"] = extra_hrs
+			per_hr = flt(row.get("per_hour_qty") or 0)
+			row["extra_qty"] = round(extra_hrs * per_hr, 3) if per_hr else None
 		else:
 			row["extra_hours"] = 0
+			row["extra_qty"] = 0
+
+		# On-hand colour and excess qty
+		ic = row["item_code"]
+		on_hand_stock = flt(row.get("on_hand_stock") or 0)
+		tog_val = flt(row.get("tog") or 0)
+		qd_val = flt(qualified_demand_map.get(ic) or 0)
+		on_hand_colour = None
+		if row.get("sku_type") == "RBMTA":
+			denominator = tog_val + qd_val
+			if denominator > 0:
+				pct = (on_hand_stock / denominator) * 100
+				if pct == 0:
+					on_hand_colour = "BLACK"
+				elif pct <= 34:
+					on_hand_colour = "RED"
+				elif pct <= 67:
+					on_hand_colour = "YELLOW"
+				elif pct <= 100:
+					on_hand_colour = "GREEN"
+				else:
+					on_hand_colour = "WHITE"
+		elif row.get("sku_type") == "RBMTO":
+			on_hand_colour = _rbmto_on_hand_colour(on_hand_stock, rbmto_so_detail_map.get(ic, []))
+		row["on_hand_colour"] = on_hand_colour
+		if on_hand_colour == "WHITE":
+			row["excess_qty"] = on_hand_stock - tog_val - qd_val
+		else:
+			row["excess_qty"] = flt(row.get("extra_qty") or 0)
+		excess = flt(row["excess_qty"])
+		row["excess_qty_tog"] = round((excess / tog_val) * 100, 3) if tog_val else None
+
+	# --- Allocated Hours ---
+	subgrp_extra_hrs_sum = defaultdict(float)
+	for row in data:
+		if row.get("sku_type") == "RBMTA":
+			subgrp_extra_hrs_sum[row["subgrp_shape"]] += flt(row.get("extra_hours") or 0)
+	for row in data:
+		if row.get("sku_type") == "RBMTA":
+			total_extra = subgrp_extra_hrs_sum.get(row["subgrp_shape"], 0)
+			tog_pct_val = flt(row.get("tog_pct") or 0)
+			alloc_hrs = round(total_extra * tog_pct_val / 100, 3)
+			row["allocated_hours"] = alloc_hrs
+			per_hr = flt(row.get("per_hour_qty") or 0)
+			row["total_allocated_qty"] = round(alloc_hrs * per_hr, 3) if per_hr else None
+		else:
+			row["allocated_hours"] = 0
+			row["total_allocated_qty"] = 0
 
 	# --- Child BOM expansion with FIFO allocation ---
 

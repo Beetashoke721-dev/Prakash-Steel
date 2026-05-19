@@ -21,46 +21,58 @@ frappe.query_reports["Rolled Plan"] = {
 				font-weight:bold;display:inline-block;
 			">${value}</span>`;
 		}
+		if (column.fieldname === "on_hand_colour" && value) {
+			const key = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+			const style = COLOUR_STYLES[key];
+			if (style) {
+				const { bg, fg } = style;
+				return `<div style="
+					background-color:${bg};color:${fg};
+					border-radius:0px;padding:4px;
+					text-align:center;font-weight:bold;
+				">${value}</div>`;
+			}
+		}
 		return default_formatter(value, row, column, data);
 	},
 
 	onload(report) {
-		// report.page.add_inner_button(__("Item Breakdown"), () => {
-		// 	const d = new frappe.ui.Dialog({
-		// 		title: __("Item Colour Breakdown"),
-		// 		fields: [
-		// 			{
-		// 				label: __("Item Code"),
-		// 				fieldname: "item_code",
-		// 				fieldtype: "Link",
-		// 				options: "Item",
-		// 				reqd: 1,
-		// 				get_query() {
-		// 					return { filters: { custom_item_type: "RB" } };
-		// 				},
-		// 			},
-		// 		],
-		// 		primary_action_label: __("Show Breakdown"),
-		// 		primary_action({ item_code }) {
-		// 			if (!item_code) return;
-		// 			d.disable_primary_action();
-		// 			frappe.call({
-		// 				method: "prakash_steel.prakash_steel.report.rolled_plan.rolled_plan.get_item_colour_breakdown",
-		// 				args: { item_code },
-		// 				callback(r) {
-		// 					d.enable_primary_action();
-		// 					if (!r.message) {
-		// 						frappe.msgprint(__("No data returned."));
-		// 						return;
-		// 					}
-		// 					show_breakdown_dialog(r.message);
-		// 				},
-		// 				error() { d.enable_primary_action(); },
-		// 			});
-		// 		},
-		// 	});
-		// 	d.show();
-		// });
+		report.page.add_inner_button(__("Item Breakdown"), () => {
+			const d = new frappe.ui.Dialog({
+				title: __("Item Colour Breakdown"),
+				fields: [
+					{
+						label: __("Item Code"),
+						fieldname: "item_code",
+						fieldtype: "Link",
+						options: "Item",
+						reqd: 1,
+						get_query() {
+							return { filters: { custom_item_type: "RB" } };
+						},
+					},
+				],
+				primary_action_label: __("Show Breakdown"),
+				primary_action({ item_code }) {
+					if (!item_code) return;
+					d.disable_primary_action();
+					frappe.call({
+						method: "prakash_steel.prakash_steel.report.rolled_plan.rolled_plan.get_item_colour_breakdown",
+						args: { item_code },
+						callback(r) {
+							d.enable_primary_action();
+							if (!r.message) {
+								frappe.msgprint(__("No data returned."));
+								return;
+							}
+							show_breakdown_dialog(r.message);
+						},
+						error() { d.enable_primary_action(); },
+					});
+				},
+			});
+			d.show();
+		});
 	},
 };
 
