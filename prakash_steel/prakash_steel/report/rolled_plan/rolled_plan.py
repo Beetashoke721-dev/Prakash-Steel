@@ -176,6 +176,41 @@
 # 	return batches
 
 
+# _COLOUR_PRIORITY = {"Black": 5, "Red": 4, "Yellow": 3, "Green": 2, "White": 1}
+# _PRIORITY_TO_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
+
+
+# def _rbmto_on_hand_colour(level, own_so_list):
+# 	"""
+# 	RBMTO on-hand colour (mirrors po_recomendation _non_buffer_priority):
+# 	FIFO-allocate `level` across own SOs sorted by delivery_date ASC.
+# 	- If any SO has shortage → return worst colour of shortage SOs.
+# 	- If no shortage → return worst colour of no-shortage SOs.
+# 	"""
+# 	if not own_so_list:
+# 		return ""
+# 	available = flt(level)
+# 	worst_shortage = 0
+# 	worst_no_shortage = 0
+# 	for so in own_so_list:
+# 		required = flt(so["pending_qty"])
+# 		allocated = min(required, available)
+# 		shortage = required - allocated
+# 		available -= allocated
+# 		priority = _COLOUR_PRIORITY.get(so["colour"], 0)
+# 		if shortage > 0:
+# 			if priority > worst_shortage:
+# 				worst_shortage = priority
+# 		else:
+# 			if priority > worst_no_shortage:
+# 				worst_no_shortage = priority
+# 	if worst_shortage > 0:
+# 		return _PRIORITY_TO_COLOUR.get(worst_shortage, "")
+# 	if worst_no_shortage > 0:
+# 		return _PRIORITY_TO_COLOUR.get(worst_no_shortage, "")
+# 	return ""
+
+
 # def _rbmto_colour(level, own_so_list, parent_so_fifo_list):
 # 	"""
 # 	RBMTO colour:
@@ -195,12 +230,12 @@
 # 		if shortage > 0:
 # 			return so["colour"] or ""
 
-# 	# Step 2: parent SO FIFO (pre-sorted by priority_sequence ASC)
-# 	# Each entry is one parent SO; stop and return its colour at first shortage
+# 	# Step 2: parent batch FIFO (pre-sorted by priority_sequence ASC)
+# 	# Allocate batch_qty (parent units) from available; child_req is for reference only
 # 	for entry in parent_so_fifo_list:
-# 		child_req = entry["child_req"]
-# 		allocated = min(child_req, available)
-# 		shortage = child_req - allocated
+# 		batch_qty = entry["batch_qty"]
+# 		allocated = min(batch_qty, available)
+# 		shortage = batch_qty - allocated
 # 		available -= allocated
 # 		if shortage > 0:
 # 			return entry["colour"] or ""
@@ -230,6 +265,12 @@
 # 			"width": 100,
 # 		},
 # 		{
+# 			"label": _("On Hand Colour"),
+# 			"fieldname": "on_hand_colour",
+# 			"fieldtype": "Data",
+# 			"width": 130,
+# 		},
+# 		{
 # 			"label": _("Net Order Recommendation"),
 # 			"fieldname": "net_order_recommendation",
 # 			"fieldtype": "Int",
@@ -246,19 +287,6 @@
 # 			"fieldname": "item_type",
 # 			"fieldtype": "Data",
 # 			"width": 100,
-# 		},
-# 		{
-# 			"label": _("TOG"),
-# 			"fieldname": "tog",
-# 			"fieldtype": "Int",
-# 			"width": 100,
-# 		},
-# 		{
-# 			"label": _("TOG Subgroup %"),
-# 			"fieldname": "tog_subgroup_pct",
-# 			"fieldtype": "Float",
-# 			"precision": 2,
-# 			"width": 140,
 # 		},
 # 		{
 # 			"label": _("Last Rolled Date"),
@@ -304,6 +332,19 @@
 # 			"width": 130,
 # 		},
 # 		{
+# 			"label": _("TOG"),
+# 			"fieldname": "tog",
+# 			"fieldtype": "Int",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("TOG Subgroup %"),
+# 			"fieldname": "tog_subgroup_pct",
+# 			"fieldtype": "Float",
+# 			"precision": 2,
+# 			"width": 140,
+# 		},
+# 		{
 # 			"label": _("Net Qty"),
 # 			"fieldname": "net_qty",
 # 			"fieldtype": "Float",
@@ -316,6 +357,12 @@
 # 			"width": 120,
 # 		},
 # 		{
+# 			"label": _("Grp"),
+# 			"fieldname": "grp",
+# 			"fieldtype": "Data",
+# 			"width": 100,
+# 		},
+# 		{
 # 			"label": _("Shape"),
 # 			"fieldname": "shape",
 # 			"fieldtype": "Data",
@@ -326,6 +373,144 @@
 # 			"fieldname": "subgrp_shape",
 # 			"fieldtype": "Data",
 # 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Grp+Shape"),
+# 			"fieldname": "grp_shape",
+# 			"fieldtype": "Data",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Grp Weightage Value"),
+# 			"fieldname": "grp_weightage_value",
+# 			"fieldtype": "Float",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Subgrp Count"),
+# 			"fieldname": "subgrp_count",
+# 			"fieldtype": "Int",
+# 			"width": 120,
+# 		},
+# 		{
+# 			"label": _("Subgroup Qty"),
+# 			"fieldname": "subgroup_qty",
+# 			"fieldtype": "Float",
+# 			"width": 120,
+# 		},
+# 		{
+# 			"label": _("Per Hour Qty"),
+# 			"fieldname": "per_hour_qty",
+# 			"fieldtype": "Float",
+# 			"width": 120,
+# 		},
+# 		{
+# 			"label": _("Hrs Work"),
+# 			"fieldname": "hrs_work",
+# 			"fieldtype": "Float",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("Subgrp Hours+Setup"),
+# 			"fieldname": "subgrp_hours_setup",
+# 			"fieldtype": "Float",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Subgrp Hours Shortage"),
+# 			"fieldname": "subgrp_hours_shortage",
+# 			"fieldtype": "Float",
+# 			"width": 170,
+# 		},
+# 		{
+# 			"label": _("Extra Hours"),
+# 			"fieldname": "extra_hours",
+# 			"fieldtype": "Float",
+# 			"width": 110,
+# 		},
+# 		{
+# 			"label": _("Extra Qty"),
+# 			"fieldname": "extra_qty",
+# 			"fieldtype": "Float",
+# 			"width": 110,
+# 		},
+# 		{
+# 			"label": _("Excess Qty"),
+# 			"fieldname": "excess_qty",
+# 			"fieldtype": "Float",
+# 			"width": 110,
+# 		},
+# 		{
+# 			"label": _("Excess Qty/TOG"),
+# 			"fieldname": "excess_qty_tog",
+# 			"fieldtype": "Float",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("TOG%"),
+# 			"fieldname": "tog_pct",
+# 			"fieldtype": "Float",
+# 			"width": 90,
+# 		},
+# 		{
+# 			"label": _("Allocated Hours"),
+# 			"fieldname": "allocated_hours",
+# 			"fieldtype": "Float",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Total Allocated Qty"),
+# 			"fieldname": "total_allocated_qty",
+# 			"fieldtype": "Float",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Final Allocated Qty"),
+# 			"fieldname": "final_allocated_qty",
+# 			"fieldtype": "Float",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Calc Excess Qty"),
+# 			"fieldname": "calc_excess_qty",
+# 			"fieldtype": "Float",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Net Calc Excess Qty"),
+# 			"fieldname": "net_calc_excess_qty",
+# 			"fieldtype": "Float",
+# 			"width": 160,
+# 		},
+# 		{
+# 			"label": _("Net Calc TOG%"),
+# 			"fieldname": "net_calc_tog_pct",
+# 			"fieldtype": "Float",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("New Excess Qty"),
+# 			"fieldname": "new_excess_qty",
+# 			"fieldtype": "Float",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("New Excess/TOG"),
+# 			"fieldname": "new_excess_tog",
+# 			"fieldtype": "Float",
+# 			"width": 130,
+# 		},
+# 		{
+# 			"label": _("Subgroup Weightage Value"),
+# 			"fieldname": "subgroup_weightage_value",
+# 			"fieldtype": "Float",
+# 			"width": 190,
+# 		},
+# 		{
+# 			"label": _("Group Count"),
+# 			"fieldname": "group_count",
+# 			"fieldtype": "Int",
+# 			"width": 120,
 # 		},
 # 		{
 # 			"label": _("Weightage Value"),
@@ -440,7 +625,8 @@
 # 			i.min_order_qty as moq,
 # 			i.custom_batch_size as batch_size,
 # 			i.custom_sub_group_new_name as sub_grp,
-# 			i.custom_shape as shape
+# 			i.custom_shape as shape,
+# 			i.custom_group_for_sub_assemblies as grp
 # 		FROM `tabItem` i
 # 		WHERE i.custom_item_type = 'RB'
 # 		""",
@@ -463,6 +649,14 @@
 # 		item_type_map[item.item_code] = item.item_type
 # 		item_tog_map[item.item_code] = flt(item.tog or 0)
 # 		item_info_map[item.item_code] = item
+
+# 	# Per hour qty and final planned hrs from Rolling Algo
+# 	rolling_algo_rows = frappe.db.get_all(
+# 		"Rolling Algo",
+# 		fields=["item_code", "per_hour_planned_qty", "final_planned_hrs"],
+# 	)
+# 	per_hour_qty_map = {r.item_code: flt(r.per_hour_planned_qty) for r in rolling_algo_rows}
+# 	final_planned_hrs_map = {r.item_code: flt(r.final_planned_hrs) for r in rolling_algo_rows}
 
 # 	stock_map = get_stock_map(item_codes)
 # 	mrq_map = get_mrq_map()
@@ -595,6 +789,7 @@
 # 	parent_bom_map = {}
 # 	parent_data_map = {}
 # 	child_parent_so_fifo = defaultdict(list)
+# 	rbmto_eligible_parent_map = {}
 
 # 	if rbmto_codes:
 # 		rbmto_so_detail_map = get_rbmto_so_detail_map(rbmto_codes)
@@ -682,6 +877,15 @@
 # 					"moq": moq_p,
 # 				}
 
+# 		# RBMTO items eligible for BBMTA parent allocation logic:
+# 		# exactly one parent AND that parent is BBMTA (BB + Buffer)
+# 		for child_ic in rbmto_codes:
+# 			parents = parent_bom_map.get(child_ic, [])
+# 			if len(parents) == 1:
+# 				parent_ic = parents[0]["parent_item"]
+# 				if p_type_map.get(parent_ic) == "BB" and p_buffer_map.get(parent_ic) == "Buffer":
+# 					rbmto_eligible_parent_map[child_ic] = parent_ic
+
 # 		# Build per-child-item flat batch FIFO list using bright_plan incremental logic
 # 		for child_ic in rbmto_codes:
 # 			flat = []
@@ -714,9 +918,10 @@
 # 							"priority_colour": batch["priority_colour"],
 # 							"priority_sequence": batch["priority_sequence"],
 # 							"op_cp": batch["op_cp"],
+# 							"tog": pd["tog"],
 # 						}
 # 					)
-# 			flat.sort(key=lambda x: x["priority_sequence"])
+# 			flat.sort(key=lambda x: (x["priority_sequence"], -flt(x["tog"])))
 # 			child_parent_so_fifo[child_ic] = flat
 
 # 	# Fetch colour weightage map from Single DocType
@@ -758,8 +963,11 @@
 # 		base_order_rec = max(0, base_order_rec)
 # 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 
-# 		# Colour — level = stock + open MR pending qty (WIP = 0)
-# 		level = stock + mrq
+# 		# if net_order_rec <= 0:
+# 		# 	continue
+
+# 		# Colour — level = stock only (MRQ excluded)
+# 		level = stock
 # 		if is_buffer:
 # 			colour = _buffer_colour(level, tog, flt(qualified_demand_map.get(item_code, 0)))
 # 		else:
@@ -769,15 +977,27 @@
 # 				child_parent_so_fifo.get(item_code, []),
 # 			)
 
+# 		# For eligible RBMTO: use parent BBMTA's tog, per_hour_qty, final_planned_hrs
+# 		effective_tog = tog
+# 		effective_per_hour_qty = per_hour_qty_map.get(item_code) or None
+# 		if item_code in rbmto_eligible_parent_map:
+# 			parent_ic = rbmto_eligible_parent_map[item_code]
+# 			pd = parent_data_map.get(parent_ic, {})
+# 			if flt(pd.get("tog") or 0) > 0:
+# 				effective_tog = flt(pd.get("tog") or 0)
+# 			if not effective_per_hour_qty:
+# 				effective_per_hour_qty = per_hour_qty_map.get(parent_ic) or None
+
 # 		data.append(
 # 			{
 # 				"item_code": item_code,
 # 				"item_name": item.item_name,
 # 				"colour": colour,
+# 				"on_hand_colour": None,
 # 				"net_order_recommendation": math.ceil(flt(net_order_rec)),
 # 				"sku_type": sku_type,
 # 				"item_type": item_type_map[item_code],
-# 				"tog": math.ceil(flt(tog)),
+# 				"tog": math.ceil(flt(effective_tog)),
 # 				"tog_subgroup_pct": None,
 # 				"last_rolled_date": last_rolled_map.get(item_code, {}).get("last_rolled_date"),
 # 				"last_rolled_qty": last_rolled_map.get(item_code, {}).get("last_rolled_qty"),
@@ -788,8 +1008,34 @@
 # 				"on_hand_stock": flt(stock),
 # 				"net_qty": None,
 # 				"sub_grp": item.sub_grp or "",
+# 				"grp": item.grp or "",
 # 				"shape": item.shape or "",
 # 				"subgrp_shape": " ".join(filter(None, [item.sub_grp, item.shape])),
+# 				"grp_shape": " ".join(filter(None, [item.grp, item.shape])),
+# 				"grp_weightage_value": None,
+# 				"subgrp_count": None,
+# 				"subgroup_qty": None,
+# 				"per_hour_qty": effective_per_hour_qty,
+# 				"hrs_work": (flt(net_order_rec) / effective_per_hour_qty)
+# 				if effective_per_hour_qty
+# 				else None,
+# 				"subgrp_hours_setup": None,
+# 				"subgrp_hours_shortage": None,
+# 				"extra_hours": None,
+# 				"extra_qty": None,
+# 				"excess_qty": None,
+# 				"excess_qty_tog": None,
+# 				"tog_pct": None,
+# 				"allocated_hours": None,
+# 				"total_allocated_qty": None,
+# 				"final_allocated_qty": None,
+# 				"calc_excess_qty": None,
+# 				"net_calc_excess_qty": None,
+# 				"net_calc_tog_pct": None,
+# 				"new_excess_qty": None,
+# 				"new_excess_tog": None,
+# 				"subgroup_weightage_value": None,
+# 				"group_count": None,
 # 				"weightage_value": math.ceil(flt(net_order_rec)) * colour_weightage_map.get(colour, 0),
 # 				"prod_qty_based_on_child_stock": None,
 # 				"prod_qty_based_on_child_stock_wip_open_po": None,
@@ -814,7 +1060,246 @@
 # 		subgrp_tog_sum[row["subgrp_shape"]] += flt(row["tog"])
 # 	for row in data:
 # 		group_sum = subgrp_tog_sum.get(row["subgrp_shape"], 0)
-# 		row["tog_subgroup_pct"] = round((flt(row["tog"]) / group_sum) * 100, 2) if group_sum else None
+# 		tog_pct_val = round((flt(row["tog"]) / group_sum) * 100, 2) if group_sum else None
+# 		row["tog_subgroup_pct"] = tog_pct_val
+# 		row["tog_pct"] = tog_pct_val
+
+# 	# --- Weightage Value aggregations ---
+# 	subgrp_wv_sum = defaultdict(float)
+# 	grp_wv_sum = defaultdict(float)
+# 	subgrp_qty_sum = defaultdict(float)
+# 	subgrp_count_map = defaultdict(int)
+# 	grp_count_map = defaultdict(int)
+# 	subgrp_hrs_sum = defaultdict(float)
+# 	subgrp_final_hrs_sum = defaultdict(float)
+# 	for row in data:
+# 		subgrp_wv_sum[row["subgrp_shape"]] += flt(row["weightage_value"])
+# 		grp_wv_sum[row["grp_shape"]] += flt(row["weightage_value"])
+# 		subgrp_qty_sum[row["subgrp_shape"]] += flt(row.get("net_order_recommendation", 0))
+# 		subgrp_count_map[row["subgrp_shape"]] += 1
+# 		grp_count_map[row["grp_shape"]] += 1
+# 		subgrp_hrs_sum[row["sub_grp"]] += flt(row.get("hrs_work") or 0)
+# 		subgrp_final_hrs_sum[row["sub_grp"]] += flt(final_planned_hrs_map.get(row["item_code"]) or 0)
+# 	for row in data:
+# 		row["subgroup_weightage_value"] = subgrp_wv_sum.get(row["subgrp_shape"], 0) or None
+# 		row["grp_weightage_value"] = grp_wv_sum.get(row["grp_shape"], 0) or None
+# 		row["subgroup_qty"] = subgrp_qty_sum.get(row["subgrp_shape"], 0) or None
+# 		row["subgrp_count"] = subgrp_count_map.get(row["subgrp_shape"], 0)
+# 		row["group_count"] = grp_count_map.get(row["grp_shape"], 0)
+# 		row["subgrp_hours_setup"] = subgrp_hrs_sum.get(row["sub_grp"]) or None
+# 		final_hrs = subgrp_final_hrs_sum.get(row["sub_grp"], 0)
+# 		setup_hrs = subgrp_hrs_sum.get(row["sub_grp"], 0)
+# 		shortage = max(0, final_hrs - setup_hrs)
+# 		row["subgrp_hours_shortage"] = shortage
+# 		ic = row["item_code"]
+# 		is_eligible_rbmto = (
+# 			row.get("sku_type") == "RBMTO"
+# 			and ic in rbmto_eligible_parent_map
+# 		)
+
+# 		if row.get("sku_type") == "RBMTA" or is_eligible_rbmto:
+# 			tog_pct = flt(row.get("tog_subgroup_pct") or 0)
+# 			extra_hrs = round((tog_pct * shortage) / 100, 3)
+# 			row["extra_hours"] = extra_hrs
+# 			per_hr = flt(row.get("per_hour_qty") or 0)
+# 			row["extra_qty"] = round(extra_hrs * per_hr, 3) if per_hr else None
+# 		else:
+# 			row["extra_hours"] = 0
+# 			row["extra_qty"] = 0
+
+# 		# On-hand colour and excess qty
+# 		on_hand_stock = flt(row.get("on_hand_stock") or 0)
+# 		tog_val = flt(row.get("tog") or 0)
+# 		qd_val = flt(qualified_demand_map.get(ic) or 0)
+# 		on_hand_colour = None
+
+# 		if row.get("sku_type") == "RBMTA":
+# 			denominator = tog_val + qd_val
+# 			if denominator > 0:
+# 				pct = (on_hand_stock / denominator) * 100
+# 				if pct == 0:
+# 					on_hand_colour = "BLACK"
+# 				elif pct <= 34:
+# 					on_hand_colour = "RED"
+# 				elif pct <= 67:
+# 					on_hand_colour = "YELLOW"
+# 				elif pct <= 100:
+# 					on_hand_colour = "GREEN"
+# 				else:
+# 					on_hand_colour = "WHITE"
+# 		elif is_eligible_rbmto:
+# 			# Use parent BBMTA item's stock/tog/qd for buffer-style on_hand_colour
+# 			parent_ic = rbmto_eligible_parent_map[ic]
+# 			pd = parent_data_map.get(parent_ic, {})
+# 			p_stock = flt(pd.get("stock") or 0)
+# 			p_tog = flt(pd.get("tog") or 0)
+# 			p_qd = flt(pd.get("qd") or 0)
+# 			denominator = p_tog + p_qd
+# 			if denominator > 0:
+# 				pct = (p_stock / denominator) * 100
+# 				if pct == 0:
+# 					on_hand_colour = "BLACK"
+# 				elif pct <= 34:
+# 					on_hand_colour = "RED"
+# 				elif pct <= 67:
+# 					on_hand_colour = "YELLOW"
+# 				elif pct <= 100:
+# 					on_hand_colour = "GREEN"
+# 				else:
+# 					on_hand_colour = "WHITE"
+# 			# For excess_qty use parent values
+# 			tog_val = p_tog
+# 			qd_val = p_qd
+# 			on_hand_stock = p_stock
+# 		elif row.get("sku_type") == "RBMTO":
+# 			on_hand_colour = _rbmto_on_hand_colour(
+# 				flt(row.get("on_hand_stock") or 0), rbmto_so_detail_map.get(ic, [])
+# 			)
+
+# 		row["on_hand_colour"] = on_hand_colour
+# 		if on_hand_colour == "WHITE":
+# 			row["excess_qty"] = on_hand_stock - tog_val - qd_val
+# 		else:
+# 			row["excess_qty"] = flt(row.get("extra_qty") or 0)
+# 		excess = flt(row["excess_qty"])
+# 		row["excess_qty_tog"] = round((excess / tog_val) * 100, 3) if tog_val else None
+
+# 	# --- Allocated Hours ---
+# 	subgrp_extra_hrs_sum = defaultdict(float)
+# 	for row in data:
+# 		ic = row["item_code"]
+# 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
+# 		if row.get("sku_type") == "RBMTA" or is_eligible_rbmto:
+# 			subgrp_extra_hrs_sum[row["subgrp_shape"]] += flt(row.get("extra_hours") or 0)
+# 	for row in data:
+# 		ic = row["item_code"]
+# 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
+# 		if row.get("sku_type") == "RBMTA" or is_eligible_rbmto:
+# 			total_extra = subgrp_extra_hrs_sum.get(row["subgrp_shape"], 0)
+# 			tog_pct_val = flt(row.get("tog_pct") or 0)
+# 			alloc_hrs = round(total_extra * tog_pct_val / 100, 3)
+# 			row["allocated_hours"] = alloc_hrs
+# 			per_hr = flt(row.get("per_hour_qty") or 0)
+# 			total_alloc_qty = round(alloc_hrs * per_hr, 3) if per_hr else None
+# 			row["total_allocated_qty"] = total_alloc_qty
+# 			if row.get("on_hand_colour") == "WHITE":
+# 				row["final_allocated_qty"] = max(0, flt(total_alloc_qty) - flt(row.get("excess_qty") or 0))
+# 			else:
+# 				row["final_allocated_qty"] = total_alloc_qty
+# 		else:
+# 			row["allocated_hours"] = 0
+# 			row["total_allocated_qty"] = 0
+# 			row["final_allocated_qty"] = 0
+
+# 	# --- Redistribute lost hours from WHITE items to eligible items ---
+# 	# Step 1: sum lost_hours per subgrp_shape from WHITE items (RBMTA + eligible RBMTO)
+# 	subgrp_lost_hrs = defaultdict(float)
+# 	for row in data:
+# 		ic = row["item_code"]
+# 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
+# 		if (row.get("sku_type") == "RBMTA" or is_eligible_rbmto) and row.get("on_hand_colour") == "WHITE":
+# 			per_hr = flt(row.get("per_hour_qty") or 0)
+# 			lost_qty = flt(row.get("total_allocated_qty") or 0) - flt(row.get("final_allocated_qty") or 0)
+# 			if per_hr > 0 and lost_qty > 0:
+# 				subgrp_lost_hrs[row["subgrp_shape"]] += lost_qty / per_hr
+
+# 	# Step 2: sum tog_pct of eligible items per subgrp_shape (non-WHITE, final_allocated_qty > 0)
+# 	subgrp_eligible_tog_sum = defaultdict(float)
+# 	for row in data:
+# 		ic = row["item_code"]
+# 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
+# 		if ((row.get("sku_type") == "RBMTA" or is_eligible_rbmto)
+# 				and row.get("on_hand_colour") != "WHITE"
+# 				and flt(row.get("final_allocated_qty") or 0) > 0):
+# 			subgrp_eligible_tog_sum[row["subgrp_shape"]] += flt(row.get("tog_pct") or 0)
+
+# 	# Step 3: distribute to eligible items (RBMTA + eligible RBMTO)
+# 	for row in data:
+# 		ic = row["item_code"]
+# 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
+# 		if ((row.get("sku_type") == "RBMTA" or is_eligible_rbmto)
+# 				and row.get("on_hand_colour") != "WHITE"
+# 				and flt(row.get("final_allocated_qty") or 0) > 0):
+# 			lost_hrs = subgrp_lost_hrs.get(row["subgrp_shape"], 0)
+# 			if lost_hrs > 0:
+# 				eligible_tog_sum = subgrp_eligible_tog_sum.get(row["subgrp_shape"], 0)
+# 				per_hr = flt(row.get("per_hour_qty") or 0)
+# 				if eligible_tog_sum > 0 and per_hr > 0:
+# 					norm_pct = flt(row.get("tog_pct") or 0) / eligible_tog_sum
+# 					additional_qty = round(lost_hrs * norm_pct * per_hr, 3)
+# 					row["final_allocated_qty"] = flt(row.get("final_allocated_qty") or 0) + additional_qty
+
+# 	# --- Calc Excess Qty: sum of excess_qty per subgrp_shape ---
+# 	subgrp_excess_sum = defaultdict(float)
+# 	for row in data:
+# 		subgrp_excess_sum[row["subgrp_shape"]] += flt(row.get("excess_qty") or 0)
+# 	for row in data:
+# 		calc_excess = subgrp_excess_sum.get(row["subgrp_shape"], 0)
+# 		row["calc_excess_qty"] = calc_excess or None
+# 		# Net Calc Excess Qty
+# 		if row.get("sku_type") == "RBMTA" and row.get("on_hand_colour") == "WHITE":
+# 			row["net_calc_excess_qty"] = max(calc_excess - flt(row.get("excess_qty") or 0), 0) or None
+# 		else:
+# 			row["net_calc_excess_qty"] = calc_excess or None
+
+# 	# --- Net Calc TOG%: (tog / sum of net_calc_excess_qty > 0 per subgrp_shape) * 100 ---
+# 	subgrp_net_calc_excess_sum = defaultdict(float)
+# 	for row in data:
+# 		val = flt(row.get("net_calc_excess_qty") or 0)
+# 		if val > 0:
+# 			subgrp_net_calc_excess_sum[row["subgrp_shape"]] += val
+# 	for row in data:
+# 		denom = subgrp_net_calc_excess_sum.get(row["subgrp_shape"], 0)
+# 		tog_val = flt(row.get("tog") or 0)
+# 		row["net_calc_tog_pct"] = round((tog_val / denom) * 100, 2) if denom else None
+
+# 	# --- New Excess Qty: sum_of_extra_qty_per_subgrp_shape * (net_calc_tog_pct / 100) ---
+# 	subgrp_extra_qty_sum = defaultdict(float)
+# 	for row in data:
+# 		subgrp_extra_qty_sum[row["subgrp_shape"]] += flt(row.get("extra_qty") or 0)
+# 	for row in data:
+# 		net_calc_tog = flt(row.get("net_calc_tog_pct") or 0)
+# 		total_extra_qty = subgrp_extra_qty_sum.get(row["subgrp_shape"], 0)
+# 		new_excess = round(total_extra_qty * net_calc_tog / 100, 3) if net_calc_tog else None
+# 		row["new_excess_qty"] = new_excess
+# 		tog_val = flt(row.get("tog") or 0)
+# 		row["new_excess_tog"] = round(flt(new_excess) / tog_val, 3) if tog_val and new_excess else None
+# 		net_order = flt(row.get("net_order_recommendation") or 0)
+# 		row["net_qty"] = round(flt(new_excess or 0) + net_order, 3) if (new_excess or net_order) else None
+
+# 	# --- Top-3 parent items per RB item (any item that uses this RB item in their BOM) ---
+# 	rb_item_codes_in_data = [r["item_code"] for r in data]
+# 	rb_top3_parents_map = {}
+# 	rb_parent_stock_map = {}
+# 	if rb_item_codes_in_data:
+# 		rb_tuple = tuple(rb_item_codes_in_data) if len(rb_item_codes_in_data) > 1 else (rb_item_codes_in_data[0],)
+# 		rb_parent_rows = frappe.db.sql(
+# 			"""
+# 			SELECT bi.item_code AS child_item, b.item AS parent_item,
+# 			       b.is_default, b.creation
+# 			FROM `tabBOM Item` bi
+# 			INNER JOIN `tabBOM` b ON b.name = bi.parent
+# 			WHERE bi.item_code IN %s AND b.docstatus = 1
+# 			ORDER BY bi.item_code, b.is_default DESC, b.creation ASC
+# 			""",
+# 			(rb_tuple,),
+# 			as_dict=True,
+# 		)
+# 		for r in rb_parent_rows:
+# 			lst = rb_top3_parents_map.setdefault(r.child_item, [])
+# 			if len(lst) < 3:
+# 				lst.append(r.parent_item)
+# 		all_rb_parent_codes = {p for lst in rb_top3_parents_map.values() for p in lst}
+# 		if all_rb_parent_codes:
+# 			rp_tuple = (
+# 				tuple(all_rb_parent_codes) if len(all_rb_parent_codes) > 1 else (next(iter(all_rb_parent_codes)),)
+# 			)
+# 			rp_stock_rows = frappe.db.sql(
+# 				"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+# 				(rp_tuple,),
+# 				as_dict=True,
+# 			)
+# 			rb_parent_stock_map = {r.item_code: flt(r.stock) for r in rp_stock_rows}
 
 # 	# --- Child BOM expansion with FIFO allocation ---
 
@@ -871,45 +1356,6 @@
 # 				r.custom_buffer_flag or "Non-Buffer", r.custom_item_type
 # 			)
 
-# 		# Top-3 parent items per child item (default BOM first, then by creation ASC)
-# 		parent_bom_rows = frappe.db.sql(
-# 			"""
-# 			SELECT bi.item_code AS child_item, b.item AS parent_item,
-# 			       b.is_default, b.creation
-# 			FROM `tabBOM Item` bi
-# 			INNER JOIN `tabBOM` b ON b.name = bi.parent
-# 			WHERE bi.item_code IN %s AND b.docstatus = 1
-# 			ORDER BY bi.item_code, b.is_default DESC, b.creation ASC
-# 			""",
-# 			(child_tuple,),
-# 			as_dict=True,
-# 		)
-# 		# Group and keep top 3 per child
-# 		child_top3_parents_map = {}  # {child_item_code: [parent_item, ...]} max 3
-# 		for r in parent_bom_rows:
-# 			lst = child_top3_parents_map.setdefault(r.child_item, [])
-# 			if len(lst) < 3:
-# 				lst.append(r.parent_item)
-
-# 		# Fetch stock for all unique parent items found
-# 		all_top3_parent_codes = {p for lst in child_top3_parents_map.values() for p in lst}
-# 		top3_parent_stock_map = {}
-# 		if all_top3_parent_codes:
-# 			tp_tuple = (
-# 				tuple(all_top3_parent_codes)
-# 				if len(all_top3_parent_codes) > 1
-# 				else (next(iter(all_top3_parent_codes)),)
-# 			)
-# 			tp_stock_rows = frappe.db.sql(
-# 				"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
-# 				(tp_tuple,),
-# 				as_dict=True,
-# 			)
-# 			top3_parent_stock_map = {r.item_code: flt(r.stock) for r in tp_stock_rows}
-# 	else:
-# 		child_top3_parents_map = {}
-# 		top3_parent_stock_map = {}
-
 # 	child_wip_map = get_wip_map()
 
 # 	# Sort by colour priority descending (Black first = most urgent → allocated first)
@@ -926,6 +1372,19 @@
 # 		net_or = flt(row.get("net_order_recommendation", 0))
 
 # 		if not children:
+# 			top3 = rb_top3_parents_map.get(item_code, [])
+# 			keys = [
+# 				("first_parent_item", "first_parent_item_stock"),
+# 				("second_parent_item", "second_parent_item_stock"),
+# 				("third_parent_item", "third_parent_item_stock"),
+# 			]
+# 			for i, (pk, sk) in enumerate(keys):
+# 				if i < len(top3):
+# 					row[pk] = top3[i]
+# 					row[sk] = rb_parent_stock_map.get(top3[i], 0)
+# 				else:
+# 					row[pk] = None
+# 					row[sk] = None
 # 			expanded_data.append(row)
 # 			continue
 
@@ -958,12 +1417,8 @@
 # 			parent_per_child_factor = (bom_quantity / bom_qty) if bom_qty else 0
 # 			total_allocated = stock_allocated + wip_open_po_allocated
 
-# 			prod_qty_stock = min(
-# 				math.ceil(flt(stock_allocated) * parent_per_child_factor), math.ceil(net_or)
-# 			)
-# 			prod_qty_wip = min(
-# 				math.ceil(flt(total_allocated) * parent_per_child_factor), math.ceil(net_or)
-# 			)
+# 			prod_qty_stock = min(math.ceil(flt(stock_allocated) * parent_per_child_factor), math.ceil(net_or))
+# 			prod_qty_wip = min(math.ceil(flt(total_allocated) * parent_per_child_factor), math.ceil(net_or))
 
 # 			new_row = row.copy()
 # 			new_row["child_item_code"] = child_ic
@@ -975,8 +1430,8 @@
 # 			new_row["prod_qty_based_on_child_stock"] = prod_qty_stock
 # 			new_row["prod_qty_based_on_child_stock_wip_open_po"] = prod_qty_wip
 
-# 			# Top-3 parent items for this child item
-# 			top3 = child_top3_parents_map.get(child_ic, [])
+# 			# Top-3 parent items for this RB item (any item that uses it in their BOM)
+# 			top3 = rb_top3_parents_map.get(item_code, [])
 # 			keys = [
 # 				("first_parent_item", "first_parent_item_stock"),
 # 				("second_parent_item", "second_parent_item_stock"),
@@ -985,7 +1440,7 @@
 # 			for i, (pk, sk) in enumerate(keys):
 # 				if i < len(top3):
 # 					new_row[pk] = top3[i]
-# 					new_row[sk] = top3_parent_stock_map.get(top3[i], 0)
+# 					new_row[sk] = rb_parent_stock_map.get(top3[i], 0)
 # 				else:
 # 					new_row[pk] = None
 # 					new_row[sk] = None
@@ -998,6 +1453,101 @@
 # # ---------------------------------------------------------------------------
 # # Whitelist API — Item Colour Breakdown
 # # ---------------------------------------------------------------------------
+
+
+# @frappe.whitelist()
+# def get_final_allocated_qty_breakdown(item_code):
+# 	"""
+# 	Returns step-by-step breakdown of how final_allocated_qty is computed for an RB item.
+# 	Runs the full report and extracts the item's row + subgroup context.
+# 	"""
+# 	data = get_data()
+# 	if not data:
+# 		return None
+
+# 	# Find the item's row
+# 	item_row = next((r for r in data if r.get("item_code") == item_code), None)
+# 	if not item_row:
+# 		return {"error": f"Item {item_code} not found in report (no net order recommendation?)"}
+
+# 	subgrp = item_row.get("subgrp_shape", "")
+# 	sub_grp = item_row.get("sub_grp", "")
+
+# 	# All rows in same subgrp_shape
+# 	subgrp_rows = [r for r in data if r.get("subgrp_shape") == subgrp]
+
+# 	# Eligible items (non-WHITE, final_allocated_qty > 0)
+# 	eligible_rows = [
+# 		r for r in subgrp_rows
+# 		if r.get("on_hand_colour") != "WHITE"
+# 		and flt(r.get("final_allocated_qty") or 0) > 0
+# 	]
+
+# 	return {
+# 		"item_code": item_code,
+# 		"item_name": item_row.get("item_name"),
+# 		"sku_type": item_row.get("sku_type"),
+# 		"subgrp_shape": subgrp,
+# 		"sub_grp": sub_grp,
+# 		# Step 1: Item base values
+# 		"tog": item_row.get("tog"),
+# 		"per_hour_qty": item_row.get("per_hour_qty"),
+# 		"net_order_rec": item_row.get("net_order_recommendation"),
+# 		"hrs_work": item_row.get("hrs_work"),
+# 		"tog_pct": item_row.get("tog_pct"),
+# 		# Step 2: Subgroup hours shortage
+# 		"subgrp_hrs_setup": item_row.get("subgrp_hours_setup"),
+# 		"subgrp_hours_shortage": item_row.get("subgrp_hours_shortage"),
+# 		# Step 3: Extra hours & qty
+# 		"extra_hours": item_row.get("extra_hours"),
+# 		"extra_qty": item_row.get("extra_qty"),
+# 		# Step 4: On hand colour & excess qty
+# 		"on_hand_colour": item_row.get("on_hand_colour"),
+# 		"on_hand_stock": item_row.get("on_hand_stock"),
+# 		"excess_qty": item_row.get("excess_qty"),
+# 		"excess_qty_tog": item_row.get("excess_qty_tog"),
+# 		# Step 5: Allocated hours
+# 		"subgrp_extra_hrs_sum": sum(flt(r.get("extra_hours") or 0) for r in subgrp_rows),
+# 		"allocated_hours": item_row.get("allocated_hours"),
+# 		"total_allocated_qty": item_row.get("total_allocated_qty"),
+# 		# Step 6: Final allocated qty
+# 		"final_allocated_qty": item_row.get("final_allocated_qty"),
+# 		# Subgroup context for white deduction & redistribution
+# 		"white_items": [
+# 			{
+# 				"item_code": r.get("item_code"),
+# 				"total_allocated_qty": r.get("total_allocated_qty"),
+# 				"excess_qty": r.get("excess_qty"),
+# 				"final_allocated_qty": r.get("final_allocated_qty"),
+# 				"per_hour_qty": r.get("per_hour_qty"),
+# 				"lost_qty": flt(r.get("total_allocated_qty") or 0) - flt(r.get("final_allocated_qty") or 0),
+# 			}
+# 			for r in subgrp_rows
+# 			if r.get("on_hand_colour") == "WHITE"
+# 		],
+# 		"eligible_tog_sum": sum(flt(r.get("tog_pct") or 0) for r in eligible_rows),
+# 		"subgrp_lost_hrs": sum(
+# 			(flt(r.get("total_allocated_qty") or 0) - flt(r.get("final_allocated_qty") or 0)) / flt(r.get("per_hour_qty") or 1)
+# 			for r in subgrp_rows
+# 			if r.get("on_hand_colour") == "WHITE"
+# 			and flt(r.get("per_hour_qty") or 0) > 0
+# 			and flt(r.get("total_allocated_qty") or 0) > flt(r.get("final_allocated_qty") or 0)
+# 		),
+# 		# All rows in subgrp for context table
+# 		"subgrp_rows": [
+# 			{
+# 				"item_code": r.get("item_code"),
+# 				"tog_pct": r.get("tog_pct"),
+# 				"extra_hours": r.get("extra_hours"),
+# 				"on_hand_colour": r.get("on_hand_colour"),
+# 				"excess_qty": r.get("excess_qty"),
+# 				"allocated_hours": r.get("allocated_hours"),
+# 				"total_allocated_qty": r.get("total_allocated_qty"),
+# 				"final_allocated_qty": r.get("final_allocated_qty"),
+# 			}
+# 			for r in subgrp_rows
+# 		],
+# 	}
 
 
 # @frappe.whitelist()
@@ -1038,7 +1588,7 @@
 # 	stock = flt(stock_data[0].stock if stock_data else 0)
 # 	mrq_map_all = get_mrq_map()
 # 	mrq = flt(mrq_map_all.get(item_code, 0))
-# 	level = stock + mrq
+# 	level = stock
 
 # 	item_buffer_map = {item_code: buffer_flag}
 # 	item_type_map = {item_code: item_type}
@@ -1242,14 +1792,15 @@
 # 							"op_cp": batch["op_cp"],
 # 							"colour": batch["colour"],
 # 							"child_req": child_req,
+# 							"tog": pd["tog"],
 # 						}
 # 					)
-# 			flat.sort(key=lambda x: x["priority_sequence"])
+# 			flat.sort(key=lambda x: (x["priority_sequence"], -flt(x["tog"])))
 
 # 			for entry in flat:
-# 				child_req = entry["child_req"]
-# 				allocated = min(child_req, available)
-# 				shortage = child_req - allocated
+# 				batch_qty = entry["batch_qty"]
+# 				allocated = min(batch_qty, available)
+# 				shortage = batch_qty - allocated
 # 				available -= allocated
 # 				parent_fifo.append(
 # 					{
@@ -1259,7 +1810,7 @@
 # 						"op_cp": entry["op_cp"],
 # 						"level_before": math.ceil(entry["level_before"]),
 # 						"batch_qty": math.ceil(entry["batch_qty"]),
-# 						"child_req": child_req,
+# 						"child_req": math.ceil(entry["child_req"]),
 # 						"allocated": math.ceil(allocated),
 # 						"shortage": math.ceil(shortage),
 # 						"available_after": math.ceil(available),
