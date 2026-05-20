@@ -74,10 +74,11 @@ def get_item_breakdown(item_code):
 	)
 	qualified_demand = flt(qualified_demand)
 
+	item_open_so = flt(open_so_qty_map.get(item_code, 0))
 	if is_buffer:
 		base_order_rec = max(0, tog + qualified_demand - stock - wip - mrq)
 	else:
-		base_order_rec = max(0, qualified_demand - stock - wip - mrq)
+		base_order_rec = max(0, item_open_so - stock - wip - mrq)
 
 	net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 
@@ -88,7 +89,6 @@ def get_item_breakdown(item_code):
 		num_batches = 1
 		qty_per_row = net_order_rec
 
-	item_open_so = flt(open_so_qty_map.get(item_code, 0))
 	# Buffer: display/OP-CP uses qualified_demand (delivery_date <= today + spike)
 	# Non-buffer: display/OP-CP uses all-time open SO
 	display_open_so = qualified_demand if is_buffer else item_open_so
@@ -473,12 +473,13 @@ def get_data(filters=None):
 			spike_master_map,
 		)
 		qualified_demand = flt(qualified_demand)
+		item_open_so = flt(open_so_qty_map.get(item_code, 0))
 
 		# Calculate order recommendation
 		if is_buffer:
 			base_order_rec = max(0, tog + qualified_demand - stock - wip - mrq)
 		else:
-			base_order_rec = max(0, qualified_demand - stock - wip - mrq)
+			base_order_rec = max(0, item_open_so - stock - wip - mrq)
 
 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 
@@ -557,7 +558,6 @@ def get_data(filters=None):
 			except Exception:
 				pass
 
-		item_open_so = flt(open_so_qty_map.get(item_code, 0))
 		# Buffer: open SO for display/OP-CP = qualified_demand (delivery_date <= today + spike)
 		# Non-buffer: open SO for display/OP-CP = all-time open SO (no date filter)
 		display_open_so = qualified_demand if is_buffer else item_open_so
