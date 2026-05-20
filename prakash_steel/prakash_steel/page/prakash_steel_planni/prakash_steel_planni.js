@@ -6,29 +6,9 @@ frappe.pages['prakash-steel-planni'].on_page_load = function (wrapper) {
 		single_column: true,
 	});
 
-	// Main container with filter bar + charts grid
+	// Main container with charts grid
 	const $container = $(`
 		<div class="planning-dashboard" style="padding: 15px;">
-			<div class="filter-bar" style="
-				display: flex;
-				align-items: center;
-				gap: 16px;
-				margin-bottom: 16px;
-				padding: 12px 16px;
-				background: #fff;
-				border-radius: 8px;
-				box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-			">
-				<div style="display:flex;align-items:center;gap:8px;">
-					<label style="margin:0;font-weight:600;font-size:0.85rem;white-space:nowrap;">${__('From Date')}</label>
-					<div class="from-date-wrapper"></div>
-				</div>
-				<div style="display:flex;align-items:center;gap:8px;">
-					<label style="margin:0;font-weight:600;font-size:0.85rem;white-space:nowrap;">${__('To Date')}</label>
-					<div class="to-date-wrapper"></div>
-				</div>
-				<button class="btn btn-primary btn-sm refresh-btn">${__('Refresh')}</button>
-			</div>
 			<div class="charts-grid" style="
 				display: grid;
 				grid-template-columns: repeat(3, 1fr);
@@ -40,37 +20,11 @@ frappe.pages['prakash-steel-planni'].on_page_load = function (wrapper) {
 	page.main.empty();
 	page.main.append($container);
 
-	// Create Frappe date controls inside filter bar
-	const fromDateControl = frappe.ui.form.make_control({
-		df: { fieldtype: 'Date', fieldname: 'from_date', label: __('From Date') },
-		parent: $container.find('.from-date-wrapper')[0],
-		only_input: true,
-	});
-	fromDateControl.refresh();
-
-	const toDateControl = frappe.ui.form.make_control({
-		df: { fieldtype: 'Date', fieldname: 'to_date', label: __('To Date') },
-		parent: $container.find('.to-date-wrapper')[0],
-		only_input: true,
-	});
-	toDateControl.refresh();
-
 	const $chartsContainer = $container.find('.charts-grid');
-
-	// Refresh button handler
-	$container.find('.refresh-btn').on('click', function () {
-		const filters = {
-			from_date: fromDateControl.get_value() || null,
-			to_date: toDateControl.get_value() || null,
-		};
-		$chartsContainer.empty();
-		page.set_indicator(__('Loading chart data...'), 'blue');
-		load_all_charts(page, $chartsContainer, filters);
-	});
 
 	page.set_indicator(__('Loading chart data...'), 'blue');
 
-	const afterChartReady = () => load_all_charts(page, $chartsContainer, {});
+	const afterChartReady = () => load_all_charts(page, $chartsContainer);
 
 	// Ensure Chart.js is available
 	if (typeof Chart === 'undefined') {
@@ -80,14 +34,13 @@ frappe.pages['prakash-steel-planni'].on_page_load = function (wrapper) {
 	}
 };
 
-function load_all_charts(page, $chartsContainer, filters) {
+function load_all_charts(page, $chartsContainer) {
 	const colorMap = getColorMap();
 
 	Promise.all([
 		new Promise((resolve, reject) => {
 			frappe.call({
 				method: 'prakash_steel.prakash_steel.page.prakash_steel_planni.prakash_steel_planni.get_sku_type_on_hand_status',
-				args: { filters: filters || {} },
 				callback: resolve,
 				error: reject,
 			});
@@ -95,7 +48,6 @@ function load_all_charts(page, $chartsContainer, filters) {
 		new Promise((resolve, reject) => {
 			frappe.call({
 				method: 'prakash_steel.prakash_steel.page.prakash_steel_planni.prakash_steel_planni.get_pending_so_status',
-				args: { filters: filters || {} },
 				callback: resolve,
 				error: reject,
 			});
@@ -107,8 +59,15 @@ function load_all_charts(page, $chartsContainer, filters) {
 				error: reject,
 			});
 		}),
+		new Promise((resolve, reject) => {
+			frappe.call({
+				method: 'prakash_steel.prakash_steel.page.prakash_steel_planni.prakash_steel_planni.get_cs_item_on_hand_status',
+				callback: resolve,
+				error: reject,
+			});
+		}),
 	])
-		.then(([skuRes, pendingSoRes, openPoRes]) => {
+		.then(([skuRes, pendingSoRes, openPoRes, csRes]) => {
 			page.clear_indicator();
 
 			// 1) SKU type pies
@@ -137,6 +96,13 @@ function load_all_charts(page, $chartsContainer, filters) {
 				const $card = createChartCard('Open PO Status', openPoRes.message, colorMap);
 				$chartsContainer.append($card);
 				renderPieChart('Open PO Status', openPoRes.message, colorMap);
+			}
+
+			// 4) CS Item On Hand Status pie
+			if (csRes && csRes.message && csRes.message.colours && csRes.message.colours.length) {
+				const $card = createChartCard('CS Item On Hand Status', csRes.message, colorMap);
+				$chartsContainer.append($card);
+				renderPieChart('CS Item On Hand Status', csRes.message, colorMap);
 			}
 
 			if ($chartsContainer.children().length === 0) {

@@ -12,6 +12,7 @@ class SORecommendationSnapshot(Document):
 # Core capture logic
 # ---------------------------------------------------------------------------
 
+
 def _capture_snapshot(trigger="Scheduled"):
 	"""
 	Run the Open SO Analysis report and save results as a snapshot.
@@ -22,6 +23,7 @@ def _capture_snapshot(trigger="Scheduled"):
 	filters = frappe._dict(
 		from_date="2000-01-01",
 		to_date=today(),
+		order_fullkit_status=["Pending", "Partial", "Full-kit"],  # add this
 	)
 
 	try:
@@ -61,36 +63,39 @@ def _capture_snapshot(trigger="Scheduled"):
 	snap.trigger = trigger
 	snap.status = "Success"
 
-	for row in (data or []):
+	for row in data or []:
 		so_name = row.get("sales_order")
 		extra = so_extra.get(so_name) or {}
-		snap.append("items", {
-			"sales_order": so_name,
-			"so_date": row.get("date"),
-			"customer": row.get("customer"),
-			"item_code": row.get("item_code"),
-			"status": row.get("status") or "",
-			"qty": row.get("qty") or 0,
-			"rate": row.get("rate") or 0,
-			"payment_terms_template": extra.get("payment_terms_template") or "",
-			"lead_time": row.get("lead_time") or 0,
-			"special_condition": extra.get("custom_special_condition") or "",
-			"delivered_qty": row.get("delivered_qty") or 0,
-			"delivery_date": row.get("delivery_date"),
-			"pending_qty": row.get("pending_qty") or 0,
-			"item_type": row.get("item_type") or "",
-			"sku_type": row.get("sku_type") or "",
-			"remaining_days": row.get("remaining_days") or 0,
-			"buffer_status": row.get("buffer_status") or "",
-			"order_status": row.get("order_status") or "",
-			"stock": row.get("stock") or 0,
-			"stock_allocation": row.get("stock_allocation") or 0,
-			"shortage": row.get("shortage") or 0,
-			"line_fullkit": row.get("line_fullkit") or "",
-			"order_fullkit": row.get("order_fullkit") or "",
-			"amount": row.get("amount") or 0,
-			"pending_amount": row.get("pending_amount") or 0,
-		})
+		snap.append(
+			"items",
+			{
+				"sales_order": so_name,
+				"so_date": row.get("date"),
+				"customer": row.get("customer"),
+				"item_code": row.get("item_code"),
+				"status": row.get("status") or "",
+				"qty": row.get("qty") or 0,
+				"rate": row.get("rate") or 0,
+				"payment_terms_template": extra.get("payment_terms_template") or "",
+				"lead_time": row.get("lead_time") or 0,
+				"special_condition": extra.get("custom_special_condition") or "",
+				"delivered_qty": row.get("delivered_qty") or 0,
+				"delivery_date": row.get("delivery_date"),
+				"pending_qty": row.get("pending_qty") or 0,
+				"item_type": row.get("item_type") or "",
+				"sku_type": row.get("sku_type") or "",
+				"remaining_days": row.get("remaining_days") or 0,
+				"buffer_status": row.get("buffer_status") or "",
+				"order_status": row.get("order_status") or "",
+				"stock": row.get("stock") or 0,
+				"stock_allocation": row.get("stock_allocation") or 0,
+				"shortage": row.get("shortage") or 0,
+				"line_fullkit": row.get("line_fullkit") or "",
+				"order_fullkit": row.get("order_fullkit") or "",
+				"amount": row.get("amount") or 0,
+				"pending_amount": row.get("pending_amount") or 0,
+			},
+		)
 
 	snap.row_count = len(snap.items)
 	snap.insert(ignore_permissions=True)
@@ -102,6 +107,7 @@ def _capture_snapshot(trigger="Scheduled"):
 # Scheduled job — runs at 4:30 PM IST daily (wired in hooks.py)
 # ---------------------------------------------------------------------------
 
+
 def capture_daily_so_snapshot():
 	"""Capture Open SO Analysis snapshot at 4:30 PM IST."""
 	_capture_snapshot(trigger="Scheduled")
@@ -110,6 +116,7 @@ def capture_daily_so_snapshot():
 # ---------------------------------------------------------------------------
 # Whitelisted API — manual trigger from UI
 # ---------------------------------------------------------------------------
+
 
 @frappe.whitelist()
 def run_manual_snapshot():
