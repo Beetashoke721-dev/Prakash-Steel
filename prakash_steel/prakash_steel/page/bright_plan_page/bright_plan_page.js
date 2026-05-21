@@ -6,6 +6,12 @@
 //     });
 
 //     page.add_inner_button(__("Refresh"), () => load_data());
+//     page.add_inner_button(__("Execute"), () => {
+//         const selected = _get_selected_rows();
+//         // Logic to be added
+//         console.log("Execute with:", selected);
+//         frappe.show_alert({ message: `${selected.length} row(s) ready for execution.`, indicator: "blue" });
+//     });
 
 //     // ── Tab bar ───────────────────────────────────────────────────────────────
 //     $(`
@@ -29,10 +35,6 @@
 // 		<div id="bp-view-tomorrow" style="display:none;padding-bottom:40px;">
 // 			<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
 // 				<span style="font-size:13px;color:#555;" id="bp-tomorrow-count"></span>
-// 				<button id="bp-execute" class="btn btn-primary btn-sm"
-// 					style="background:#27ae60;border-color:#27ae60;font-weight:600;padding:6px 20px;">
-// 					Execute
-// 				</button>
 // 			</div>
 // 			<div id="bp-tomorrow-table" style="overflow-x:auto;"></div>
 // 		</div>
@@ -41,6 +43,7 @@
 //     // ── State ─────────────────────────────────────────────────────────────────
 //     let _all_data = [];
 //     let _machines = [];
+//     let _machine_map = {};   // { machine_name: { no_of_machines } }
 //     let _active_tab = "plan";
 
 //     // ── Colour helpers ────────────────────────────────────────────────────────
@@ -142,6 +145,11 @@
 // 					width:80px;text-align:right;background:#fffbe6;">
 // 			</td>`;
 //         }
+//         if (col.key === "process_time_based_on_child_stock") {
+//             const v = row[col.key];
+//             return `<td class="bp-time-stock-cell" data-idx="${row_idx}"
+// 				style="padding:5px 10px;border-bottom:1px solid #eef0f3;text-align:right;">${fmtr(v)}</td>`;
+//         }
 //         const v = row[col.key];
 //         let content;
 //         if (col.badge) {
@@ -233,7 +241,35 @@
 //     function render_tomorrow_tab() {
 //         const selected = _get_selected_rows();
 //         $("#bp-tomorrow-count").text(`${selected.length} row${selected.length !== 1 ? "s" : ""} selected for tomorrow's plan`);
-//         $("#bp-tomorrow-table").html(build_table(selected, false));
+
+//         // Group by machine, sum Time(Stock) h
+//         const grouped = {};
+//         selected.forEach(row => {
+//             const machine = row.machine || "— none —";
+//             if (!grouped[machine]) grouped[machine] = { no_of_machines: 0, time_stock_h: 0 };
+//             grouped[machine].time_stock_h += (parseFloat(row.process_time_based_on_child_stock) || 0);
+//             if (row.machine && _machine_map[row.machine]) {
+//                 grouped[machine].no_of_machines = _machine_map[row.machine].no_of_machines;
+//             }
+//         });
+
+//         let html = `<table style="width:auto;border-collapse:collapse;font-size:12px;">
+//             <thead><tr>
+//                 ${th("Machine Name", false, "min-width:160px;")}
+//                 ${th("No of Machines", true)}
+//                 ${th("Time(Stock) h", true)}
+//             </tr></thead><tbody>`;
+
+//         Object.entries(grouped).forEach(([machine, vals]) => {
+//             html += `<tr onmouseover="this.style.background='#fafbfc'" onmouseout="this.style.background=''">
+//                 <td style="padding:6px 12px;border-bottom:1px solid #eef0f3;">${esc(machine)}</td>
+//                 <td style="padding:6px 12px;border-bottom:1px solid #eef0f3;text-align:right;">${vals.no_of_machines || dash()}</td>
+//                 <td style="padding:6px 12px;border-bottom:1px solid #eef0f3;text-align:right;">${vals.time_stock_h.toFixed(2)}</td>
+//             </tr>`;
+//         });
+
+//         html += "</tbody></table>";
+//         $("#bp-tomorrow-table").html(html);
 //     }
 
 //     // ── Load ─────────────────────────────────────────────────────────────────
@@ -244,8 +280,8 @@
 
 //         Promise.all([
 //             new Promise(resolve => {
-//                 frappe.db.get_list("Bright Machine", { fields: ["name"], limit: 500 })
-//                     .then(rows => resolve(rows.map(r => r.name)));
+//                 frappe.db.get_list("Bright Machine", { fields: ["name", "no_of_machines"], limit: 500 })
+//                     .then(rows => resolve(rows));
 //             }),
 //             new Promise(resolve => {
 //                 frappe.call({
@@ -255,8 +291,10 @@
 //                     callback(r) { resolve((r.message && r.message.data) || []); },
 //                 });
 //             }),
-//         ]).then(([machines, data]) => {
-//             _machines = machines;
+//         ]).then(([machine_rows, data]) => {
+//             _machines = machine_rows.map(r => r.name);
+//             _machine_map = {};
+//             machine_rows.forEach(r => { _machine_map[r.name] = { no_of_machines: r.no_of_machines || 0 }; });
 //             _all_data = data;
 //             $("#bp-view-plan").html(build_table(_all_data, true));
 //             bind_events();
@@ -283,9 +321,18 @@
 //         });
 
 //         $(document).off("input", ".bp-prod-qty-input").on("input", ".bp-prod-qty-input", function () {
+//             const idx = parseInt($(this).data("idx"));
 //             const val = $(this).val();
-//             _all_data[parseInt($(this).data("idx"))].production_qty_based_on_child_stock =
-//                 val === "" ? null : parseFloat(val);
+//             const qty = val === "" ? null : parseFloat(val);
+//             _all_data[idx].production_qty_based_on_child_stock = qty;
+
+//             const per_hr = parseFloat(_all_data[idx].per_hour_production) || 0;
+//             const new_time = (qty !== null && per_hr > 0) ? qty / per_hr : null;
+//             _all_data[idx].process_time_based_on_child_stock = new_time;
+
+//             $(`.bp-time-stock-cell[data-idx="${idx}"]`).text(
+//                 new_time !== null ? new_time.toFixed(2) : "—"
+//             );
 //         });
 //     }
 
@@ -293,14 +340,6 @@
 //     $("#bp-tab-plan").on("click", () => switch_tab("plan"));
 //     $("#bp-tab-tomorrow").on("click", function () {
 //         if (!$(this).prop("disabled")) switch_tab("tomorrow");
-//     });
-
-//     // ── Execute ───────────────────────────────────────────────────────────────
-//     $("#bp-execute").on("click", function () {
-//         const selected = _get_selected_rows();
-//         // Logic to be added
-//         console.log("Execute with:", selected);
-//         frappe.show_alert({ message: `${selected.length} row(s) ready for execution.`, indicator: "blue" });
 //     });
 
 //     load_data();
