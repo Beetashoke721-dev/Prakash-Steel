@@ -109,7 +109,7 @@ def get_parent_bom_map(item_codes):
 		       bi.qty AS bom_qty, b.quantity AS bom_quantity
 		FROM `tabBOM Item` bi
 		INNER JOIN `tabBOM` b ON b.name = bi.parent
-		WHERE b.is_default = 1 AND b.docstatus = 1
+		WHERE b.is_default = 1 AND b.docstatus = 1 AND b.is_active = 1
 		  AND bi.item_code IN %s
 		""",
 		(t,),
@@ -128,8 +128,18 @@ def get_parent_bom_map(item_codes):
 
 
 def _build_parent_batches(
-	stock, wip, tog, qd, is_buffer, net_order_rec, batch_size, moq, priority_seq_map,
-	item_code=None, open_so=0.0, so_map_for_priority=None,
+	stock,
+	wip,
+	tog,
+	qd,
+	is_buffer,
+	net_order_rec,
+	batch_size,
+	moq,
+	priority_seq_map,
+	item_code=None,
+	open_so=0.0,
+	so_map_for_priority=None,
 ):
 	"""
 	Generate production batch list for a parent BB item, mirroring bright_plan logic.
@@ -353,16 +363,10 @@ def get_columns():
 			"width": 140,
 		},
 		{
-			"label": _("Net Qty"),
-			"fieldname": "net_qty",
-			"fieldtype": "Float",
-			"width": 100,
-		},
-		{
-			"label": _("Sub Grp"),
-			"fieldname": "sub_grp",
+			"label": _("Shape"),
+			"fieldname": "shape",
 			"fieldtype": "Data",
-			"width": 120,
+			"width": 100,
 		},
 		{
 			"label": _("Grp"),
@@ -371,16 +375,16 @@ def get_columns():
 			"width": 100,
 		},
 		{
-			"label": _("Shape"),
-			"fieldname": "shape",
-			"fieldtype": "Data",
-			"width": 100,
+			"label": _("Group Count"),
+			"fieldname": "group_count",
+			"fieldtype": "Int",
+			"width": 120,
 		},
 		{
-			"label": _("Subgrp+Shape"),
-			"fieldname": "subgrp_shape",
-			"fieldtype": "Data",
-			"width": 130,
+			"label": _("Weightage Value"),
+			"fieldname": "weightage_value",
+			"fieldtype": "Float",
+			"width": 140,
 		},
 		{
 			"label": _("Grp+Shape"),
@@ -395,6 +399,12 @@ def get_columns():
 			"width": 160,
 		},
 		{
+			"label": _("Sub Grp"),
+			"fieldname": "sub_grp",
+			"fieldtype": "Data",
+			"width": 120,
+		},
+		{
 			"label": _("Subgrp Count"),
 			"fieldname": "subgrp_count",
 			"fieldtype": "Int",
@@ -405,6 +415,18 @@ def get_columns():
 			"fieldname": "subgroup_qty",
 			"fieldtype": "Float",
 			"width": 120,
+		},
+		{
+			"label": _("Net Qty"),
+			"fieldname": "net_qty",
+			"fieldtype": "Float",
+			"width": 100,
+		},
+		{
+			"label": _("Subgrp+Shape"),
+			"fieldname": "subgrp_shape",
+			"fieldtype": "Data",
+			"width": 130,
 		},
 		{
 			"label": _("Per Hour Qty"),
@@ -513,18 +535,6 @@ def get_columns():
 			"fieldname": "subgroup_weightage_value",
 			"fieldtype": "Float",
 			"width": 190,
-		},
-		{
-			"label": _("Group Count"),
-			"fieldname": "group_count",
-			"fieldtype": "Int",
-			"width": 120,
-		},
-		{
-			"label": _("Weightage Value"),
-			"fieldname": "weightage_value",
-			"fieldtype": "Float",
-			"width": 140,
 		},
 		{
 			"label": _("Prod Qty Based on Child Stock"),
@@ -700,35 +710,39 @@ def get_data(filters=None):
 	last_3month_consumption_rows = frappe.db.sql(
 		"""
 		SELECT
-			bbp.raw_material AS item_code,
+			COALESCE(NULLIF(bbp.raw_material, ''), bbp.material) AS item_code,
 			SUM(bbp.actual_rm_consumption) AS consumption_qty
 		FROM `tabBright Bar Production` bbp
 		WHERE bbp.docstatus = 1
 			AND bbp.production_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
-			AND bbp.raw_material IN %s
-		GROUP BY bbp.raw_material
+			AND (bbp.raw_material IN %s OR bbp.material IN %s)
+		GROUP BY COALESCE(NULLIF(bbp.raw_material, ''), bbp.material)
 		""",
-		(item_codes_tuple,),
+		(item_codes_tuple, item_codes_tuple),
 		as_dict=True,
 	)
-	last_3month_consumption_map = {r.item_code: flt(r.consumption_qty) for r in last_3month_consumption_rows}
+	last_3month_consumption_map = {
+		r.item_code: flt(r.consumption_qty) for r in last_3month_consumption_rows if r.item_code
+	}
 
 	# Last 1 month consumption (30 days) from Bright Bar Production
 	last_1month_consumption_rows = frappe.db.sql(
 		"""
 		SELECT
-			bbp.raw_material AS item_code,
+			COALESCE(NULLIF(bbp.raw_material, ''), bbp.material) AS item_code,
 			SUM(bbp.actual_rm_consumption) AS consumption_qty
 		FROM `tabBright Bar Production` bbp
 		WHERE bbp.docstatus = 1
 			AND bbp.production_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-			AND bbp.raw_material IN %s
-		GROUP BY bbp.raw_material
+			AND (bbp.raw_material IN %s OR bbp.material IN %s)
+		GROUP BY COALESCE(NULLIF(bbp.raw_material, ''), bbp.material)
 		""",
-		(item_codes_tuple,),
+		(item_codes_tuple, item_codes_tuple),
 		as_dict=True,
 	)
-	last_1month_consumption_map = {r.item_code: flt(r.consumption_qty) for r in last_1month_consumption_rows}
+	last_1month_consumption_map = {
+		r.item_code: flt(r.consumption_qty) for r in last_1month_consumption_rows if r.item_code
+	}
 
 	# Last 3 months sale (90 days) — same logic as bright_plan
 	last_3month_rows = frappe.db.sql(
@@ -1297,7 +1311,7 @@ def get_data(filters=None):
 			       b.is_default, b.creation
 			FROM `tabBOM Item` bi
 			INNER JOIN `tabBOM` b ON b.name = bi.parent
-			WHERE bi.item_code IN %s AND b.docstatus = 1
+			WHERE bi.item_code IN %s AND b.docstatus = 1 AND b.is_active = 1
 			ORDER BY bi.item_code, b.is_default DESC, b.creation ASC
 			""",
 			(rb_tuple,),
@@ -1334,7 +1348,7 @@ def get_data(filters=None):
 			       bi.qty AS bom_qty, b.quantity AS bom_quantity
 			FROM `tabBOM Item` bi
 			INNER JOIN `tabBOM` b ON b.name = bi.parent
-			WHERE b.is_default = 1 AND b.docstatus = 1
+			WHERE b.is_default = 1 AND b.docstatus = 1 AND b.is_active = 1
 			  AND b.item IN %s
 			""",
 			(bom_parent_tuple,),
