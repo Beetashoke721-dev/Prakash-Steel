@@ -6,11 +6,13 @@
 # from frappe.utils import date_diff, flt, nowdate
 
 # from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
+# 	_non_buffer_priority,
 # 	calculate_net_order_recommendation,
 # 	calculate_sku_type,
 # 	calculate_spike_map,
 # 	get_mrq_map,
 # 	get_open_po_map,
+# 	get_open_so_map_for_priority,
 # 	get_qualified_demand_for_item,
 # 	get_qualified_demand_map,
 # 	get_sales_order_qty_map,
@@ -107,7 +109,7 @@
 # 		       bi.qty AS bom_qty, b.quantity AS bom_quantity
 # 		FROM `tabBOM Item` bi
 # 		INNER JOIN `tabBOM` b ON b.name = bi.parent
-# 		WHERE b.is_default = 1 AND b.docstatus = 1
+# 		WHERE b.is_default = 1 AND b.docstatus = 1 AND b.is_active = 1
 # 		  AND bi.item_code IN %s
 # 		""",
 # 		(t,),
@@ -125,7 +127,20 @@
 # 	return result
 
 
-# def _build_parent_batches(stock, wip, tog, qd, is_buffer, net_order_rec, batch_size, moq, priority_seq_map):
+# def _build_parent_batches(
+# 	stock,
+# 	wip,
+# 	tog,
+# 	qd,
+# 	is_buffer,
+# 	net_order_rec,
+# 	batch_size,
+# 	moq,
+# 	priority_seq_map,
+# 	item_code=None,
+# 	open_so=0.0,
+# 	so_map_for_priority=None,
+# ):
 # 	"""
 # 	Generate production batch list for a parent BB item, mirroring bright_plan logic.
 # 	Returns list of {batch_qty, level_before, colour, op_cp, priority_colour, priority_sequence}.
@@ -143,8 +158,8 @@
 # 	if qty_per_row <= 0:
 # 		return []
 
-# 	# For buffer BB parents, display_open_so = qualified_demand (same as bright_plan)
-# 	display_open_so = flt(qd) if is_buffer else 0.0
+# 	# BBMTA: display_open_so = qualified_demand; BBMTO: total open SO (same as bright_plan)
+# 	display_open_so = flt(qd) if is_buffer else flt(open_so)
 # 	remaining_so_for_op_cp = max(0.0, display_open_so - flt(stock) - flt(wip))
 # 	accumulated = 0.0
 # 	sku_type = "BBMTA" if is_buffer else "BBMTO"
@@ -152,7 +167,10 @@
 # 	batches = []
 # 	for _i in range(num_batches):
 # 		level = flt(stock) + flt(wip) + accumulated
-# 		colour = _buffer_colour(level, tog, qd) if is_buffer else ""
+# 		if is_buffer:
+# 			colour = _buffer_colour(level, tog, qd)
+# 		else:
+# 			colour = _non_buffer_priority(item_code, level, so_map_for_priority or {}) if item_code else ""
 # 		op_cp = ""
 # 		if is_buffer and qty_per_row > 0:
 # 			op_cp = "OP" if remaining_so_for_op_cp > 0 else "CP"
@@ -345,16 +363,10 @@
 # 			"width": 140,
 # 		},
 # 		{
-# 			"label": _("Net Qty"),
-# 			"fieldname": "net_qty",
-# 			"fieldtype": "Float",
-# 			"width": 100,
-# 		},
-# 		{
-# 			"label": _("Sub Grp"),
-# 			"fieldname": "sub_grp",
+# 			"label": _("Shape"),
+# 			"fieldname": "shape",
 # 			"fieldtype": "Data",
-# 			"width": 120,
+# 			"width": 100,
 # 		},
 # 		{
 # 			"label": _("Grp"),
@@ -363,16 +375,16 @@
 # 			"width": 100,
 # 		},
 # 		{
-# 			"label": _("Shape"),
-# 			"fieldname": "shape",
-# 			"fieldtype": "Data",
-# 			"width": 100,
+# 			"label": _("Group Count"),
+# 			"fieldname": "group_count",
+# 			"fieldtype": "Int",
+# 			"width": 120,
 # 		},
 # 		{
-# 			"label": _("Subgrp+Shape"),
-# 			"fieldname": "subgrp_shape",
-# 			"fieldtype": "Data",
-# 			"width": 130,
+# 			"label": _("Weightage Value"),
+# 			"fieldname": "weightage_value",
+# 			"fieldtype": "Float",
+# 			"width": 140,
 # 		},
 # 		{
 # 			"label": _("Grp+Shape"),
@@ -387,6 +399,12 @@
 # 			"width": 160,
 # 		},
 # 		{
+# 			"label": _("Sub Grp"),
+# 			"fieldname": "sub_grp",
+# 			"fieldtype": "Data",
+# 			"width": 120,
+# 		},
+# 		{
 # 			"label": _("Subgrp Count"),
 # 			"fieldname": "subgrp_count",
 # 			"fieldtype": "Int",
@@ -397,6 +415,18 @@
 # 			"fieldname": "subgroup_qty",
 # 			"fieldtype": "Float",
 # 			"width": 120,
+# 		},
+# 		{
+# 			"label": _("Net Qty"),
+# 			"fieldname": "net_qty",
+# 			"fieldtype": "Float",
+# 			"width": 100,
+# 		},
+# 		{
+# 			"label": _("Subgrp+Shape"),
+# 			"fieldname": "subgrp_shape",
+# 			"fieldtype": "Data",
+# 			"width": 130,
 # 		},
 # 		{
 # 			"label": _("Per Hour Qty"),
@@ -505,18 +535,6 @@
 # 			"fieldname": "subgroup_weightage_value",
 # 			"fieldtype": "Float",
 # 			"width": 190,
-# 		},
-# 		{
-# 			"label": _("Group Count"),
-# 			"fieldname": "group_count",
-# 			"fieldtype": "Int",
-# 			"width": 120,
-# 		},
-# 		{
-# 			"label": _("Weightage Value"),
-# 			"fieldname": "weightage_value",
-# 			"fieldtype": "Float",
-# 			"width": 140,
 # 		},
 # 		{
 # 			"label": _("Prod Qty Based on Child Stock"),
@@ -692,35 +710,39 @@
 # 	last_3month_consumption_rows = frappe.db.sql(
 # 		"""
 # 		SELECT
-# 			bbp.raw_material AS item_code,
+# 			COALESCE(NULLIF(bbp.raw_material, ''), bbp.material) AS item_code,
 # 			SUM(bbp.actual_rm_consumption) AS consumption_qty
 # 		FROM `tabBright Bar Production` bbp
 # 		WHERE bbp.docstatus = 1
 # 			AND bbp.production_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
-# 			AND bbp.raw_material IN %s
-# 		GROUP BY bbp.raw_material
+# 			AND (bbp.raw_material IN %s OR bbp.material IN %s)
+# 		GROUP BY COALESCE(NULLIF(bbp.raw_material, ''), bbp.material)
 # 		""",
-# 		(item_codes_tuple,),
+# 		(item_codes_tuple, item_codes_tuple),
 # 		as_dict=True,
 # 	)
-# 	last_3month_consumption_map = {r.item_code: flt(r.consumption_qty) for r in last_3month_consumption_rows}
+# 	last_3month_consumption_map = {
+# 		r.item_code: flt(r.consumption_qty) for r in last_3month_consumption_rows if r.item_code
+# 	}
 
 # 	# Last 1 month consumption (30 days) from Bright Bar Production
 # 	last_1month_consumption_rows = frappe.db.sql(
 # 		"""
 # 		SELECT
-# 			bbp.raw_material AS item_code,
+# 			COALESCE(NULLIF(bbp.raw_material, ''), bbp.material) AS item_code,
 # 			SUM(bbp.actual_rm_consumption) AS consumption_qty
 # 		FROM `tabBright Bar Production` bbp
 # 		WHERE bbp.docstatus = 1
 # 			AND bbp.production_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-# 			AND bbp.raw_material IN %s
-# 		GROUP BY bbp.raw_material
+# 			AND (bbp.raw_material IN %s OR bbp.material IN %s)
+# 		GROUP BY COALESCE(NULLIF(bbp.raw_material, ''), bbp.material)
 # 		""",
-# 		(item_codes_tuple,),
+# 		(item_codes_tuple, item_codes_tuple),
 # 		as_dict=True,
 # 	)
-# 	last_1month_consumption_map = {r.item_code: flt(r.consumption_qty) for r in last_1month_consumption_rows}
+# 	last_1month_consumption_map = {
+# 		r.item_code: flt(r.consumption_qty) for r in last_1month_consumption_rows if r.item_code
+# 	}
 
 # 	# Last 3 months sale (90 days) — same logic as bright_plan
 # 	last_3month_rows = frappe.db.sql(
@@ -830,6 +852,10 @@
 # 			parent_stock_map = get_stock_map(all_parent_codes)
 # 			parent_wip_map = get_wip_map()
 
+# 			# Open SO for BBMTO parents (all open SOs, no date filter — same as bright_plan)
+# 			parent_open_so_qty_map = get_sales_order_qty_map({})
+# 			parent_so_for_priority_map = get_open_so_map_for_priority(list(all_parent_codes))
+
 # 			# Priority sequence master
 # 			priority_seq_rows = frappe.db.sql(
 # 				"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
@@ -859,11 +885,12 @@
 # 					spike_master_map,
 # 				)
 # 				qd_p = flt(qd_p)
+# 				open_so_p = flt(parent_open_so_qty_map.get(ic, 0)) if not is_buf else 0.0
 
 # 				if is_buf:
 # 					base_rec = max(0, tog_p + qd_p - stock_p - wip_p - mrq_p)
 # 				else:
-# 					base_rec = max(0, qd_p - stock_p - wip_p - mrq_p)
+# 					base_rec = max(0, open_so_p - stock_p - wip_p - mrq_p)
 # 				net_rec = calculate_net_order_recommendation(base_rec, moq_p, bs_p)
 
 # 				parent_data_map[ic] = {
@@ -872,6 +899,7 @@
 # 					"wip": wip_p,
 # 					"tog": tog_p,
 # 					"qd": qd_p,
+# 					"open_so": open_so_p,
 # 					"is_buffer": is_buf,
 # 					"batch_size": bs_p,
 # 					"moq": moq_p,
@@ -905,6 +933,9 @@
 # 					pd["batch_size"],
 # 					pd["moq"],
 # 					priority_seq_map,
+# 					item_code=parent_item,
+# 					open_so=pd.get("open_so", 0),
+# 					so_map_for_priority=parent_so_for_priority_map,
 # 				)
 # 				for batch in batches:
 # 					child_req = math.ceil(batch["batch_qty"] * bom_ratio)
@@ -1016,9 +1047,7 @@
 # 				"subgrp_count": None,
 # 				"subgroup_qty": None,
 # 				"per_hour_qty": effective_per_hour_qty,
-# 				"hrs_work": (flt(net_order_rec) / effective_per_hour_qty)
-# 				if effective_per_hour_qty
-# 				else None,
+# 				"hrs_work": (flt(net_order_rec) / effective_per_hour_qty) if effective_per_hour_qty else None,
 # 				"subgrp_hours_setup": None,
 # 				"subgrp_hours_shortage": None,
 # 				"extra_hours": None,
@@ -1092,10 +1121,7 @@
 # 		shortage = max(0, final_hrs - setup_hrs)
 # 		row["subgrp_hours_shortage"] = shortage
 # 		ic = row["item_code"]
-# 		is_eligible_rbmto = (
-# 			row.get("sku_type") == "RBMTO"
-# 			and ic in rbmto_eligible_parent_map
-# 		)
+# 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
 
 # 		if row.get("sku_type") == "RBMTA" or is_eligible_rbmto:
 # 			tog_pct = flt(row.get("tog_subgroup_pct") or 0)
@@ -1208,18 +1234,22 @@
 # 	for row in data:
 # 		ic = row["item_code"]
 # 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
-# 		if ((row.get("sku_type") == "RBMTA" or is_eligible_rbmto)
-# 				and row.get("on_hand_colour") != "WHITE"
-# 				and flt(row.get("final_allocated_qty") or 0) > 0):
+# 		if (
+# 			(row.get("sku_type") == "RBMTA" or is_eligible_rbmto)
+# 			and row.get("on_hand_colour") != "WHITE"
+# 			and flt(row.get("final_allocated_qty") or 0) > 0
+# 		):
 # 			subgrp_eligible_tog_sum[row["subgrp_shape"]] += flt(row.get("tog_pct") or 0)
 
 # 	# Step 3: distribute to eligible items (RBMTA + eligible RBMTO)
 # 	for row in data:
 # 		ic = row["item_code"]
 # 		is_eligible_rbmto = row.get("sku_type") == "RBMTO" and ic in rbmto_eligible_parent_map
-# 		if ((row.get("sku_type") == "RBMTA" or is_eligible_rbmto)
-# 				and row.get("on_hand_colour") != "WHITE"
-# 				and flt(row.get("final_allocated_qty") or 0) > 0):
+# 		if (
+# 			(row.get("sku_type") == "RBMTA" or is_eligible_rbmto)
+# 			and row.get("on_hand_colour") != "WHITE"
+# 			and flt(row.get("final_allocated_qty") or 0) > 0
+# 		):
 # 			lost_hrs = subgrp_lost_hrs.get(row["subgrp_shape"], 0)
 # 			if lost_hrs > 0:
 # 				eligible_tog_sum = subgrp_eligible_tog_sum.get(row["subgrp_shape"], 0)
@@ -1272,14 +1302,16 @@
 # 	rb_top3_parents_map = {}
 # 	rb_parent_stock_map = {}
 # 	if rb_item_codes_in_data:
-# 		rb_tuple = tuple(rb_item_codes_in_data) if len(rb_item_codes_in_data) > 1 else (rb_item_codes_in_data[0],)
+# 		rb_tuple = (
+# 			tuple(rb_item_codes_in_data) if len(rb_item_codes_in_data) > 1 else (rb_item_codes_in_data[0],)
+# 		)
 # 		rb_parent_rows = frappe.db.sql(
 # 			"""
 # 			SELECT bi.item_code AS child_item, b.item AS parent_item,
 # 			       b.is_default, b.creation
 # 			FROM `tabBOM Item` bi
 # 			INNER JOIN `tabBOM` b ON b.name = bi.parent
-# 			WHERE bi.item_code IN %s AND b.docstatus = 1
+# 			WHERE bi.item_code IN %s AND b.docstatus = 1 AND b.is_active = 1
 # 			ORDER BY bi.item_code, b.is_default DESC, b.creation ASC
 # 			""",
 # 			(rb_tuple,),
@@ -1292,7 +1324,9 @@
 # 		all_rb_parent_codes = {p for lst in rb_top3_parents_map.values() for p in lst}
 # 		if all_rb_parent_codes:
 # 			rp_tuple = (
-# 				tuple(all_rb_parent_codes) if len(all_rb_parent_codes) > 1 else (next(iter(all_rb_parent_codes)),)
+# 				tuple(all_rb_parent_codes)
+# 				if len(all_rb_parent_codes) > 1
+# 				else (next(iter(all_rb_parent_codes)),)
 # 			)
 # 			rp_stock_rows = frappe.db.sql(
 # 				"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
@@ -1314,7 +1348,7 @@
 # 			       bi.qty AS bom_qty, b.quantity AS bom_quantity
 # 			FROM `tabBOM Item` bi
 # 			INNER JOIN `tabBOM` b ON b.name = bi.parent
-# 			WHERE b.is_default = 1 AND b.docstatus = 1
+# 			WHERE b.is_default = 1 AND b.docstatus = 1 AND b.is_active = 1
 # 			  AND b.item IN %s
 # 			""",
 # 			(bom_parent_tuple,),
@@ -1478,9 +1512,9 @@
 
 # 	# Eligible items (non-WHITE, final_allocated_qty > 0)
 # 	eligible_rows = [
-# 		r for r in subgrp_rows
-# 		if r.get("on_hand_colour") != "WHITE"
-# 		and flt(r.get("final_allocated_qty") or 0) > 0
+# 		r
+# 		for r in subgrp_rows
+# 		if r.get("on_hand_colour") != "WHITE" and flt(r.get("final_allocated_qty") or 0) > 0
 # 	]
 
 # 	return {
@@ -1527,7 +1561,8 @@
 # 		],
 # 		"eligible_tog_sum": sum(flt(r.get("tog_pct") or 0) for r in eligible_rows),
 # 		"subgrp_lost_hrs": sum(
-# 			(flt(r.get("total_allocated_qty") or 0) - flt(r.get("final_allocated_qty") or 0)) / flt(r.get("per_hour_qty") or 1)
+# 			(flt(r.get("total_allocated_qty") or 0) - flt(r.get("final_allocated_qty") or 0))
+# 			/ flt(r.get("per_hour_qty") or 1)
 # 			for r in subgrp_rows
 # 			if r.get("on_hand_colour") == "WHITE"
 # 			and flt(r.get("per_hour_qty") or 0) > 0
@@ -1714,6 +1749,10 @@
 # 			p_stock_map = {r.item_code: flt(r.stock) for r in p_stock_rows}
 # 			p_wip_map = get_wip_map()
 
+# 			# Open SO for BBMTO parents (all open SOs, no date filter — same as bright_plan)
+# 			p_open_so_qty_map = get_sales_order_qty_map({})
+# 			p_so_for_priority_map = get_open_so_map_for_priority(list(all_parent_codes))
+
 # 			priority_seq_rows = frappe.db.sql(
 # 				"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
 # 				as_dict=True,
@@ -1743,11 +1782,12 @@
 # 					spike_master_map,
 # 				)
 # 				qd_p = flt(qd_p)
+# 				open_so_p = flt(p_open_so_qty_map.get(ic, 0)) if not is_buf else 0.0
 
 # 				if is_buf:
 # 					base_rec = max(0, tog_p + qd_p - stock_p - wip_p - mrq_p)
 # 				else:
-# 					base_rec = max(0, qd_p - stock_p - wip_p - mrq_p)
+# 					base_rec = max(0, open_so_p - stock_p - wip_p - mrq_p)
 # 				net_rec = calculate_net_order_recommendation(base_rec, moq_p, bs_p)
 
 # 				p_data[ic] = {
@@ -1755,6 +1795,7 @@
 # 					"wip": wip_p,
 # 					"tog": tog_p,
 # 					"qd": qd_p,
+# 					"open_so": open_so_p,
 # 					"is_buffer": is_buf,
 # 					"net_order_rec": net_rec,
 # 					"batch_size": bs_p,
@@ -1779,6 +1820,9 @@
 # 					pd["batch_size"],
 # 					pd["moq"],
 # 					priority_seq_map,
+# 					item_code=parent_item,
+# 					open_so=pd.get("open_so", 0),
+# 					so_map_for_priority=p_so_for_priority_map,
 # 				)
 # 				for batch in batches:
 # 					child_req = math.ceil(batch["batch_qty"] * bom_ratio)

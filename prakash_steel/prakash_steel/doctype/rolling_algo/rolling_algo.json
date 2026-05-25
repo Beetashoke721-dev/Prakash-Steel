@@ -1,170 +1,170 @@
 {
-    "actions": [],
-    "allow_rename": 1,
-    "autoname": "format: {item_code}",
-    "creation": "2026-05-15 12:29:39.241020",
-    "doctype": "DocType",
-    "engine": "InnoDB",
-    "field_order": [
-        "item_details_section",
-        "item_code",
-        "item_size",
-        "item_group",
-        "no_of_guide_setups",
-        "column_break_medi",
-        "shape",
-        "grade",
-        "item_sub_group",
-        "per_hour_planned_qty",
-        "section_break_wdff",
-        "planning_sub_group",
-        "planning_sub_group_name",
-        "planned_hrs",
-        "column_break_xaar",
-        "final_sub_group",
-        "final_sub_group_shape",
-        "final_planned_hrs"
-    ],
-    "fields": [
-        {
-            "fieldname": "item_code",
-            "fieldtype": "Link",
-            "in_list_view": 1,
-            "label": "Item Code",
-            "link_filters": "[[\"Item\",\"custom_item_type\",\"!=\",\"BB\"]]",
-            "options": "Item",
-            "reqd": 1
-        },
-        {
-            "fieldname": "item_size",
-            "fieldtype": "Data",
-            "label": "Item Size",
-            "read_only": 1
-        },
-        {
-            "fieldname": "column_break_medi",
-            "fieldtype": "Column Break"
-        },
-        {
-            "fetch_from": "item_code.custom_shape",
-            "fieldname": "shape",
-            "fieldtype": "Data",
-            "label": "Shape",
-            "read_only": 1
-        },
-        {
-            "fetch_from": "item_code.custom_grade",
-            "fieldname": "grade",
-            "fieldtype": "Link",
-            "label": "Grade",
-            "options": "Item Grade",
-            "read_only": 1
-        },
-        {
-            "fieldname": "item_details_section",
-            "fieldtype": "Section Break",
-            "label": "Item Details"
-        },
-        {
-            "fetch_from": "item_code.custom_group_for_sub_assemblies",
-            "fieldname": "item_group",
-            "fieldtype": "Link",
-            "label": "Item Group",
-            "options": "Group for Sub Assemblies",
-            "read_only": 1
-        },
-        {
-            "fetch_from": "item_code.custom_sub_group_new_name",
-            "fieldname": "item_sub_group",
-            "fieldtype": "Small Text",
-            "label": "Item Sub Group",
-            "read_only": 1
-        },
-        {
-            "fieldname": "section_break_wdff",
-            "fieldtype": "Section Break",
-            "label": "Planned Sub Group & Hrs"
-        },
-        {
-            "fieldname": "planning_sub_group",
-            "fieldtype": "Link",
-            "label": "Planning Sub Group",
-            "options": "Sub Group"
-        },
-        {
-            "fieldname": "column_break_xaar",
-            "fieldtype": "Column Break"
-        },
-        {
-            "fetch_from": "planning_sub_group.sub_group_name",
-            "fieldname": "planning_sub_group_name",
-            "fieldtype": "Small Text",
-            "label": "Planning Sub Group Name",
-            "read_only": 1
-        },
-        {
-            "fieldname": "final_sub_group",
-            "fieldtype": "Small Text",
-            "label": "Final Sub Group",
-            "read_only": 1
-        },
-        {
-            "fieldname": "final_sub_group_shape",
-            "fieldtype": "Small Text",
-            "label": "Final Sub Group + Shape",
-            "read_only": 1
-        },
-        {
-            "fieldname": "planned_hrs",
-            "fieldtype": "Int",
-            "label": "Planned Hrs"
-        },
-        {
-            "fieldname": "final_planned_hrs",
-            "fieldtype": "Int",
-            "label": "Final Planned Hrs"
-        },
-        {
-            "fieldname": "no_of_guide_setups",
-            "fieldtype": "Int",
-            "label": "No. of Guide Setups",
-            "reqd": 1
-        },
-        {
-            "description": "In Kg",
-            "fieldname": "per_hour_planned_qty",
-            "fieldtype": "Int",
-            "label": "Per Hour Planned Qty",
-            "reqd": 1
-        }
-    ],
-    "grid_page_length": 50,
-    "index_web_pages_for_search": 1,
-    "links": [],
-    "modified": "2026-05-16 11:29:20.654479",
-    "modified_by": "Administrator",
-    "module": "Prakash Steel",
-    "name": "Rolling Algo",
-    "naming_rule": "Expression",
-    "owner": "Administrator",
-    "permissions": [
-        {
-            "create": 1,
-            "delete": 1,
-            "email": 1,
-            "export": 1,
-            "print": 1,
-            "read": 1,
-            "report": 1,
-            "role": "System Manager",
-            "share": 1,
-            "write": 1
-        }
-    ],
-    "row_format": "Dynamic",
-    "rows_threshold_for_grid_search": 20,
-    "sort_field": "modified",
-    "sort_order": "DESC",
-    "states": [],
-    "track_changes": 1
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format : {item_code}",
+ "creation": "2026-05-15 12:29:39.241020",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_details_section",
+  "item_code",
+  "item_size",
+  "item_group",
+  "no_of_guide_setups",
+  "column_break_medi",
+  "shape",
+  "grade",
+  "item_sub_group",
+  "per_hour_planned_qty",
+  "section_break_wdff",
+  "planning_sub_group",
+  "planning_sub_group_name",
+  "planned_hrs",
+  "column_break_xaar",
+  "final_sub_group",
+  "final_sub_group_shape",
+  "final_planned_hrs"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "link_filters": "[[\"Item\",\"custom_item_type\",\"!=\",\"BB\"]]",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_size",
+   "fieldtype": "Data",
+   "label": "Item Size",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_medi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "item_code.custom_shape",
+   "fieldname": "shape",
+   "fieldtype": "Data",
+   "label": "Shape",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_grade",
+   "fieldname": "grade",
+   "fieldtype": "Link",
+   "label": "Grade",
+   "options": "Item Grade",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_details_section",
+   "fieldtype": "Section Break",
+   "label": "Item Details"
+  },
+  {
+   "fetch_from": "item_code.custom_group_for_sub_assemblies",
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "Group for Sub Assemblies",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.custom_sub_group_new_name",
+   "fieldname": "item_sub_group",
+   "fieldtype": "Small Text",
+   "label": "Item Sub Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_wdff",
+   "fieldtype": "Section Break",
+   "label": "Planned Sub Group & Hrs"
+  },
+  {
+   "fieldname": "planning_sub_group",
+   "fieldtype": "Link",
+   "label": "Planning Sub Group",
+   "options": "Sub Group"
+  },
+  {
+   "fieldname": "column_break_xaar",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "planning_sub_group.sub_group_name",
+   "fieldname": "planning_sub_group_name",
+   "fieldtype": "Small Text",
+   "label": "Planning Sub Group Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "final_sub_group",
+   "fieldtype": "Small Text",
+   "label": "Final Sub Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "final_sub_group_shape",
+   "fieldtype": "Small Text",
+   "label": "Final Sub Group + Shape",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_hrs",
+   "fieldtype": "Int",
+   "label": "Planned Hrs"
+  },
+  {
+   "fieldname": "final_planned_hrs",
+   "fieldtype": "Int",
+   "label": "Final Planned Hrs"
+  },
+  {
+   "fieldname": "no_of_guide_setups",
+   "fieldtype": "Int",
+   "label": "No. of Guide Setups",
+   "reqd": 1
+  },
+  {
+   "description": "In Kg",
+   "fieldname": "per_hour_planned_qty",
+   "fieldtype": "Int",
+   "label": "Per Hour Planned Qty",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-21 16:32:37.896737",
+ "modified_by": "ritika@clapgrow.com",
+ "module": "Prakash Steel",
+ "name": "Rolling Algo",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
 }

@@ -303,7 +303,7 @@
 // 	html += kv_table([
 // 		["On Hand Colour", colour_badge(d.on_hand_colour) || "—"],
 // 		["WHITE deduction", isWhite
-// 			? `Total Alloc Qty − Excess Qty = ${fmt(d.total_allocated_qty)} − ${fmt(d.excess_qty)} = <b>${fmt(Math.max(0, (d.total_allocated_qty||0) - (d.excess_qty||0)))}</b>`
+// 			? `Total Alloc Qty − Excess Qty = ${fmt(d.total_allocated_qty)} − ${fmt(d.excess_qty)} = <b>${fmt(Math.max(0, (d.total_allocated_qty || 0) - (d.excess_qty || 0)))}</b>`
 // 			: "Not WHITE — no deduction"],
 // 		["Lost Hours from WHITE items in Subgrp+Shape", fmt(d.subgrp_lost_hrs)],
 // 		["Eligible TOG Sum (non-WHITE, final > 0)", fmt(d.eligible_tog_sum)],
