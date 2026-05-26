@@ -13,41 +13,14 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         frappe.show_alert({ message: `${selected.length} row(s) ready for execution.`, indicator: "blue" });
     });
 
-    // ── Tab bar ───────────────────────────────────────────────────────────────
-    $(`
-		<div id="bp-tabs" style="display:flex;gap:0;border-bottom:2px solid #d1d8e0;margin-bottom:12px;">
-			<button id="bp-tab-plan" class="bp-tab active"
-				style="padding:8px 20px;font-size:13px;font-weight:600;border:none;background:none;
-				cursor:pointer;border-bottom:3px solid #3498db;color:#3498db;margin-bottom:-2px;">
-				Bright Plan
-			</button>
-			<button id="bp-tab-tomorrow" class="bp-tab" disabled
-				style="padding:8px 20px;font-size:13px;font-weight:600;border:none;background:none;
-				cursor:not-allowed;border-bottom:3px solid transparent;color:#aaa;margin-bottom:-2px;">
-				Tomorrow's Plan <span id="bp-tab-badge" style="display:none;
-					background:#e74c3c;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;
-					margin-left:6px;"></span>
-			</button>
-		</div>
-
-		<div id="bp-view-plan" style="padding-bottom:40px;"></div>
-
-		<div id="bp-view-tomorrow" style="display:none;padding-bottom:40px;">
-			<div style="margin-bottom:12px;">
-				<span style="font-size:13px;color:#555;" id="bp-tomorrow-count"></span>
-			</div>
-			<div id="bp-tomorrow-table" style="overflow-x:auto;"></div>
-		</div>
-	`).appendTo(page.main);
+    $(`<div id="bp-view-plan" style="padding-bottom:40px;"></div>`).appendTo(page.main);
 
     // ── State ─────────────────────────────────────────────────────────────────
     let _all_data = [];
-    let _machines = [];
     let _machine_map = {};      // { machine_name: { no_of_machines } }
     let _machine_groups = {};   // { item_code: [machine_group_name, ...] }
-    let _active_tab = "plan";
     let _dt = null;
-    let _selected = new Set();  // tracks selected row indices (source of truth)
+    let _selected = new Set();  // source of truth for row selection
 
     // ── Colour helpers ────────────────────────────────────────────────────────
     const COLOUR_STYLES = {
@@ -89,36 +62,36 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 
     // ── Column definitions ────────────────────────────────────────────────────
     const COLS = [
-        { label: "Item Code",    key: "item_code",                                    link: "item", width: 140 },
-        { label: "SKU Type",     key: "sku_type",                                                   width: 100 },
-        { label: "Open SO",      key: "open_so",                          right: true,              width: 80  },
-        { label: "3M Sale",      key: "last_3month_sale",                 right: true,              width: 80  },
-        { label: "Stock",        key: "on_hand_stock",                    right: true,              width: 80  },
-        { label: "Colour",       key: "on_hand_colour_priority",          badge: true,              width: 100 },
-        { label: "Prod Rec",     key: "or_with_moq_batch_size",           right: true,              width: 80  },
-        { label: "Priority",     key: "priority_colour",                  badge: true,              width: 100 },
-        { label: "Seq",          key: "priority_sequence",                right: true,              width: 60  },
-        { label: "OP/CP",        key: "op_cp",                            op_cp: true,              width: 70  },
-        { label: "MOQ",          key: "moq",                              right: true,              width: 70  },
-        { label: "Batch",        key: "batch_size",                       right: true,              width: 70  },
-        { label: "Child Item",   key: "child_item_code",                  link: "item", width: 140 },
-        { label: "Child Req",    key: "child_requirement",                right: true,              width: 80  },
-        { label: "Child Stock",  key: "child_stock",                      right: true,              width: 80  },
-        { label: "Alloc",        key: "child_stock_soft_allocation_qty",  right: true,              width: 70  },
-        { label: "Shortage",     key: "child_stock_shortage",             right: true,              width: 80  },
-        { label: "Child SKU",    key: "child_sku_type",                                             width: 90  },
-        { label: "Prod(Stock)",  key: "production_qty_based_on_child_stock",             right: true, width: 100 },
-        { label: "Time(Stock) h",key: "process_time_based_on_child_stock",              right: true, width: 100 },
-        { label: "Prod(+WIP)",   key: "production_qty_based_on_child_stock_wip_open_po",right: true, width: 100 },
-        { label: "Per Hr",       key: "per_hour_production",              right: true,              width: 70  },
-        { label: "Process Hr",   key: "process_time",                     right: true,              width: 80  },
+        { label: "Item Code",     key: "item_code",                                    link: "item", width: 140 },
+        { label: "SKU Type",      key: "sku_type",                                                   width: 100 },
+        { label: "Open SO",       key: "open_so",                          right: true,              width: 80  },
+        { label: "3M Sale",       key: "last_3month_sale",                 right: true,              width: 80  },
+        { label: "Stock",         key: "on_hand_stock",                    right: true,              width: 80  },
+        { label: "Colour",        key: "on_hand_colour_priority",          badge: true,              width: 100 },
+        { label: "Prod Rec",      key: "or_with_moq_batch_size",           right: true,              width: 80  },
+        { label: "Priority",      key: "priority_colour",                  badge: true,              width: 100 },
+        { label: "Seq",           key: "priority_sequence",                right: true,              width: 60  },
+        { label: "OP/CP",         key: "op_cp",                            op_cp: true,              width: 70  },
+        { label: "MOQ",           key: "moq",                              right: true,              width: 70  },
+        { label: "Batch",         key: "batch_size",                       right: true,              width: 70  },
+        { label: "Child Item",    key: "child_item_code",                  link: "item", width: 140 },
+        { label: "Child Req",     key: "child_requirement",                right: true,              width: 80  },
+        { label: "Child Stock",   key: "child_stock",                      right: true,              width: 80  },
+        { label: "Alloc",         key: "child_stock_soft_allocation_qty",  right: true,              width: 70  },
+        { label: "Shortage",      key: "child_stock_shortage",             right: true,              width: 80  },
+        { label: "Child SKU",     key: "child_sku_type",                                             width: 90  },
+        { label: "Prod(Stock)",   key: "production_qty_based_on_child_stock",              right: true, width: 100 },
+        { label: "Time(Stock) h", key: "process_time_based_on_child_stock",               right: true, width: 100 },
+        { label: "Prod(+WIP)",    key: "production_qty_based_on_child_stock_wip_open_po", right: true, width: 100 },
+        { label: "Per Hr",        key: "per_hour_production",              right: true,              width: 70  },
+        { label: "Process Hr",    key: "process_time",                     right: true,              width: 80  },
     ];
 
-    // ── th helper (used for tomorrow's plan table only) ───────────────────────
-    function th(label, right, extra_style) {
-        return `<th style="padding:7px 10px;background:#f4f5f7;border-bottom:2px solid #d1d8e0;
-			white-space:nowrap;font-size:11px;font-weight:600;color:#555;
-			${right ? "text-align:right;" : ""}${extra_style || ""}">${label}</th>`;
+    // ── th helper (used in summary panel table) ───────────────────────────────
+    function th(label, right) {
+        return `<th style="padding:7px 12px;background:#e8f0fe;border-bottom:2px solid #c5d8f5;
+			white-space:nowrap;font-size:11px;font-weight:600;color:#1a73e8;
+			${right ? "text-align:right;" : ""}">${label}</th>`;
     }
 
     // ── Machine select HTML ───────────────────────────────────────────────────
@@ -133,6 +106,44 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 			<option value="">— none —</option>
 			${options}
 		</select>`;
+    }
+
+    // ── Summary panel ─────────────────────────────────────────────────────────
+    function update_summary_panel() {
+        const count = _selected.size;
+        const $panel = $("#bp-summary-panel");
+
+        if (count === 0) {
+            $panel.slideUp(200);
+            return;
+        }
+
+        // Group selected rows by machine, sum Time(Stock) h
+        const grouped = {};
+        _get_selected_rows().forEach(row => {
+            const machine = row.machine || "— none —";
+            if (!grouped[machine]) grouped[machine] = { no_of_machines: 0, time_stock_h: 0 };
+            grouped[machine].time_stock_h += (parseFloat(row.process_time_based_on_child_stock) || 0);
+            if (row.machine && _machine_map[row.machine]) {
+                grouped[machine].no_of_machines = _machine_map[row.machine].no_of_machines;
+            }
+        });
+
+        let rows_html = "";
+        Object.entries(grouped).forEach(([machine, vals]) => {
+            rows_html += `<tr>
+				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;">${esc(machine)}</td>
+				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">${vals.no_of_machines || "—"}</td>
+				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">${vals.time_stock_h.toFixed(2)}</td>
+			</tr>`;
+        });
+
+        $("#bp-summary-count").text(
+            `${count} row${count !== 1 ? "s" : ""} selected for tomorrow's plan`
+        );
+        $("#bp-summary-tbody").html(rows_html);
+
+        if (!$panel.is(":visible")) $panel.slideDown(220);
     }
 
     // ── Build DataTable ───────────────────────────────────────────────────────
@@ -170,7 +181,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
                 };
                 if (c.key === "production_qty_based_on_child_stock") {
                     dt_col.format = (val, _row, _col, d) =>
-                        `<input type="number" class="bp-prod-qty-input" data-idx="${d._idx}"
+                        `<input type="number" class="bp-prod-qty-input" data-idx="${d._idx}" min="0"
 						value="${val !== null && val !== undefined ? val : ""}"
 						style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
 						font-size:12px;width:80px;text-align:right;background:#fffbe6;">`;
@@ -193,16 +204,45 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
             }),
         ];
 
-        // Toolbar with select-all above the DataTable
         $("#bp-view-plan").html(`
-			<div id="bp-plan-toolbar" style="padding:6px 4px 8px;display:flex;align-items:center;gap:12px;">
-				<label style="font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:6px;">
+			<div id="bp-summary-panel" style="display:none;background:#f8fbff;border:1px solid #c5d8f5;
+				border-radius:6px;margin-bottom:12px;overflow:hidden;">
+				<div style="display:flex;align-items:center;justify-content:space-between;
+					padding:8px 14px;background:#e8f0fe;border-bottom:1px solid #c5d8f5;">
+					<span id="bp-summary-count"
+						style="font-size:12px;font-weight:600;color:#1a73e8;"></span>
+					<button id="bp-summary-close"
+						style="border:none;background:none;cursor:pointer;font-size:18px;
+						color:#888;line-height:1;padding:0 4px;">&times;</button>
+				</div>
+				<div style="padding:10px 14px;overflow-x:auto;">
+					<table style="border-collapse:collapse;font-size:12px;min-width:380px;">
+						<thead><tr>
+							${th("Machine Name")}
+							${th("No of Machines", true)}
+							${th("Time(Stock) h", true)}
+						</tr></thead>
+						<tbody id="bp-summary-tbody"></tbody>
+					</table>
+				</div>
+			</div>
+
+			<div style="padding:6px 4px 8px;display:flex;align-items:center;gap:12px;">
+				<label style="font-size:12px;color:#555;cursor:pointer;
+					display:flex;align-items:center;gap:6px;">
 					<input type="checkbox" id="bp-select-all">
 					<span>Select all for Tomorrow's Plan</span>
 				</label>
 			</div>
 			<div id="bp-plan-dt" style="overflow-x:auto;"></div>
 		`);
+
+        $(document).off("click", "#bp-summary-close").on("click", "#bp-summary-close", function () {
+            _selected.clear();
+            $(".bp-row-check").prop("checked", false);
+            $("#bp-select-all").prop("checked", false).prop("indeterminate", false);
+            $("#bp-summary-panel").slideUp(200);
+        });
 
         _dt = new DataTable(document.getElementById("bp-plan-dt"), {
             columns: dt_columns,
@@ -216,84 +256,14 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         });
     }
 
-    // ── Tab switching ─────────────────────────────────────────────────────────
-    function switch_tab(tab) {
-        _active_tab = tab;
-        if (tab === "plan") {
-            $("#bp-view-plan").show();
-            $("#bp-view-tomorrow").hide();
-            $("#bp-tab-plan")
-                .css({ "border-bottom-color": "#3498db", "color": "#3498db", "cursor": "pointer" });
-            $("#bp-tab-tomorrow")
-                .css({ "border-bottom-color": "transparent", "color": _get_selected_rows().length ? "#555" : "#aaa" });
-        } else {
-            $("#bp-view-plan").hide();
-            $("#bp-view-tomorrow").show();
-            $("#bp-tab-tomorrow")
-                .css({ "border-bottom-color": "#27ae60", "color": "#27ae60", "cursor": "pointer" });
-            $("#bp-tab-plan")
-                .css({ "border-bottom-color": "transparent", "color": "#555" });
-            render_tomorrow_tab();
-        }
-    }
-
     // ── Selection helpers ─────────────────────────────────────────────────────
     function _get_selected_rows() {
         return _all_data.filter((_, i) => _selected.has(i));
     }
 
-    function update_tomorrow_tab_state() {
-        const count = _selected.size;
-        const $tab = $("#bp-tab-tomorrow");
-        if (count > 0) {
-            $tab.prop("disabled", false).css({ "cursor": "pointer", "color": "#555" });
-            $("#bp-tab-badge").text(count).show();
-        } else {
-            $tab.prop("disabled", true).css({ "cursor": "not-allowed", "color": "#aaa" });
-            $("#bp-tab-badge").hide();
-            if (_active_tab === "tomorrow") switch_tab("plan");
-        }
-    }
-
-    function render_tomorrow_tab() {
-        const selected = _get_selected_rows();
-        $("#bp-tomorrow-count").text(`${selected.length} row${selected.length !== 1 ? "s" : ""} selected for tomorrow's plan`);
-
-        // Group by machine, sum Time(Stock) h
-        const grouped = {};
-        selected.forEach(row => {
-            const machine = row.machine || "— none —";
-            if (!grouped[machine]) grouped[machine] = { no_of_machines: 0, time_stock_h: 0 };
-            grouped[machine].time_stock_h += (parseFloat(row.process_time_based_on_child_stock) || 0);
-            if (row.machine && _machine_map[row.machine]) {
-                grouped[machine].no_of_machines = _machine_map[row.machine].no_of_machines;
-            }
-        });
-
-        let html = `<table style="width:auto;border-collapse:collapse;font-size:12px;">
-            <thead><tr>
-                ${th("Machine Name", false, "min-width:160px;")}
-                ${th("No of Machines", true)}
-                ${th("Time(Stock) h", true)}
-            </tr></thead><tbody>`;
-
-        Object.entries(grouped).forEach(([machine, vals]) => {
-            html += `<tr onmouseover="this.style.background='#fafbfc'" onmouseout="this.style.background=''">
-                <td style="padding:6px 12px;border-bottom:1px solid #eef0f3;">${esc(machine)}</td>
-                <td style="padding:6px 12px;border-bottom:1px solid #eef0f3;text-align:right;">${vals.no_of_machines || dash()}</td>
-                <td style="padding:6px 12px;border-bottom:1px solid #eef0f3;text-align:right;">${vals.time_stock_h.toFixed(2)}</td>
-            </tr>`;
-        });
-
-        html += "</tbody></table>";
-        $("#bp-tomorrow-table").html(html);
-    }
-
     // ── Load ─────────────────────────────────────────────────────────────────
     function load_data() {
         $("#bp-view-plan").html(`<p class="text-muted" style="padding:12px;">Loading…</p>`);
-        switch_tab("plan");
-        update_tomorrow_tab_state();
 
         Promise.all([
             new Promise(resolve => {
@@ -309,7 +279,6 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
                 });
             }),
         ]).then(([machine_rows, result]) => {
-            _machines = machine_rows.map(r => r.name);
             _machine_map = {};
             machine_rows.forEach(r => { _machine_map[r.name] = { no_of_machines: r.no_of_machines || 0 }; });
             _machine_groups = result.machine_groups || {};
@@ -329,7 +298,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
                 _selected.clear();
             }
             $(".bp-row-check").prop("checked", this.checked);
-            update_tomorrow_tab_state();
+            update_summary_panel();
         });
 
         $(document).off("change", ".bp-row-check").on("change", ".bp-row-check", function () {
@@ -342,17 +311,19 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
             const total = _all_data.length;
             $("#bp-select-all").prop("indeterminate", _selected.size > 0 && _selected.size < total);
             $("#bp-select-all").prop("checked", _selected.size === total);
-            update_tomorrow_tab_state();
+            update_summary_panel();
         });
 
         $(document).off("change", ".bp-machine-select").on("change", ".bp-machine-select", function () {
             _all_data[parseInt($(this).data("idx"))].machine = $(this).val();
+            if (_selected.size > 0) update_summary_panel();
         });
 
         $(document).off("input", ".bp-prod-qty-input").on("input", ".bp-prod-qty-input", function () {
             const idx = parseInt($(this).data("idx"));
             const val = $(this).val();
-            const qty = val === "" ? null : parseFloat(val);
+            let qty = val === "" ? null : parseFloat(val);
+            if (qty !== null && qty < 0) { qty = 0; $(this).val(0); }
             _all_data[idx].production_qty_based_on_child_stock = qty;
 
             const per_hr = parseFloat(_all_data[idx].per_hour_production) || 0;
@@ -362,14 +333,10 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
             $(`.bp-time-stock-cell[data-idx="${idx}"]`).text(
                 new_time !== null ? new_time.toFixed(2) : "—"
             );
+
+            if (_selected.has(idx)) update_summary_panel();
         });
     }
-
-    // ── Tab click events ──────────────────────────────────────────────────────
-    $("#bp-tab-plan").on("click", () => switch_tab("plan"));
-    $("#bp-tab-tomorrow").on("click", function () {
-        if (!$(this).prop("disabled")) switch_tab("tomorrow");
-    });
 
     load_data();
 };
