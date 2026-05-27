@@ -8,9 +8,43 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
     page.add_inner_button(__("Refresh"), () => load_data());
     page.add_inner_button(__("Execute"), () => {
         const selected = _get_selected_rows();
-        // Logic to be added
-        console.log("Execute with:", selected);
-        frappe.show_alert({ message: `${selected.length} row(s) ready for execution.`, indicator: "blue" });
+        if (!selected.length) {
+            frappe.show_alert({ message: __("No rows selected."), indicator: "orange" });
+            return;
+        }
+        const valid = selected.filter(r => r.production_qty_based_on_child_stock > 0);
+        if (!valid.length) {
+            frappe.show_alert({ message: __("Selected rows have no production qty."), indicator: "orange" });
+            return;
+        }
+        frappe.confirm(
+            __(`Create Work Orders for <b>${valid.length}</b> item(s)?`),
+            () => {
+                frappe.call({
+                    method: "prakash_steel.prakash_steel.page.bright_plan_page.bright_plan_page.execute_work_orders",
+                    args: { rows: valid },
+                    freeze: true,
+                    freeze_message: __("Creating Work Orders…"),
+                    callback(r) {
+                        if (!r.message) return;
+                        const { created, errors } = r.message;
+                        if (created.length) {
+                            frappe.show_alert({
+                                message: __(`${created.length} Work Order(s) created successfully.`),
+                                indicator: "green",
+                            });
+                        }
+                        if (errors.length) {
+                            frappe.msgprint({
+                                title: __("Some items failed"),
+                                message: errors.join("<br><br>"),
+                                indicator: "red",
+                            });
+                        }
+                    },
+                });
+            }
+        );
     });
 
     $(`<div id="bp-view-plan" style="padding-bottom:40px;"></div>`).appendTo(page.main);
