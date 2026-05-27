@@ -62,29 +62,29 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 
     // ── Column definitions ────────────────────────────────────────────────────
     const COLS = [
-        { label: "Item Code",     key: "item_code",                                    link: "item", width: 140 },
-        { label: "SKU Type",      key: "sku_type",                                                   width: 100 },
-        { label: "Open SO",       key: "open_so",                          right: true,              width: 80  },
-        { label: "3M Sale",       key: "last_3month_sale",                 right: true,              width: 80  },
-        { label: "Stock",         key: "on_hand_stock",                    right: true,              width: 80  },
-        { label: "Colour",        key: "on_hand_colour_priority",          badge: true,              width: 100 },
-        { label: "Prod Rec",      key: "or_with_moq_batch_size",           right: true,              width: 80  },
-        { label: "Priority",      key: "priority_colour",                  badge: true,              width: 100 },
-        { label: "Seq",           key: "priority_sequence",                right: true,              width: 60  },
-        { label: "OP/CP",         key: "op_cp",                            op_cp: true,              width: 70  },
-        { label: "MOQ",           key: "moq",                              right: true,              width: 70  },
-        { label: "Batch",         key: "batch_size",                       right: true,              width: 70  },
-        { label: "Child Item",    key: "child_item_code",                  link: "item", width: 140 },
-        { label: "Child Req",     key: "child_requirement",                right: true,              width: 80  },
-        { label: "Child Stock",   key: "child_stock",                      right: true,              width: 80  },
-        { label: "Alloc",         key: "child_stock_soft_allocation_qty",  right: true,              width: 70  },
-        { label: "Shortage",      key: "child_stock_shortage",             right: true,              width: 80  },
-        { label: "Child SKU",     key: "child_sku_type",                                             width: 90  },
-        { label: "Prod(Stock)",   key: "production_qty_based_on_child_stock",              right: true, width: 100 },
-        { label: "Time(Stock) h", key: "process_time_based_on_child_stock",               right: true, width: 100 },
-        { label: "Prod(+WIP)",    key: "production_qty_based_on_child_stock_wip_open_po", right: true, width: 100 },
-        { label: "Per Hr",        key: "per_hour_production",              right: true,              width: 70  },
-        { label: "Process Hr",    key: "process_time",                     right: true,              width: 80  },
+        { label: "Item Code",                                key: "item_code",                                    link: "item", width: 140 },
+        { label: "SKU Type",                                 key: "sku_type",                                                   width: 100 },
+        { label: "Open SO",                                  key: "open_so",                          right: true,              width: 80  },
+        { label: "Last 3 Month Sale",                        key: "last_3month_sale",                 right: true,              width: 130 },
+        { label: "On Hand Stock",                            key: "on_hand_stock",                    right: true,              width: 100 },
+        { label: "Order Recommendation Colour",              key: "on_hand_colour_priority",          badge: true,              width: 180 },
+        { label: "Production Order Recommendation",          key: "or_with_moq_batch_size",           right: true,              width: 200 },
+        { label: "Priority",                                 key: "priority_colour",                  badge: true,              width: 100 },
+        { label: "Priority Sequence",                        key: "priority_sequence",                right: true,              width: 120 },
+        { label: "OP/CP",                                    key: "op_cp",                            op_cp: true,              width: 70  },
+        { label: "MOQ",                                      key: "moq",                              right: true,              width: 70  },
+        { label: "Order Multiple Qty",                       key: "batch_size",                       right: true,              width: 130 },
+        { label: "Child Item Code",                          key: "child_item_code",                  link: "item", width: 140 },
+        { label: "Child Requirement",                        key: "child_requirement",                right: true,              width: 130 },
+        { label: "Child Stock",                              key: "child_stock",                      right: true,              width: 100 },
+        { label: "Child Stock Soft Allocation",              key: "child_stock_soft_allocation_qty",  right: true,              width: 180 },
+        { label: "Child Stock Shortage",                     key: "child_stock_shortage",             right: true,              width: 150 },
+        { label: "Child SKU Type",                           key: "child_sku_type",                                             width: 110 },
+        { label: "Prod Qty based on Child Stock",            key: "production_qty_based_on_child_stock",              right: true, width: 200 },
+        { label: "Process Time based on Child Stock",        key: "process_time_based_on_child_stock",               right: true, width: 210 },
+        { label: "Prod Qty based on Child Stock+WIP/Open PO",key: "production_qty_based_on_child_stock_wip_open_po", right: true, width: 260 },
+        { label: "Per Hour Production",                      key: "per_hour_production",              right: true,              width: 140 },
+        { label: "Process Time",                             key: "process_time",                     right: true,              width: 110 },
     ];
 
     // ── th helper (used in summary panel table) ───────────────────────────────
@@ -220,7 +220,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 						<thead><tr>
 							${th("Machine Name")}
 							${th("No of Machines", true)}
-							${th("Time(Stock) h", true)}
+							${th("Process Time based on Child Stock", true)}
 						</tr></thead>
 						<tbody id="bp-summary-tbody"></tbody>
 					</table>

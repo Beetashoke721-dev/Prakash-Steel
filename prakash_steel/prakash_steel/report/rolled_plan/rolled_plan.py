@@ -1083,6 +1083,8 @@ def get_data(filters=None):
 			}
 		)
 
+	wip_map_rb = get_wip_map()
+
 	# --- TOG Subgroup % ---
 	subgrp_tog_sum = defaultdict(float)
 	for row in data:
@@ -1135,6 +1137,7 @@ def get_data(filters=None):
 
 		# On-hand colour and excess qty
 		on_hand_stock = flt(row.get("on_hand_stock") or 0)
+		wip_val = flt(wip_map_rb.get(ic, 0))
 		tog_val = flt(row.get("tog") or 0)
 		qd_val = flt(qualified_demand_map.get(ic) or 0)
 		on_hand_colour = None
@@ -1158,6 +1161,7 @@ def get_data(filters=None):
 			parent_ic = rbmto_eligible_parent_map[ic]
 			pd = parent_data_map.get(parent_ic, {})
 			p_stock = flt(pd.get("stock") or 0)
+			p_wip = flt(pd.get("wip") or 0)
 			p_tog = flt(pd.get("tog") or 0)
 			p_qd = flt(pd.get("qd") or 0)
 			denominator = p_tog + p_qd
@@ -1174,6 +1178,7 @@ def get_data(filters=None):
 				else:
 					on_hand_colour = "WHITE"
 			# For excess_qty use parent values
+			wip_val = p_wip
 			tog_val = p_tog
 			qd_val = p_qd
 			on_hand_stock = p_stock
@@ -1184,7 +1189,7 @@ def get_data(filters=None):
 
 		row["on_hand_colour"] = on_hand_colour
 		if on_hand_colour == "WHITE":
-			row["excess_qty"] = on_hand_stock - tog_val - qd_val
+			row["excess_qty"] = on_hand_stock + wip_val - tog_val - qd_val
 		else:
 			row["excess_qty"] = flt(row.get("extra_qty") or 0)
 		excess = flt(row["excess_qty"])
