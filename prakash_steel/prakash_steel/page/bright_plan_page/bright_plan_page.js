@@ -54,6 +54,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
     let _machine_map = {};      // { machine_name: { no_of_machines } }
     let _machine_groups = {};   // { item_code: [machine_group_name, ...] }
     let _dt = null;
+    let _dt_observer = null;    // MutationObserver to keep checkboxes in sync
     let _selected = new Set();  // source of truth for row selection
 
     // ── Colour helpers ────────────────────────────────────────────────────────
@@ -137,51 +138,60 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         return `<select class="bp-machine-select" data-idx="${row_idx}"
 			style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;font-size:12px;
 			background:#fff;width:100%;min-width:130px;">
-			<option value="">— none —</option>
+			<option value=""></option>
 			${options}
 		</select>`;
     }
 
     // ── Summary panel ─────────────────────────────────────────────────────────
     function update_summary_panel() {
-        const count = _selected.size;
-        const $panel = $("#bp-summary-panel");
-
-        if (count === 0) {
-            $panel.slideUp(200);
-            return;
-        }
-
-        // Group selected rows by machine, sum Time(Stock) h
-        const grouped = {};
+        // Sum process time per machine from selected rows
+        const time_by_machine = {};
         _get_selected_rows().forEach(row => {
-            const machine = row.machine || "— none —";
-            if (!grouped[machine]) grouped[machine] = { no_of_machines: 0, time_stock_h: 0 };
-            grouped[machine].time_stock_h += (parseFloat(row.process_time_based_on_child_stock) || 0);
-            if (row.machine && _machine_map[row.machine]) {
-                grouped[machine].no_of_machines = _machine_map[row.machine].no_of_machines;
+            if (row.machine) {
+                time_by_machine[row.machine] = (time_by_machine[row.machine] || 0)
+                    + (parseFloat(row.process_time_based_on_child_stock) || 0);
             }
         });
 
+        // Render a row for every machine in _machine_map
         let rows_html = "";
-        Object.entries(grouped).forEach(([machine, vals]) => {
+        Object.entries(_machine_map).forEach(([machine, info]) => {
+            const time = time_by_machine[machine] || 0;
+            const runtime = info.runtime || 0;
+            const t1 = Math.ceil(runtime / 3);        // 1/3 of runtime
+            const t2 = Math.ceil(2 * runtime / 3);    // 2/3 of runtime
+
+            let bg = "#1a1a1a", fg = "#ffffff";       // BLACK (0)
+            if (time > 0) {
+                if (time <= t1)              { bg = "#e74c3c"; fg = "#ffffff"; }  // RED
+                else if (time <= t2)         { bg = "#f1c40f"; fg = "#000000"; }  // YELLOW
+                else if (time <= runtime)    { bg = "#2ecc71"; fg = "#000000"; }  // GREEN
+                else                         { bg = "#f0f0f0"; fg = "#000000"; }  // WHITE (over)
+            }
+
             rows_html += `<tr>
 				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;">${esc(machine)}</td>
-				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">${vals.no_of_machines || "—"}</td>
-				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">${vals.time_stock_h.toFixed(2)}</td>
+				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">${info.no_of_machines || "—"}</td>
+				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">
+					<span style="display:inline-block;padding:2px 10px;border-radius:3px;
+						background:${bg};color:${fg};font-weight:600;min-width:50px;text-align:right;">
+						${time.toFixed(2)}
+					</span>
+				</td>
 			</tr>`;
         });
 
+        const count = _selected.size;
         $("#bp-summary-count").text(
-            `${count} row${count !== 1 ? "s" : ""} selected for tomorrow's plan`
+            count ? `${count} row${count !== 1 ? "s" : ""} selected for tomorrow's plan` : "Tomorrow's Plan"
         );
         $("#bp-summary-tbody").html(rows_html);
-
-        if (!$panel.is(":visible")) $panel.slideDown(220);
     }
 
     // ── Build DataTable ───────────────────────────────────────────────────────
     function build_datatable(data) {
+        if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
         if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
         const dt_data = data.map((row, idx) => ({ ...row, _idx: idx }));
@@ -239,15 +249,11 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         ];
 
         $("#bp-view-plan").html(`
-			<div id="bp-summary-panel" style="display:none;background:#f8fbff;border:1px solid #c5d8f5;
+			<div id="bp-summary-panel" style="background:#f8fbff;border:1px solid #c5d8f5;
 				border-radius:6px;margin-bottom:12px;overflow:hidden;">
-				<div style="display:flex;align-items:center;justify-content:space-between;
-					padding:8px 14px;background:#e8f0fe;border-bottom:1px solid #c5d8f5;">
+				<div style="padding:8px 14px;background:#e8f0fe;border-bottom:1px solid #c5d8f5;">
 					<span id="bp-summary-count"
-						style="font-size:12px;font-weight:600;color:#1a73e8;"></span>
-					<button id="bp-summary-close"
-						style="border:none;background:none;cursor:pointer;font-size:18px;
-						color:#888;line-height:1;padding:0 4px;">&times;</button>
+						style="font-size:12px;font-weight:600;color:#1a73e8;">Tomorrow's Plan</span>
 				</div>
 				<div style="padding:10px 14px;overflow-x:auto;">
 					<table style="border-collapse:collapse;font-size:12px;min-width:380px;">
@@ -271,13 +277,6 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 			<div id="bp-plan-dt" style="overflow-x:auto;"></div>
 		`);
 
-        $(document).off("click", "#bp-summary-close").on("click", "#bp-summary-close", function () {
-            _selected.clear();
-            $(".bp-row-check").prop("checked", false);
-            $("#bp-select-all").prop("checked", false).prop("indeterminate", false);
-            $("#bp-summary-panel").slideUp(200);
-        });
-
         _dt = new DataTable(document.getElementById("bp-plan-dt"), {
             columns: dt_columns,
             data: dt_data,
@@ -288,6 +287,21 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
             noDataMessage: __("No data"),
             layout: "fixed",
         });
+
+        update_summary_panel();
+
+        // Re-sync checkboxes whenever DataTable re-renders rows (clusterize scroll swap)
+        let _obs_timer = null;
+        const dt_el = document.getElementById("bp-plan-dt");
+        _dt_observer = new MutationObserver(() => {
+            clearTimeout(_obs_timer);
+            _obs_timer = setTimeout(() => {
+                dt_el.querySelectorAll(".bp-row-check").forEach(cb => {
+                    cb.checked = _selected.has(parseInt(cb.dataset.idx));
+                });
+            }, 30);
+        });
+        _dt_observer.observe(dt_el, { childList: true, subtree: true });
     }
 
     // ── Selection helpers ─────────────────────────────────────────────────────
@@ -301,7 +315,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 
         Promise.all([
             new Promise(resolve => {
-                frappe.db.get_list("Bright Machine", { fields: ["name", "no_of_machines"], limit: 500 })
+                frappe.db.get_list("Bright Machine", { fields: ["name", "no_of_machines", "runtime"], limit: 500 })
                     .then(rows => resolve(rows));
             }),
             new Promise(resolve => {
@@ -314,7 +328,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
             }),
         ]).then(([machine_rows, result]) => {
             _machine_map = {};
-            machine_rows.forEach(r => { _machine_map[r.name] = { no_of_machines: r.no_of_machines || 0 }; });
+            machine_rows.forEach(r => { _machine_map[r.name] = { no_of_machines: r.no_of_machines || 0, runtime: r.runtime || 0 }; });
             _machine_groups = result.machine_groups || {};
             _all_data = result.data || [];
             _selected.clear();
