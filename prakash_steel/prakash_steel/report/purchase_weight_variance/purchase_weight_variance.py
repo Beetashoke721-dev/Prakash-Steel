@@ -33,8 +33,13 @@ def get_columns():
 		{"label": "PO Qty", "fieldname": "po_qty", "fieldtype": "Float", "width": 100},
 		{"label": "Received Qty", "fieldname": "received_qty", "fieldtype": "Float", "width": 120},
 		{"label": "Weight Variation", "fieldname": "weight_variation", "fieldtype": "Float", "width": 140},
-		{"label": "Weight Variation %", "fieldname": "weight_variation_pct", "fieldtype": "Percent", "width": 150},
-		{"label": "Status", "fieldname": "status", "fieldtype": "Data", "width": 130},
+		{
+			"label": "Weight Variation %",
+			"fieldname": "weight_variation_pct",
+			"fieldtype": "Percent",
+			"width": 150,
+		},
+		{"label": "Status", "fieldname": "status", "fieldtype": "HTML", "width": 130},
 	]
 
 
@@ -92,10 +97,10 @@ def get_data(filters):
 
 		pct = r["weight_variation_pct"]
 		if -5 <= pct <= 5:
-			r["status"] = "Acceptable"
+			r["status"] = "<span style='color:green'>● Acceptable</span>"
 		elif pct > 5:
-			r["status"] = "+5% Up"
+			r["status"] = "<span style='color:blue'>↑ +5% Up</span>"
 		else:
-			r["status"] = "-5% Down"
+			r["status"] = "<span style='color:red'>↓ -5% Down</span>"
 
 	return rows
