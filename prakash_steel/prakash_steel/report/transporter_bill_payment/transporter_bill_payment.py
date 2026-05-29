@@ -165,16 +165,10 @@ def get_purchase_data(filters):
 
     where_clause = " AND ".join(conditions)
 
-    # We fetch data at the Purchase Invoice Item level so that
-    # Billing Qty comes from the item.qty and Receiving Qty from
-    # the linked Purchase Receipt.
-    #
-    # Assumptions (based on your description):
-    # - `vehicle_no` is on Purchase Invoice (pi.vehicle_no)
-    # - `transporter_name` is on Purchase Invoice (pi.transporter_name)
-    # - `bill_no` is on Purchase Invoice (pi.bill_no)
-    # - `purchase_receipt` is on Purchase Invoice Item (pii.purchase_receipt)
-    # - Receiving qty is taken from Purchase Receipt Item.qty for that receipt & item
+    # Billing Qty: sum of all Purchase Invoice Item quantities.
+    # Receiving Qty: for each distinct purchase_receipt on the PI, sum that
+    # receipt's received qty once (avoids double-count when multiple PI lines
+    # link to the same Purchase Receipt).
 
     query = f"""
         SELECT
@@ -186,17 +180,18 @@ def get_purchase_data(filters):
             pi.vehicle_no AS truck_no,
             pi.transporter_name AS transporter_name,
             SUM(pii.qty) AS billing_qty,
-            -- Receiving qty from Purchase Receipt Item
-            SUM(
-                IFNULL(
-                    (
-                        SELECT SUM(pri.qty)
-                        FROM `tabPurchase Receipt Item` pri
-                        WHERE pri.parent = pii.purchase_receipt
-                          AND pri.item_code = pii.item_code
-                    ),
-                    0
-                )
+            IFNULL(
+                (
+                    SELECT SUM(pri.qty)
+                    FROM `tabPurchase Receipt Item` pri
+                    WHERE pri.parent IN (
+                        SELECT DISTINCT pii_pr.purchase_receipt
+                        FROM `tabPurchase Invoice Item` pii_pr
+                        WHERE pii_pr.parent = pi.name
+                          AND IFNULL(pii_pr.purchase_receipt, '') != ''
+                    )
+                ),
+                0
             ) AS receiving_qty
         FROM
             `tabPurchase Invoice` pi
