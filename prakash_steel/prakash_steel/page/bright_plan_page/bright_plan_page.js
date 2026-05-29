@@ -28,18 +28,19 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
                     callback(r) {
                         if (!r.message) return;
                         const { created, errors } = r.message;
-                        if (created.length) {
-                            frappe.show_alert({
-                                message: __(`${created.length} Work Order(s) created successfully.`),
-                                indicator: "green",
-                            });
-                        }
                         if (errors.length) {
                             frappe.msgprint({
                                 title: __("Some items failed"),
                                 message: errors.join("<br><br>"),
                                 indicator: "red",
                             });
+                        }
+                        if (created.length) {
+                            frappe.show_alert({
+                                message: __(`${created.length} Work Order(s) created. Refreshing data…`),
+                                indicator: "green",
+                            });
+                            load_data();
                         }
                     },
                 });
