@@ -15,5 +15,23 @@ frappe.query_reports["Purchase Weight Variance"] = {
 			"fieldtype": "Link",
 			"options": "Purchase Order",
 		},
+		{
+			"fieldname": "po_status",
+			"label": __("PO Status"),
+			"fieldtype": "MultiSelectList",
+			get_data: function(txt) {
+				const statuses = [
+					"Draft",
+					"To Receive and Bill",
+					"To Bill",
+					"To Receive",
+					"Completed",
+					"Closed",
+				];
+				return statuses
+					.filter(s => !txt || s.toLowerCase().includes(txt.toLowerCase()))
+					.map(s => ({ value: s, description: "" }));
+			},
+		},
 	]
 };

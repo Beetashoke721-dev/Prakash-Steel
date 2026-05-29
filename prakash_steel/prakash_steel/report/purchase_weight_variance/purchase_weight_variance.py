@@ -30,6 +30,7 @@ def get_columns():
 			"width": 140,
 		},
 		{"label": "Item Name", "fieldname": "item_name", "fieldtype": "Data", "width": 220},
+		{"label": "PO Status", "fieldname": "po_status", "fieldtype": "Data", "width": 150},
 		{"label": "PO Qty", "fieldname": "po_qty", "fieldtype": "Float", "width": 100},
 		{"label": "Received Qty", "fieldname": "received_qty", "fieldtype": "Float", "width": 120},
 		{"label": "Weight Variation", "fieldname": "weight_variation", "fieldtype": "Float", "width": 140},
@@ -68,6 +69,13 @@ def get_data(filters):
 		where.append("po.name LIKE %(po_no_like)s")
 		params["po_no_like"] = f"%{filters.get('po_no')}%"
 
+	if filters.get("po_status"):
+		statuses = filters.get("po_status")
+		placeholders = ", ".join([f"%(po_status_{i})s" for i in range(len(statuses))])
+		where.append(f"po.status IN ({placeholders})")
+		for i, s in enumerate(statuses):
+			params[f"po_status_{i}"] = s
+
 	where_clause = " AND ".join(where)
 
 	rows = frappe.db.sql(
@@ -77,6 +85,7 @@ def get_data(filters):
             po.name AS po_no,
             poi.item_code,
             poi.item_name,
+            po.status AS po_status,
             poi.qty AS po_qty,
             IFNULL(poi.received_qty, 0) AS received_qty
         FROM `tabPurchase Order` po
