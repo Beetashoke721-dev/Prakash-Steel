@@ -2279,9 +2279,10 @@ def get_qualified_demand_for_item(
 
 def get_mrq_map_for_mrp():
 	"""Get MRQ (Material Request Quantity) map - sum of (qty - ordered_qty) from Material Request Items
-	for all items (only Material Requests with status 'Pending' or 'Partially Ordered')
+	for all items (only Material Requests with status 'Pending' or 'Partially Ordered'),
+	plus Draft Work Orders (docstatus=0).
 	"""
-	# Get Material Requests with status 'Pending' or 'Partially Ordered'
+	# Pending Material Requests (submitted, not yet fully ordered)
 	mrq_rows = frappe.db.sql(
 		"""
 		SELECT
@@ -2300,7 +2301,28 @@ def get_mrq_map_for_mrp():
 		as_dict=True,
 	)
 
-	return {d.item_code: flt(d.mrq_qty) for d in mrq_rows}
+	mrq_map = {d.item_code: flt(d.mrq_qty) for d in mrq_rows}
+
+	# Draft Work Orders (docstatus = 0) — also considered as pending demand
+	wo_rows = frappe.db.sql(
+		"""
+		SELECT
+			production_item as item_code,
+			SUM(GREATEST(0, qty - IFNULL(produced_qty, 0))) as wo_qty
+		FROM
+			`tabWork Order`
+		WHERE
+			docstatus = 0
+		GROUP BY
+			production_item
+		""",
+		as_dict=True,
+	)
+
+	for d in wo_rows:
+		mrq_map[d.item_code] = mrq_map.get(d.item_code, 0) + flt(d.wo_qty)
+
+	return mrq_map
 
 
 def get_open_po_map_for_mrp():
