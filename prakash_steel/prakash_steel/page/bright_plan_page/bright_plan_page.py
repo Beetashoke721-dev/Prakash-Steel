@@ -180,7 +180,7 @@ def execute_work_orders(rows):
 			wo.source_warehouse = "Bright Bar Unit - PSPL"
 			wo.update_consumed_material_cost_in_project = 1
 			wo.insert()
-			wo.submit()
+			# wo.submit()
 			created.append(wo.name)
 
 		except Exception as e:
