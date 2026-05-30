@@ -179,6 +179,8 @@ def execute_work_orders(rows):
 			wo.fg_warehouse = "Bright Bar Unit - PSPL"
 			wo.source_warehouse = "Bright Bar Unit - PSPL"
 			wo.update_consumed_material_cost_in_project = 1
+			wo.custom_machine_name = row.get("machine") or ""
+			wo.custom_priority = row.get("priority_colour") or ""
 			wo.insert()
 			# wo.submit()
 			created.append(wo.name)

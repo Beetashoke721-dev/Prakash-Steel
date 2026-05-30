@@ -194,7 +194,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         row.child_stock_soft_allocation_qty = Math.ceil(stock_allocated);
         row.child_stock_shortage = Math.ceil(stock_shortage);
         row.production_qty_based_on_child_stock = prod_qty_child_stock;
-        row.process_time_based_on_child_stock = process_time !== null ? parseFloat(process_time.toFixed(2)) : null;
+        row.process_time_based_on_child_stock = process_time !== null ? parseFloat(process_time.toFixed(1)) : null;
         row.production_qty_based_on_child_stock_wip_open_po = prod_qty_wip;
         row.child_bom_qty = child_bom_qty;
         row.child_bom_quantity = child_bom_quantity;
@@ -206,7 +206,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         $(`.bp-child-shortage[data-idx="${idx}"]`).text(Math.ceil(stock_shortage));
         $(`.bp-child-sku[data-idx="${idx}"]`).text(child_opt.child_sku_type || "—");
         $(`.bp-prod-qty-input[data-idx="${idx}"]`).val(prod_qty_child_stock);
-        $(`.bp-time-stock-cell[data-idx="${idx}"]`).text(process_time !== null ? process_time.toFixed(2) : "—");
+        $(`.bp-time-stock-cell[data-idx="${idx}"]`).text(process_time !== null ? process_time.toFixed(1) : "—");
         $(`.bp-prod-wip[data-idx="${idx}"]`).text(prod_qty_wip);
 
         if (_selected.has(idx)) update_summary_panel();
@@ -247,7 +247,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">
 					<span style="display:inline-block;padding:2px 10px;border-radius:3px;
 						background:${bg};color:${fg};font-weight:600;min-width:50px;text-align:right;">
-						${time.toFixed(2)}
+						${time.toFixed(1)}
 					</span>
 				</td>
 			</tr>`;
@@ -322,7 +322,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 						font-size:12px;width:80px;text-align:right;background:#fffbe6;">`;
                 } else if (c.key === "process_time_based_on_child_stock") {
                     dt_col.format = (val, _row, _col, d) =>
-                        `<span class="bp-time-stock-cell" data-idx="${d._idx}">${val !== null && val !== undefined ? val : "—"}</span>`;
+                        `<span class="bp-time-stock-cell" data-idx="${d._idx}">${val !== null && val !== undefined ? parseFloat(val).toFixed(1) : "—"}</span>`;
                 } else if (c.badge) {
                     dt_col.format = (val) => colour_badge(val);
                 } else if (c.op_cp) {
@@ -351,7 +351,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 						<thead><tr>
 							${th("Machine Name")}
 							${th("No of Machines", true)}
-							${th("Process Time based on Child Stock", true)}
+							${th("Process Time (Hrs)", true)}
 						</tr></thead>
 						<tbody id="bp-summary-tbody"></tbody>
 					</table>
@@ -481,7 +481,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
             _all_data[idx].process_time_based_on_child_stock = new_time;
 
             $(`.bp-time-stock-cell[data-idx="${idx}"]`).text(
-                new_time !== null ? new_time.toFixed(2) : "—"
+                new_time !== null ? new_time.toFixed(1) : "—"
             );
 
             if (_selected.has(idx)) update_summary_panel();
