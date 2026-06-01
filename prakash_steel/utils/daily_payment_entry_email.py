@@ -8,9 +8,6 @@ from openpyxl.styles import Alignment, Font
 
 
 RECIPIENTS = [
-	"pratikshya.gochhayat@clapgrow.com",
-	"ritika@clapgrow.com",
-	"beetashoke.chakraborty@clapgrow.com",
 	"accounts@prakashsteel.com",
 	"soumadwipdas1@gmail.com",
     "adarsh@prakashsteel.com",

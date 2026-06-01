@@ -75,7 +75,7 @@ frappe.query_reports["Open Work Order Report"] = {
 		// 			d.disable_primary_action();
 
 		// 			frappe.call({
-		// 				method: "prakash_steel.prakash_steel.report.open_workorder_report.open_workorder_report.get_wo_item_breakdown",
+		// 				method: "prakash_steel.prakash_steel.report.open_work_order_report.open_work_order_report.get_wo_item_breakdown",
 		// 				args: { wo_name },
 		// 				callback(r) {
 		// 					d.enable_primary_action();
