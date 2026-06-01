@@ -106,7 +106,13 @@ function update_total_weight_slip_qty(frm) {
         return sum + (flt(row.custom_weight_slip_qty) || 0);
     }, 0);
 
-    frm.set_value("custom_total_weight_slip_qty", total);
+    if (flt(frm.doc.custom_total_weight_slip_qty) === flt(total)) {
+        return;
+    }
+
+    // On submitted/cancelled docs, update display only (do not mark form "Not Saved")
+    const skip_dirty = frm.doc.docstatus !== 0;
+    frm.set_value("custom_total_weight_slip_qty", total, undefined, skip_dirty);
 }
 
 frappe.ui.form.on("Purchase Invoice", {
