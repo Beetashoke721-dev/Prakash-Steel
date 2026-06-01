@@ -41,11 +41,16 @@ def get_columns():
 			"width": 120,
 		},
 		{
-			"label": "Production Plan",
-			"fieldname": "production_plan",
-			"fieldtype": "Link",
-			"options": "Production Plan",
+			"label": "Production Planning",
+			"fieldname": "production_planning",
+			"fieldtype": "Dynamic Link",
+			"options": "plan_doctype",
 			"width": 220,
+		},
+		{
+			"fieldname": "plan_doctype",
+			"fieldtype": "Data",
+			"hidden": 1,
 		},
 	]
 
@@ -72,7 +77,7 @@ def get_data(filters):
 		conditions.append("fw.production_planning = %(production_planning)s")
 
 	if filters.get("company"):
-		conditions.append("pp.company = %(company)s")
+		conditions.append("COALESCE(pp.company, pln.company) = %(company)s")
 
 	query = f"""
 		SELECT
@@ -81,10 +86,16 @@ def get_data(filters):
 			item.custom_category_name AS category_name,
 			ROUND(fw.finish_weight, 0) AS actual_qty,
 			item.stock_uom AS usage_unit,
-			fw.production_plan AS production_plan
+			COALESCE(NULLIF(fw.production_planning, ''), NULLIF(fw.production_plan, '')) AS production_planning,
+			CASE
+				WHEN IFNULL(fw.production_planning, '') != '' THEN 'Production Planning'
+				WHEN IFNULL(fw.production_plan, '') != '' THEN 'Production Plan'
+				ELSE NULL
+			END AS plan_doctype
 		FROM `tabFinish Weight` fw
 		LEFT JOIN `tabItem` item ON item.name = fw.item_code
 		LEFT JOIN `tabProduction Plan` pp ON pp.name = fw.production_plan
+		LEFT JOIN `tabProduction Planning` pln ON pln.name = fw.production_planning
 		WHERE {" AND ".join(conditions)}
 		ORDER BY fw.posting_date DESC, fw.name DESC
 	"""
