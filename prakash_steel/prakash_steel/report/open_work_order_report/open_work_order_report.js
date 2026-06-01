@@ -17,7 +17,7 @@ function get_colour_style(val) {
 	return null;
 }
 
-frappe.query_reports["Open Workorder report"] = {
+frappe.query_reports["Open Work Order Report"] = {
 	filters: [],
 
 	formatter(value, row, column, data, default_formatter) {
