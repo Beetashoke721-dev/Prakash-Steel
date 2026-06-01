@@ -76,6 +76,13 @@ def update_gross_amount_on_items(doc, method=None):
         item.custom_gross_amount = taxable_value + gst_component
 
 
+def update_total_weight_slip_qty(doc, method=None):
+    """Sum custom_weight_slip_qty from items into custom_total_weight_slip_qty."""
+    doc.custom_total_weight_slip_qty = sum(
+        flt(item.get("custom_weight_slip_qty") or 0) for item in (doc.get("items") or [])
+    )
+
+
 def validate_cancel_reason(doc, method=None):
     """Server-side guard: block cancellation if Cancel Reason is missing.
 

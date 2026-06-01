@@ -63,7 +63,10 @@ app_include_js = ["/assets/prakash_steel/js/number_cards_uom.js"]
 
 doc_events = {
 	"Item": {
-		"validate": "prakash_steel.utils.item.validate_min_order_qty_and_batch_size",
+		"validate": [
+			"prakash_steel.utils.item.calculate_sku_type_on_validate",
+			"prakash_steel.utils.item.validate_min_order_qty_and_batch_size",
+		],
 		"on_update": "prakash_steel.utils.item.update_decoupled_lead_time_on_item_save",
 	},
 	"Sales Invoice": {
@@ -104,6 +107,7 @@ doc_events = {
 		"validate": [
 			"prakash_steel.utils.purchase_invoice_cancel.clear_cancel_reason_on_amend",
 			"prakash_steel.utils.purchase_invoice_cancel.update_gross_amount_on_items",
+			"prakash_steel.utils.purchase_invoice_cancel.update_total_weight_slip_qty",
 		],
 	},
 	"Payment Entry": {
