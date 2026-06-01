@@ -101,13 +101,35 @@
 
 
 
+function update_total_weight_slip_qty(frm) {
+    const total = (frm.doc.items || []).reduce((sum, row) => {
+        return sum + (flt(row.custom_weight_slip_qty) || 0);
+    }, 0);
+
+    frm.set_value("custom_total_weight_slip_qty", total);
+}
+
 frappe.ui.form.on("Purchase Invoice", {
+    onload(frm) {
+        update_total_weight_slip_qty(frm);
+    },
+
     refresh(frm) {
         // Clear cancel reason on amended drafts — the field is copied from the
         // cancelled doc but should not carry over to the new invoice.
         if (frm.doc.amended_from && frm.doc.docstatus === 0 && frm.doc.custom_cancel_reason) {
             frm.set_value("custom_cancel_reason", "");
         }
+
+        update_total_weight_slip_qty(frm);
+    },
+
+    items_add(frm) {
+        update_total_weight_slip_qty(frm);
+    },
+
+    items_remove(frm) {
+        update_total_weight_slip_qty(frm);
     },
 
     before_workflow_action(frm) {
@@ -327,6 +349,9 @@ function set_purchase_invoice_item_gross(cdt, cdn) {
 }
 
 frappe.ui.form.on("Purchase Invoice Item", {
+    custom_weight_slip_qty(frm) {
+        update_total_weight_slip_qty(frm);
+    },
     taxable_value(frm, cdt, cdn) {
         set_purchase_invoice_item_gross(cdt, cdn);
     },
