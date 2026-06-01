@@ -107,6 +107,7 @@ doc_events = {
 		"validate": [
 			"prakash_steel.utils.purchase_invoice_cancel.clear_cancel_reason_on_amend",
 			"prakash_steel.utils.purchase_invoice_cancel.update_gross_amount_on_items",
+			"prakash_steel.utils.purchase_invoice_cancel.update_total_weight_slip_qty",
 		],
 	},
 	"Payment Entry": {
