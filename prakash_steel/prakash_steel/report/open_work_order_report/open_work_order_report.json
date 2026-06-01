@@ -9,8 +9,8 @@
  "filters": [],
  "idx": 0,
  "is_standard": "Yes",
- "letterhead": null,
- "modified": "2026-05-28 11:49:34.653291",
+ "letter_head": null,
+ "modified": "2026-06-01 11:07:36.869580",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Open Work Order Report",
@@ -25,6 +25,15 @@
   },
   {
    "role": "Stock User"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "System Manager"
   }
  ],
  "timeout": 0
