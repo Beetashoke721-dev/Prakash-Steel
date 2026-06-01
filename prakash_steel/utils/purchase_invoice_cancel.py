@@ -49,7 +49,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 
 def clear_cancel_reason_on_amend(doc, method=None):
@@ -77,9 +77,12 @@ def update_gross_amount_on_items(doc, method=None):
 
 
 def update_total_weight_slip_qty(doc, method=None):
-    """Sum custom_weight_slip_qty from items into custom_total_weight_slip_qty."""
+    """Sum weight slip qty from items; shortage = total_qty - total weight slip qty."""
     doc.custom_total_weight_slip_qty = sum(
         flt(item.get("custom_weight_slip_qty") or 0) for item in (doc.get("items") or [])
+    )
+    doc.custom_shortage_qty = cint(
+        flt(doc.get("total_qty") or 0) - flt(doc.custom_total_weight_slip_qty or 0)
     )
 
 

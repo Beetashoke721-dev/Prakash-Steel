@@ -101,23 +101,27 @@
 
 
 
-function update_total_weight_slip_qty(frm) {
-    const total = (frm.doc.items || []).reduce((sum, row) => {
+function update_weight_slip_totals(frm) {
+    const totalWeightSlipQty = (frm.doc.items || []).reduce((sum, row) => {
         return sum + (flt(row.custom_weight_slip_qty) || 0);
     }, 0);
-
-    if (flt(frm.doc.custom_total_weight_slip_qty) === flt(total)) {
-        return;
-    }
+    const shortageQty = cint(flt(frm.doc.total_qty) - totalWeightSlipQty);
 
     // On submitted/cancelled docs, update display only (do not mark form "Not Saved")
     const skip_dirty = frm.doc.docstatus !== 0;
-    frm.set_value("custom_total_weight_slip_qty", total, undefined, skip_dirty);
+
+    if (flt(frm.doc.custom_total_weight_slip_qty) !== flt(totalWeightSlipQty)) {
+        frm.set_value("custom_total_weight_slip_qty", totalWeightSlipQty, undefined, skip_dirty);
+    }
+
+    if (cint(frm.doc.custom_shortage_qty) !== shortageQty) {
+        frm.set_value("custom_shortage_qty", shortageQty, undefined, skip_dirty);
+    }
 }
 
 frappe.ui.form.on("Purchase Invoice", {
     onload(frm) {
-        update_total_weight_slip_qty(frm);
+        update_weight_slip_totals(frm);
     },
 
     refresh(frm) {
@@ -127,15 +131,19 @@ frappe.ui.form.on("Purchase Invoice", {
             frm.set_value("custom_cancel_reason", "");
         }
 
-        update_total_weight_slip_qty(frm);
+        update_weight_slip_totals(frm);
+    },
+
+    total_qty(frm) {
+        update_weight_slip_totals(frm);
     },
 
     items_add(frm) {
-        update_total_weight_slip_qty(frm);
+        update_weight_slip_totals(frm);
     },
 
     items_remove(frm) {
-        update_total_weight_slip_qty(frm);
+        update_weight_slip_totals(frm);
     },
 
     before_workflow_action(frm) {
@@ -356,7 +364,10 @@ function set_purchase_invoice_item_gross(cdt, cdn) {
 
 frappe.ui.form.on("Purchase Invoice Item", {
     custom_weight_slip_qty(frm) {
-        update_total_weight_slip_qty(frm);
+        update_weight_slip_totals(frm);
+    },
+    qty(frm) {
+        update_weight_slip_totals(frm);
     },
     taxable_value(frm, cdt, cdn) {
         set_purchase_invoice_item_gross(cdt, cdn);
