@@ -49,50 +49,50 @@ frappe.query_reports["Open Work Order Report"] = {
 	},
 
 	onload(report) {
-		// report.page.add_inner_button(__("Debug Item Breakdown"), () => {
-		// 	const d = new frappe.ui.Dialog({
-		// 		title: __("Item Breakdown Debug"),
-		// 		fields: [
-		// 			{
-		// 				label: __("Work Order"),
-		// 				fieldname: "wo_name",
-		// 				fieldtype: "Link",
-		// 				options: "Work Order",
-		// 				reqd: 1,
-		// 				get_query() {
-		// 					return {
-		// 						filters: {
-		// 							docstatus: 1,
-		// 							status: ["not in", ["Completed", "Stopped", "Cancelled", "Closed"]],
-		// 						},
-		// 					};
-		// 				},
-		// 			},
-		// 		],
-		// 		primary_action_label: __("Show Breakdown"),
-		// 		primary_action({ wo_name }) {
-		// 			if (!wo_name) return;
-		// 			d.disable_primary_action();
+		report.page.add_inner_button(__("Debug Item Breakdown"), () => {
+			const d = new frappe.ui.Dialog({
+				title: __("Item Breakdown Debug"),
+				fields: [
+					{
+						label: __("Work Order"),
+						fieldname: "wo_name",
+						fieldtype: "Link",
+						options: "Work Order",
+						reqd: 1,
+						get_query() {
+							return {
+								filters: {
+									docstatus: 1,
+									status: ["not in", ["Completed", "Stopped", "Cancelled", "Closed"]],
+								},
+							};
+						},
+					},
+				],
+				primary_action_label: __("Show Breakdown"),
+				primary_action({ wo_name }) {
+					if (!wo_name) return;
+					d.disable_primary_action();
 
-		// 			frappe.call({
-		// 				method: "prakash_steel.prakash_steel.report.open_workorder_report.open_workorder_report.get_wo_item_breakdown",
-		// 				args: { wo_name },
-		// 				callback(r) {
-		// 					d.enable_primary_action();
-		// 					if (!r.message || !r.message.length) {
-		// 						frappe.msgprint(__("No data found for this Work Order."));
-		// 						return;
-		// 					}
-		// 					show_breakdown_dialog(wo_name, r.message);
-		// 				},
-		// 				error() {
-		// 					d.enable_primary_action();
-		// 				},
-		// 			});
-		// 		},
-		// 	});
-		// 	d.show();
-		// });
+					frappe.call({
+						method: "prakash_steel.prakash_steel.report.open_work_order_report.open_work_order_report.get_wo_item_breakdown",
+						args: { wo_name },
+						callback(r) {
+							d.enable_primary_action();
+							if (!r.message || !r.message.length) {
+								frappe.msgprint(__("No data found for this Work Order."));
+								return;
+							}
+							show_breakdown_dialog(wo_name, r.message);
+						},
+						error() {
+							d.enable_primary_action();
+						},
+					});
+				},
+			});
+			d.show();
+		});
 	},
 };
 
