@@ -1413,16 +1413,9 @@ def get_data(filters=None):
 		parent_demand = flt(parent_demand_map.get(item_code, 0))
 		parent_demand_details_list = parent_demand_details.get(item_code, [])
 
-		final_order_rec = flt(final_order_recommendations.get(item_code, 0))
 		net_order_rec = flt(net_order_recommendations.get(item_code, 0))
 
-		order_recommendation = math.ceil(flt(final_order_rec))
-		net_po_recommendation = math.ceil(
-			flt(final_order_rec)
-		)  # Base order recommendation (before MOQ/Batch Size)
-		or_with_moq_batch_size = math.ceil(
-			flt(net_order_rec)
-		)  # Net order recommendation (after MOQ/Batch Size)
+		or_with_moq_batch_size = math.ceil(flt(net_order_rec))  # Net order recommendation (after MOQ/Batch Size)
 
 		# Get Open Subcon PO (will be populated with functionality later)
 		open_subcon_po = 0
@@ -1456,6 +1449,11 @@ def get_data(filters=None):
 				# For others: use combined value
 				base_order_rec = requirement - on_hand_stock - wip_open_po_combined
 			final_order_rec = max(0, base_order_rec - mrq)
+
+		# Order Recommendation = before MRQ subtraction (capped at 0)
+		# Balance Order Recommendation = after MRQ subtraction
+		order_recommendation = math.ceil(max(0, flt(base_order_rec)))
+		net_po_recommendation = math.ceil(flt(final_order_rec))
 
 		# Calculate net order recommendation for breakdown
 		net_order_rec_breakdown = calculate_net_order_recommendation(final_order_rec, moq, batch_size)

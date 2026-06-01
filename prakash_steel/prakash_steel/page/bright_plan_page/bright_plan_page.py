@@ -182,6 +182,11 @@ def execute_work_orders(rows):
 			wo.custom_machine_name = row.get("machine") or ""
 			wo.custom_priority = row.get("priority_colour") or ""
 			wo.insert()
+			# After insert, ERPNext populates required_items from BOM with each item's
+			# own default warehouse. Override all of them to the correct source warehouse.
+			for item in wo.required_items:
+				item.source_warehouse = "Bright Bar Unit - PSPL"
+			wo.save()
 			# wo.submit()
 			created.append(wo.name)
 
