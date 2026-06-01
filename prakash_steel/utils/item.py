@@ -105,6 +105,33 @@ def _update_parent_items_lead_time(item_code):
 		)
 
 
+def calculate_sku_type_on_validate(doc, method=None):
+	"""
+	Server-side calculation of custom_sku_type based on custom_item_type and custom_buffer_flag.
+	Mirrors the client-side calculate_sku_type function in item.js.
+	"""
+	item_type = doc.get("custom_item_type")
+	buffer_flag = doc.get("custom_buffer_flag") or "Non-Buffer"
+
+	new_sku_type = None
+
+	if item_type:
+		is_buffer = buffer_flag == "Buffer"
+
+		if item_type == "BB":
+			new_sku_type = "BBMTA" if is_buffer else "BBMTO"
+		elif item_type == "RB":
+			new_sku_type = "RBMTA" if is_buffer else "RBMTO"
+		elif item_type == "BO":
+			new_sku_type = "BOTA" if is_buffer else "BOTO"
+		elif item_type == "RM":
+			new_sku_type = "PTA" if is_buffer else "PTO"
+		elif item_type == "Traded":
+			new_sku_type = "TRMTA" if is_buffer else "TRMTO"
+
+	doc.custom_sku_type = new_sku_type
+
+
 def validate_min_order_qty_and_batch_size(doc, method=None):
 	"""
 	Validate that min_order_qty and custom_batch_size are mutually exclusive.
