@@ -96,31 +96,89 @@ function colour_badge(label) {
 	return `<span style="background:${s.bg};color:${s.fg};${borderStyle}padding:1px 8px;border-radius:3px;font-weight:bold;font-size:11px;">${frappe.utils.escape_html(label)}</span>`;
 }
 
-function so_fifo_table(fifo_rows) {
-	if (!fifo_rows || !fifo_rows.length) {
-		return `<em style="color:#aaa;">No open SOs</em>`;
+function own_so_table(rows) {
+	if (!rows || !rows.length) {
+		return `<em style="color:#aaa;font-size:11px;">No own SOs</em>`;
 	}
-	const hdrs = ["Delivery Date", "Qty to Deliver", "Allocated", "Shortage", "Order Status"]
-		.map((h) => `<th style="padding:4px 8px;border-bottom:1px solid #ccc;font-size:11px;text-align:left;">${h}</th>`)
+	const hdrs = ["Pending Qty", "Allocated", "Shortage", "Colour"]
+		.map((h) => `<th style="padding:3px 6px;border-bottom:1px solid #ccc;font-size:11px;text-align:left;">${h}</th>`)
 		.join("");
-
-	const trows = fifo_rows.map((r) => {
-		const shortageStyle = r.shortage > 0
-			? "color:#c0392b;font-weight:bold;"
-			: "color:#27ae60;";
+	const trows = rows.map((r) => {
+		const shortageStyle = r.shortage > 0 ? "color:#c0392b;font-weight:bold;" : "color:#27ae60;";
 		return `<tr>
-			<td style="padding:3px 8px;font-size:11px;">${r.delivery_date || ""}</td>
-			<td style="padding:3px 8px;font-size:11px;">${r.pending_qty}</td>
-			<td style="padding:3px 8px;font-size:11px;">${r.allocated}</td>
-			<td style="padding:3px 8px;font-size:11px;${shortageStyle}">${r.shortage}</td>
-			<td style="padding:3px 8px;font-size:11px;">${colour_badge(r.order_status)}</td>
+			<td style="padding:2px 6px;font-size:11px;">${r.pending_qty}</td>
+			<td style="padding:2px 6px;font-size:11px;">${r.allocated}</td>
+			<td style="padding:2px 6px;font-size:11px;${shortageStyle}">${r.shortage}</td>
+			<td style="padding:2px 6px;font-size:11px;">${colour_badge(r.colour)}</td>
 		</tr>`;
 	}).join("");
-
-	return `<table style="border-collapse:collapse;width:100%;margin-top:4px;background:#fafafa;">
+	return `<table style="border-collapse:collapse;width:100%;background:#fafafa;">
 		<thead><tr style="background:#eee;">${hdrs}</tr></thead>
 		<tbody>${trows}</tbody>
 	</table>`;
+}
+
+function parent_fifo_table(rows) {
+	if (!rows || !rows.length) {
+		return `<em style="color:#aaa;font-size:11px;">No parent batches</em>`;
+	}
+	const hdrs = ["Parent Item", "Parent SO Qty", "Child Req", "Allocated", "Shortage", "Colour", "Priority"]
+		.map((h) => `<th style="padding:3px 6px;border-bottom:1px solid #ccc;font-size:11px;text-align:left;">${h}</th>`)
+		.join("");
+	const trows = rows.map((r) => {
+		const shortageStyle = r.shortage > 0 ? "color:#c0392b;font-weight:bold;" : "color:#27ae60;";
+		return `<tr>
+			<td style="padding:2px 6px;font-size:11px;">${frappe.utils.escape_html(r.parent_item || "")}</td>
+			<td style="padding:2px 6px;font-size:11px;">${r.parent_so_pending ?? r.child_req}</td>
+			<td style="padding:2px 6px;font-size:11px;">${r.child_req}</td>
+			<td style="padding:2px 6px;font-size:11px;">${r.allocated}</td>
+			<td style="padding:2px 6px;font-size:11px;${shortageStyle}">${r.shortage}</td>
+			<td style="padding:2px 6px;font-size:11px;">${colour_badge(r.colour)}</td>
+			<td style="padding:2px 6px;font-size:11px;">${frappe.utils.escape_html(r.priority_colour || "")}</td>
+		</tr>`;
+	}).join("");
+	return `<table style="border-collapse:collapse;width:100%;background:#fafafa;">
+		<thead><tr style="background:#eee;">${hdrs}</tr></thead>
+		<tbody>${trows}</tbody>
+	</table>`;
+}
+
+function debug_bom_table(bom_parents) {
+	if (!bom_parents || !bom_parents.length) {
+		return `<em style="color:#c0392b;font-size:11px;">No parent BOM found (BOM not default/active/submitted?)</em>`;
+	}
+	const rows = bom_parents.map((p) => {
+		const soStyle = p.open_so_count > 0 ? "color:#27ae60;font-weight:bold;" : "color:#c0392b;font-weight:bold;";
+		return `<tr>
+			<td style="padding:2px 6px;font-size:11px;">${frappe.utils.escape_html(p.parent_item)}</td>
+			<td style="padding:2px 6px;font-size:11px;">${p.bom_qty} / ${p.bom_quantity}</td>
+			<td style="padding:2px 6px;font-size:11px;${soStyle}">${p.open_so_count} open SO(s)</td>
+		</tr>`;
+	}).join("");
+	return `<table style="border-collapse:collapse;background:#fffbe6;">
+		<thead><tr style="background:#fef3c7;">
+			<th style="padding:3px 6px;font-size:11px;text-align:left;">Parent Item</th>
+			<th style="padding:3px 6px;font-size:11px;text-align:left;">BOM Qty / BOM Qty (parent)</th>
+			<th style="padding:3px 6px;font-size:11px;text-align:left;">Open SOs</th>
+		</tr></thead>
+		<tbody>${rows}</tbody>
+	</table>`;
+}
+
+function non_buffer_detail(own_so_rows, parent_rows, debug_parent_bom) {
+	return `
+		<div style="margin-bottom:6px;">
+			<b style="font-size:11px;color:#555;">BOM Parents</b>
+			${debug_bom_table(debug_parent_bom)}
+		</div>
+		<div style="margin-bottom:6px;">
+			<b style="font-size:11px;color:#555;">Own SOs</b>
+			${own_so_table(own_so_rows)}
+		</div>
+		<div>
+			<b style="font-size:11px;color:#555;">Parent SO FIFO</b>
+			${parent_fifo_table(parent_rows)}
+		</div>`;
 }
 
 function show_breakdown_dialog(mr_name, rows) {
@@ -135,7 +193,7 @@ function show_breakdown_dialog(mr_name, rows) {
 		{ label: "TOG", width: "80px" },
 		{ label: "Qual. Demand", width: "110px" },
 		{ label: "Colour", width: "90px" },
-		{ label: "SO FIFO Detail", width: "360px" },
+		{ label: "FIFO Detail", width: "400px" },
 	];
 
 	const header = columns
@@ -147,9 +205,9 @@ function show_breakdown_dialog(mr_name, rows) {
 			? `<span style="color:green;font-weight:bold;">Buffer</span>`
 			: `<span style="color:#888;">Non-Buffer</span>`;
 
-		const soDetail = row.buffer_flag === "Buffer"
+		const fifoDetail = row.buffer_flag === "Buffer"
 			? `<em style="color:#aaa;font-size:11px;">N/A (Buffer)</em>`
-			: so_fifo_table(row.so_fifo_detail);
+			: non_buffer_detail(row.own_so_detail, row.parent_fifo_detail, row.debug_parent_bom);
 
 		const cells = [
 			`<b>${frappe.utils.escape_html(row.item_code)}</b><br>
@@ -163,7 +221,7 @@ function show_breakdown_dialog(mr_name, rows) {
 			row.tog,
 			row.qualified_demand,
 			colour_badge(row.colour),
-			soDetail,
+			fifoDetail,
 		].map((v) => `<td style="padding:5px 8px;border-bottom:1px solid #eee;vertical-align:top;">${v ?? ""}</td>`).join("");
 
 		return `<tr>${cells}</tr>`;

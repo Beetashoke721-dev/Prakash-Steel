@@ -7,6 +7,12 @@ from collections import defaultdict
 import frappe
 from frappe.utils import date_diff, flt, nowdate
 
+from prakash_steel.prakash_steel.report.rolled_plan.rolled_plan import (
+	_rbmto_colour,
+	get_parent_bom_map,
+	get_rbmto_so_detail_map,
+)
+
 
 def execute(filters=None):
 	columns = get_columns()
@@ -105,7 +111,7 @@ def get_data(filters):
 	item_master_map = get_item_master_map(item_codes)
 	qd_map = get_qualified_demand_map(item_codes, item_master_map)
 	prev_mr_qty_map = get_previous_mr_qty_map(rows)
-	so_map = get_open_so_map(item_codes)
+	rbmto_so_detail_map, child_parent_so_fifo = _build_parent_fifo_data(item_codes, item_master_map)
 
 	for row in rows:
 		ic = row.item_code
@@ -121,7 +127,11 @@ def get_data(filters):
 		if master["buffer_flag"] == "Buffer":
 			row["colour"] = _buffer_colour(level, master["tog"], qd_map.get(ic, 0))
 		else:
-			row["colour"] = _non_buffer_colour(ic, level, so_map)
+			row["colour"] = _rbmto_colour(
+				level,
+				rbmto_so_detail_map.get(ic, []),
+				child_parent_so_fifo.get(ic, []),
+			)
 
 	return rows
 
@@ -431,6 +441,97 @@ def _calculate_spike_map(item_codes, item_master_map, spike_master_map):
 
 
 # ---------------------------------------------------------------------------
+# Parent BOM FIFO data for non-buffer colour
+# ---------------------------------------------------------------------------
+
+
+def _build_parent_fifo_data(item_codes, item_master_map):
+	"""
+	For non-buffer items: build own-SO FIFO list and parent-SO FIFO list.
+	Parent open SOs are fetched directly — no net_order_rec guard.
+	child_req = ceil(parent_so_pending * bom_ratio), already in child units.
+	Returns (rbmto_so_detail_map, child_parent_so_fifo).
+	"""
+	non_buffer_codes = [
+		ic for ic in item_codes
+		if item_master_map.get(ic, {}).get("buffer_flag") != "Buffer"
+	]
+	if not non_buffer_codes:
+		return {}, {}
+
+	rbmto_so_detail_map = get_rbmto_so_detail_map(non_buffer_codes)
+
+	parent_bom_map = get_parent_bom_map(non_buffer_codes)
+	all_parent_codes = {p["parent_item"] for plist in parent_bom_map.values() for p in plist}
+	if not all_parent_codes:
+		return rbmto_so_detail_map, {}
+
+	parent_tuple = tuple(all_parent_codes)
+
+	# Fetch parent open SOs directly — no net_order_rec check needed
+	parent_so_rows = frappe.db.sql(
+		"""
+		SELECT soi.item_code AS parent_item,
+		       so.transaction_date,
+		       soi.delivery_date,
+		       GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0)) AS pending_qty
+		FROM `tabSales Order Item` soi
+		INNER JOIN `tabSales Order` so ON so.name = soi.parent
+		WHERE so.docstatus = 1
+		  AND so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
+		  AND IFNULL(soi.custom_closed, 0) = 0
+		  AND soi.item_code IN %s
+		  AND GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0)) > 0
+		ORDER BY soi.delivery_date ASC
+		""",
+		(parent_tuple,),
+		as_dict=True,
+	)
+
+	parent_so_map = defaultdict(list)
+	for r in parent_so_rows:
+		status = _compute_order_status(r.delivery_date, r.transaction_date)
+		colour = status.capitalize() if status else ""
+		parent_so_map[r.parent_item].append({
+			"pending_qty": flt(r.pending_qty),
+			"colour": colour,
+			"delivery_date": r.delivery_date,
+		})
+
+	priority_seq_rows = frappe.db.sql(
+		"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
+		as_dict=True,
+	)
+	priority_seq_map = {r.priority_colour: r.sequence for r in priority_seq_rows}
+
+	child_parent_so_fifo = defaultdict(list)
+	for child_ic in non_buffer_codes:
+		flat = []
+		for p in parent_bom_map.get(child_ic, []):
+			parent_item = p["parent_item"]
+			bom_ratio = flt(p["bom_qty"]) / (flt(p["bom_quantity"]) or 1.0)
+			for so in parent_so_map.get(parent_item, []):
+				child_req = math.ceil(flt(so["pending_qty"]) * bom_ratio)
+				colour = so["colour"]
+				pc_str = "MTO" + (colour.upper() if colour else "")
+				pri_seq = priority_seq_map.get(pc_str, 999999)
+				flat.append({
+					"parent_item": parent_item,
+					"parent_so_pending": flt(so["pending_qty"]),
+					"batch_qty": child_req,  # child units — used by _rbmto_colour
+					"child_req": child_req,
+					"colour": colour,
+					"priority_colour": pc_str,
+					"priority_sequence": pri_seq,
+					"delivery_date": so["delivery_date"],
+				})
+		flat.sort(key=lambda x: (x["priority_sequence"], str(x["delivery_date"] or "")))
+		child_parent_so_fifo[child_ic] = flat
+
+	return rbmto_so_detail_map, dict(child_parent_so_fifo)
+
+
+# ---------------------------------------------------------------------------
 # Open SO map for non-buffer FIFO allocation
 # ---------------------------------------------------------------------------
 
@@ -559,7 +660,7 @@ def get_item_breakdown(mr_name):
 	open_po_map = get_open_po_map(item_codes)
 	item_master_map = get_item_master_map(item_codes)
 	qd_map = get_qualified_demand_map(item_codes, item_master_map)
-	so_map = get_open_so_map(item_codes)
+	rbmto_so_detail_map, child_parent_so_fifo = _build_parent_fifo_data(item_codes, item_master_map)
 
 	# Previous MR qty relative to this MR
 	all_pending = frappe.db.sql(
@@ -584,6 +685,29 @@ def get_item_breakdown(mr_name):
 		item_pending_map[p.item_code].append(p)
 
 	breakdown = []
+	# Build debug maps: parent BOM and parent SO counts per child item
+	_debug_parent_bom_map = get_parent_bom_map(item_codes)
+	_debug_all_parents = {p["parent_item"] for plist in _debug_parent_bom_map.values() for p in plist}
+	_debug_parent_so_counts = {}
+	if _debug_all_parents:
+		_pt = tuple(_debug_all_parents)
+		_pso_rows = frappe.db.sql(
+			"""
+			SELECT soi.item_code, COUNT(*) AS cnt
+			FROM `tabSales Order Item` soi
+			INNER JOIN `tabSales Order` so ON so.name = soi.parent
+			WHERE so.docstatus = 1
+			  AND so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+			  AND IFNULL(soi.custom_closed,0) = 0
+			  AND soi.item_code IN %s
+			  AND GREATEST(0, soi.qty - IFNULL(soi.delivered_qty,0)) > 0
+			GROUP BY soi.item_code
+			""",
+			(_pt,),
+			as_dict=True,
+		)
+		_debug_parent_so_counts = {r.item_code: r.cnt for r in _pso_rows}
+
 	for row in items:
 		ic = row.item_code
 		master = item_master_map.get(ic, {"tog": 0.0, "buffer_flag": "Non-Buffer"})
@@ -593,7 +717,7 @@ def get_item_breakdown(mr_name):
 		level = stock + open_po + prev_qty
 		is_buffer = master["buffer_flag"] == "Buffer"
 
-		entry = {
+		item_entry = {
 			"item_code": ic,
 			"description": row.description,
 			"buffer_flag": master["buffer_flag"],
@@ -609,50 +733,68 @@ def get_item_breakdown(mr_name):
 		if is_buffer:
 			tog = master["tog"]
 			qd = flt(qd_map.get(ic, 0))
-			entry["tog"] = tog
-			entry["qualified_demand"] = qd
-			entry["total"] = tog + qd
-			entry["colour"] = _buffer_colour(level, tog, qd)
-			entry["so_fifo_detail"] = []
+			item_entry["tog"] = tog
+			item_entry["qualified_demand"] = qd
+			item_entry["total"] = tog + qd
+			item_entry["colour"] = _buffer_colour(level, tog, qd)
+			item_entry["own_so_detail"] = []
+			item_entry["parent_fifo_detail"] = []
+			item_entry["debug_parent_bom"] = []
 		else:
-			entry["tog"] = "N/A"
-			entry["qualified_demand"] = "N/A"
-			entry["total"] = "N/A"
-			sos = so_map.get(ic, [])
-			available = level
-			fifo_rows = []
-			worst_priority = 0
+			item_entry["tog"] = "N/A"
+			item_entry["qualified_demand"] = "N/A"
+			item_entry["total"] = "N/A"
+			own_so_list = rbmto_so_detail_map.get(ic, [])
+			parent_fifo_list = child_parent_so_fifo.get(ic, [])
+			item_entry["colour"] = _rbmto_colour(level, own_so_list, parent_fifo_list)
 
-			for so in sos:
+			# Debug: which parents found in BOM and whether they have SOs
+			bom_parents = _debug_parent_bom_map.get(ic, [])
+			item_entry["debug_parent_bom"] = [
+				{
+					"parent_item": p["parent_item"],
+					"bom_qty": p["bom_qty"],
+					"bom_quantity": p["bom_quantity"],
+					"open_so_count": _debug_parent_so_counts.get(p["parent_item"], 0),
+				}
+				for p in bom_parents
+			]
+
+			# Own SO FIFO detail
+			available = flt(level)
+			own_so_rows = []
+			for so in own_so_list:
 				required = flt(so["pending_qty"])
 				allocated = min(required, available)
 				shortage = required - allocated
 				available -= allocated
-				status = so["order_status"] or ""
+				own_so_rows.append({
+					"pending_qty": required,
+					"colour": so["colour"],
+					"allocated": allocated,
+					"shortage": shortage,
+				})
 
-				if shortage > 0:
-					priority = _STATUS_PRIORITY.get(status, 0)
-					if priority > worst_priority:
-						worst_priority = priority
+			# Parent SO FIFO detail (remaining after own SOs)
+			parent_rows = []
+			for fifo_entry in parent_fifo_list:
+				child_req = flt(fifo_entry["child_req"])
+				allocated = min(child_req, available)
+				shortage = child_req - allocated
+				available -= allocated
+				parent_rows.append({
+					"parent_item": fifo_entry["parent_item"],
+					"parent_so_pending": fifo_entry.get("parent_so_pending", child_req),
+					"child_req": child_req,
+					"colour": fifo_entry["colour"],
+					"priority_colour": fifo_entry["priority_colour"],
+					"allocated": allocated,
+					"shortage": shortage,
+				})
 
-				fifo_rows.append(
-					{
-						"delivery_date": str(so["delivery_date"]) if so["delivery_date"] else "",
-						"pending_qty": required,
-						"allocated": allocated,
-						"shortage": shortage,
-						"order_status": status,
-					}
-				)
+			item_entry["own_so_detail"] = own_so_rows
+			item_entry["parent_fifo_detail"] = parent_rows
 
-			colour = (
-				"Green"
-				if worst_priority == 0 and sos
-				else (_PRIORITY_TO_COLOUR.get(worst_priority, "") if worst_priority else "")
-			)
-			entry["colour"] = colour
-			entry["so_fifo_detail"] = fifo_rows
-
-		breakdown.append(entry)
+		breakdown.append(item_entry)
 
 	return breakdown
