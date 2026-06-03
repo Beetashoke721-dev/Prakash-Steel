@@ -223,9 +223,21 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
             }
         });
 
-        // Render a row for every machine in _machine_map
+        // Render a row for every machine in _machine_map, sorted by prefix then numeric size
+        const _sorted_machines = Object.keys(_machine_map).sort((a, b) => {
+            const parse = name => {
+                const m = name.match(/^(.*?)\s*-\s*(\d+)/);
+                return m ? [m[1].trim(), parseInt(m[2])] : [name, 0];
+            };
+            const [pa, na] = parse(a);
+            const [pb, nb] = parse(b);
+            if (pa !== pb) return pa.localeCompare(pb);
+            return na - nb;
+        });
+
         let rows_html = "";
-        Object.entries(_machine_map).forEach(([machine, info]) => {
+        _sorted_machines.forEach(machine => {
+            const info = _machine_map[machine];
             const total_time = time_by_machine[machine] || 0;
             const no_of_machines = info.no_of_machines || 1;
             const time = no_of_machines > 0 ? total_time / no_of_machines : total_time;
