@@ -23,7 +23,7 @@ def _capture_snapshot(trigger="Scheduled"):
 	filters = frappe._dict(
 		from_date="2000-01-01",
 		to_date=today(),
-		order_fullkit_status=["Pending", "Partial", "Full-kit"],  # add this
+		line_fullkit_status=["Pending", "Partial", "Full-kit"],
 	)
 
 	try:

@@ -13,7 +13,7 @@
 
 frappe.query_reports["Open SO Analysis"] = {
 	onload: function (report) {
-		report.set_filter_value("order_fullkit_status", ["Partial", "Full-kit"]);
+		report.set_filter_value("line_fullkit_status", ["Partial", "Full-kit"]);
 	},
 
 	filters: [
@@ -101,8 +101,8 @@ frappe.query_reports["Open SO Analysis"] = {
 			},
 		},
 		{
-			fieldname: "order_fullkit_status",
-			label: __("Order Full Kit Status"),
+			fieldname: "line_fullkit_status",
+			label: __("Line Full Kit Status"),
 			fieldtype: "MultiSelectList",
 			default: ["Partial", "Full-kit"],
 			get_data: function (txt) {

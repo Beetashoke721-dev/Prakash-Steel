@@ -66,6 +66,12 @@ def get_columns():
 			"width": 120,
 		},
 		{
+			"label": _("Priority Sequence"),
+			"fieldname": "priority_sequence",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
 			"label": _("Item SKU Type"),
 			"fieldname": "item_sku_type",
 			"fieldtype": "Data",
@@ -109,8 +115,7 @@ def get_data(filters=None):
 			wo.planned_start_date AS date,
 			wo.production_item AS item,
 			ROUND(wo.qty) AS qty,
-			wo.custom_machine_name AS machine,
-			wo.custom_priority AS priority
+			wo.custom_machine_name AS machine
 		FROM `tabWork Order` wo
 		WHERE wo.docstatus = 1
 			AND wo.status NOT IN ('Completed', 'Stopped', 'Cancelled','Closed')
@@ -130,6 +135,13 @@ def get_data(filters=None):
 	qd_map = get_qualified_demand_map(parent_item_codes, item_master_map)
 	so_map = get_open_so_map(parent_item_codes)
 	prev_wo_qty_map = get_previous_wo_qty_map(work_orders)
+	op_cp_map = get_op_cp_map(work_orders, stock_map, wip_map, qd_map, item_master_map)
+
+	priority_seq_rows = frappe.db.sql(
+		"SELECT priority_colour, sequence FROM `tabPriority Colour Seq Master Table`",
+		as_dict=True,
+	)
+	priority_seq_map = {r.priority_colour: r.sequence for r in priority_seq_rows}
 
 	# Fetch child items for all work orders at once
 	wo_names = [wo.work_order for wo in work_orders]
@@ -187,13 +199,25 @@ def get_data(filters=None):
 		else:
 			colour = _non_buffer_colour(wo.item, level, so_map)
 
+		op_cp = op_cp_map.get(wo.work_order, "")
+		if colour:
+			if item_sku_type == "BBMTA":
+				priority = "MTA" + op_cp + colour.upper()
+			else:
+				priority = "MTO" + colour.upper()
+		else:
+			priority = ""
+
+		priority_sequence = priority_seq_map.get(priority) if priority else None
+
 		base = {
 			"work_order": wo.work_order,
 			"date": wo.date,
 			"item": wo.item,
 			"qty": wo.qty,
 			"colour": colour,
-			"priority": wo.priority or "",
+			"priority": priority,
+			"priority_sequence": priority_sequence,
 			"item_sku_type": item_sku_type,
 			"machine": wo.machine or "",
 		}
@@ -218,7 +242,46 @@ def get_data(filters=None):
 			row["child_sku_type"] = None
 			data.append(row)
 
+	# Sort ascending by priority_sequence; rows with no sequence go last
+	data.sort(key=lambda r: r.get("priority_sequence") if r.get("priority_sequence") is not None else 999999)
+
 	return data
+
+
+# ---------------------------------------------------------------------------
+# OP / CP assignment per Work Order
+# ---------------------------------------------------------------------------
+
+
+def get_op_cp_map(work_orders, stock_map, wip_map, qd_map, item_master_map):
+	"""
+	For Buffer items: assign OP if remaining qualified demand (after stock+wip) is not yet
+	covered by earlier WOs, else CP. Non-buffer items always get "".
+	WOs for the same item are processed in creation order (oldest first).
+	"""
+	item_wo_groups = defaultdict(list)
+	for wo in work_orders:
+		item_wo_groups[wo.item].append(wo)
+
+	op_cp_map = {}
+
+	for item_code, wos in item_wo_groups.items():
+		master = item_master_map.get(item_code, {})
+		if master.get("buffer_flag") != "Buffer":
+			for wo in wos:
+				op_cp_map[wo.work_order] = ""
+			continue
+
+		stock = flt(stock_map.get(item_code, 0))
+		wip = flt(wip_map.get(item_code, 0))
+		qualified_demand = flt(qd_map.get(item_code, 0))
+		remaining = max(0.0, qualified_demand - stock - wip)
+
+		for wo in sorted(wos, key=lambda w: w.wo_creation):
+			op_cp_map[wo.work_order] = "OP" if remaining > 0 else "CP"
+			remaining -= flt(wo.qty)
+
+	return op_cp_map
 
 
 # ---------------------------------------------------------------------------

@@ -389,11 +389,11 @@ def prepare_data(data, so_elapsed_time, filters):
 		so_name = row.get("sales_order")
 		row["order_fullkit"] = so_fullkit_map.get(so_name, "Pending")
 
-	# Filter by Order Full Kit Status (default: Partial + Full-kit, excludes Pending)
-	order_fullkit_status = filters.get("order_fullkit_status")
-	if not (order_fullkit_status and isinstance(order_fullkit_status, list) and len(order_fullkit_status) > 0):
-		order_fullkit_status = ["Partial", "Full-kit"]
-	data = [row for row in data if row.get("order_fullkit") in order_fullkit_status]
+	# Filter by Line Full Kit Status (default: Partial + Full-kit, excludes Pending)
+	line_fullkit_status = filters.get("line_fullkit_status")
+	if not (line_fullkit_status and isinstance(line_fullkit_status, list) and len(line_fullkit_status) > 0):
+		line_fullkit_status = ["Partial", "Full-kit"]
+	data = [row for row in data if row.get("line_fullkit") in line_fullkit_status]
 
 	if filters.get("group_by_so"):
 		data = []
