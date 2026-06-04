@@ -1364,33 +1364,6 @@ def get_data(filters=None):
 		on_hand_status = None
 		on_hand_colour = None
 
-		if is_item_buffer:
-			denominator = flt(tog) + flt(qualify_demand)
-			if denominator > 0:
-				on_hand_status_value = (flt(on_hand_stock) / denominator) * 100
-			else:
-				# If denominator is 0, set to None (cannot calculate)
-				on_hand_status_value = None
-
-			if on_hand_status_value is None:
-				on_hand_colour = None
-				on_hand_status = None
-			else:
-				numeric_status = round(on_hand_status_value, 2)
-
-				if numeric_status == 0:
-					on_hand_colour = "BLACK"
-				elif 0 < numeric_status <= 34:
-					on_hand_colour = "RED"
-				elif 34 < numeric_status <= 67:
-					on_hand_colour = "YELLOW"
-				elif 67 < numeric_status <= 100:
-					on_hand_colour = "GREEN"
-				else:  # > 100
-					on_hand_colour = "WHITE"
-
-				on_hand_status = f"{numeric_status:.2f}%"
-
 		# Get item name
 		item_name = item_info.get("item_name", "")
 
@@ -1412,6 +1385,33 @@ def get_data(filters=None):
 
 		parent_demand = flt(parent_demand_map.get(item_code, 0))
 		parent_demand_details_list = parent_demand_details.get(item_code, [])
+
+		if is_item_buffer:
+			total_demand_for_status = qualify_demand + parent_demand
+			denominator = flt(tog) + flt(total_demand_for_status)
+			if denominator > 0:
+				on_hand_status_value = (flt(on_hand_stock) / denominator) * 100
+			else:
+				on_hand_status_value = None
+
+			if on_hand_status_value is None:
+				on_hand_colour = None
+				on_hand_status = None
+			else:
+				numeric_status = round(on_hand_status_value, 2)
+
+				if numeric_status == 0:
+					on_hand_colour = "BLACK"
+				elif 0 < numeric_status <= 34:
+					on_hand_colour = "RED"
+				elif 34 < numeric_status <= 67:
+					on_hand_colour = "YELLOW"
+				elif 67 < numeric_status <= 100:
+					on_hand_colour = "GREEN"
+				else:  # > 100
+					on_hand_colour = "WHITE"
+
+				on_hand_status = f"{numeric_status:.2f}%"
 
 		net_order_rec = flt(net_order_recommendations.get(item_code, 0))
 

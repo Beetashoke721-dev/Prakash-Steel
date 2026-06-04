@@ -17,7 +17,7 @@ function get_colour_style(val) {
 	return null;
 }
 
-frappe.query_reports["Open Mr(wo) Report"] = {
+frappe.query_reports["Open MR (WO) Report"] = {
 	filters: [],
 
 	formatter(value, row, column, data, default_formatter) {
