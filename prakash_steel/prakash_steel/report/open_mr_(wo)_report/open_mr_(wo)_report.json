@@ -13,11 +13,11 @@
  "modified": "2026-06-03 11:42:05.213410",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
- "name": "Open Mr(wo) Report",
+ "name": "Open MR (WO) Report",
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Work Order",
- "report_name": "Open Mr(wo) Report",
+ "report_name": "Open MR (WO) Report",
  "report_type": "Script Report",
  "roles": [
   {
