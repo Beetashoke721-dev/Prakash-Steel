@@ -113,10 +113,7 @@ def get_item_breakdown(item_code):
 
 	rows = []
 	for i in range(num_batches):
-		if is_buffer:
-			level = stock + wip + draft_wo + accumulated_batch_qty
-		else:
-			level = stock + wip + accumulated_batch_qty
+		level = stock + wip + draft_wo + accumulated_batch_qty
 
 		if is_buffer:
 			total = tog + qualified_demand
@@ -587,12 +584,8 @@ def get_data(filters=None):
 		accumulated_batch_qty = 0.0
 
 		for _i in range(num_batches):
-			# Colour: level = stock + wip (+ draft_wo for buffer) + qty already produced in previous batches
-			# Mirrors open_mr_for_manufacture logic (prev_mr_qty = accumulated batches)
-			if is_buffer:
-				level = stock + wip + draft_wo + accumulated_batch_qty
-			else:
-				level = stock + wip + accumulated_batch_qty
+			# Colour: level = stock + submitted_wo + draft_wo + qty already produced in previous batches
+			level = stock + wip + draft_wo + accumulated_batch_qty
 			if is_buffer:
 				total = tog + qualified_demand
 				if level == 0:
