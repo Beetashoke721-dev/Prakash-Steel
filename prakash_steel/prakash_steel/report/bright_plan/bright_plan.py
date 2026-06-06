@@ -108,7 +108,7 @@ def get_item_breakdown(item_code):
 	# Buffer: display/OP-CP uses qualified_demand (delivery_date <= today + spike)
 	# Non-buffer: display/OP-CP uses all-time open SO
 	display_open_so = qualified_demand if is_buffer else item_open_so
-	remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
+	remaining_so_for_op_cp = max(0, display_open_so - stock - wip - draft_wo)
 	accumulated_batch_qty = 0.0
 
 	rows = []
@@ -580,7 +580,7 @@ def get_data(filters=None):
 		# Buffer: open SO for display/OP-CP = qualified_demand (delivery_date <= today + spike)
 		# Non-buffer: open SO for display/OP-CP = all-time open SO (no date filter)
 		display_open_so = qualified_demand if is_buffer else item_open_so
-		remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
+		remaining_so_for_op_cp = max(0, display_open_so - stock - wip - draft_wo)
 		accumulated_batch_qty = 0.0
 
 		for _i in range(num_batches):
