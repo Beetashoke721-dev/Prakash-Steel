@@ -1201,6 +1201,71 @@ def get_data(filters=None):
 				batch_size_map_all[_bic] = _bbatch
 				net_order_recommendations[_bic] = _bnet
 
+	# ── Include non-buffer items so their BOM children (buffer RM) get parent demand ──
+	# When report runs with buffer_flag=1, non-buffer items are excluded from all_item_codes.
+	# Their open SOs must still flow as parent demand to buffer child items via BOM traversal.
+	if buffer_flag:
+		_nonbuf_rows = frappe.db.sql(
+			"""
+			SELECT name AS item_code, custom_item_type AS item_type,
+			       min_order_qty AS moq, custom_batch_size AS batch_size
+			FROM `tabItem`
+			WHERE (custom_buffer_flag != 'Buffer' OR custom_buffer_flag IS NULL)
+			""",
+			as_dict=True,
+		)
+		if _nonbuf_rows:
+			_nonbuf_codes = [r.item_code for r in _nonbuf_rows]
+			_nonbuf_tuple = tuple(_nonbuf_codes) if len(_nonbuf_codes) > 1 else (_nonbuf_codes[0],)
+
+			_nonbuf_stock_rows = frappe.db.sql(
+				"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+				(_nonbuf_tuple,),
+				as_dict=True,
+			)
+			_nonbuf_stock_map = {r.item_code: flt(r.stock) for r in _nonbuf_stock_rows}
+
+			_nonbuf_so_rows = frappe.db.sql(
+				"""
+				SELECT soi.item_code,
+				       SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0))) AS so_qty
+				FROM `tabSales Order` so
+				INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+				WHERE so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
+				  AND so.docstatus = 1
+				  AND IFNULL(soi.custom_closed, 0) = 0
+				  AND soi.item_code IN %s
+				GROUP BY soi.item_code
+				""",
+				(_nonbuf_tuple,),
+				as_dict=True,
+			)
+			_nonbuf_so_map = {r.item_code: flt(r.so_qty) for r in _nonbuf_so_rows}
+
+			for _nr in _nonbuf_rows:
+				_nic = _nr.item_code
+				_nsku = calculate_sku_type("Non-Buffer", _nr.item_type) or ""
+				_nstock = flt(_nonbuf_stock_map.get(_nic, 0))
+				_nwip = 0 if _nsku in ["RBMTA", "RBMTO"] else flt(wip_map.get(_nic, 0))
+				_npo = flt(open_po_map.get(_nic, 0))
+				_nso = flt(_nonbuf_so_map.get(_nic, 0))
+				_nmoq = flt(_nr.moq or 0)
+				_nbatch = flt(_nr.batch_size or 0)
+
+				if _nsku in ["BOTO", "PTO", "TRMTO"]:
+					_nbase = max(0, _nso - _nstock - _nwip - _npo)
+				else:
+					_nbase = max(0, _nso - _nstock - _nwip)
+
+				_nnet = calculate_net_order_recommendation(_nbase, _nmoq, _nbatch)
+
+				if _nnet > 0:
+					item_buffer_map_all[_nic] = "Non-Buffer"
+					item_sku_type_map_all[_nic] = _nsku
+					moq_map_all[_nic] = _nmoq
+					batch_size_map_all[_nic] = _nbatch
+					net_order_recommendations[_nic] = _nnet
+
 	parent_demand_map_net = {}
 	parent_demand_details = {}
 
@@ -3137,3 +3202,201 @@ def traverse_bom_for_po(
 
 	except Exception as e:
 		pass
+
+
+@frappe.whitelist()
+def get_on_hand_status_breakdown(item_code):
+	from frappe.utils import add_days, today
+
+	today_date = today()
+
+	item = frappe.db.get_value(
+		"Item", item_code,
+		["name", "item_name", "safety_stock", "custom_buffer_flag", "custom_item_type",
+		 "min_order_qty", "custom_batch_size"],
+		as_dict=True,
+	)
+	if not item:
+		frappe.throw(f"Item {item_code} not found")
+
+	buffer_flag = item.custom_buffer_flag or "Non-Buffer"
+	item_type   = item.custom_item_type or ""
+	tog         = flt(item.safety_stock)
+
+	stock_row = frappe.db.sql(
+		"SELECT SUM(actual_qty) as stock FROM `tabBin` WHERE item_code = %s", item_code, as_dict=True
+	)
+	on_hand_stock = flt(stock_row[0].stock if stock_row else 0)
+
+	till_today_rows = frappe.db.sql(
+		"""
+		SELECT SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0))) as qty
+		FROM `tabSales Order` so
+		INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+		WHERE so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+		  AND so.docstatus = 1 AND IFNULL(soi.custom_closed, 0) = 0
+		  AND soi.item_code = %s AND IFNULL(soi.delivery_date,'1900-01-01') <= %s
+		""",
+		(item_code, today_date), as_dict=True,
+	)
+	till_today = flt(till_today_rows[0].qty if till_today_rows else 0)
+
+	spike_config = frappe.db.get_value(
+		"Spike Master", item_type, ["demand_horizon", "spike_threshold"], as_dict=True
+	) if item_type else None
+
+	demand_horizon      = flt(spike_config.demand_horizon) if spike_config else 0
+	spike_threshold_pct = flt(spike_config.spike_threshold) if spike_config else 0
+	spike_threshold_qty = tog * spike_threshold_pct / 100
+
+	spike = 0.0
+	spike_sos = []
+	if buffer_flag == "Buffer" and demand_horizon > 0:
+		end_date = add_days(today_date, int(demand_horizon))
+		spike_rows = frappe.db.sql(
+			"""
+			SELECT so.name as so_name,
+			       GREATEST(0, soi.qty - IFNULL(soi.delivered_qty,0)) as qty,
+			       soi.delivery_date
+			FROM `tabSales Order` so
+			INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+			WHERE so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+			  AND so.docstatus = 1 AND IFNULL(soi.custom_closed, 0) = 0
+			  AND soi.item_code = %s
+			  AND IFNULL(soi.delivery_date,'1900-01-01') > %s
+			  AND IFNULL(soi.delivery_date,'1900-01-01') <= %s
+			""",
+			(item_code, today_date, end_date), as_dict=True,
+		)
+		for r in spike_rows:
+			if flt(r.qty) > 0:
+				spike += flt(r.qty)
+				spike_sos.append({"so_name": r.so_name, "qty": flt(r.qty), "delivery_date": str(r.delivery_date)})
+
+	raw_qualified = till_today + spike
+	threshold_triggered = False
+	qualified_demand = raw_qualified
+	if buffer_flag == "Buffer" and spike_config and tog > 0:
+		if raw_qualified < spike_threshold_qty:
+			qualified_demand = 0.0
+			threshold_triggered = True
+
+	bom_parents = frappe.db.sql(
+		"""
+		SELECT b.item as parent_item, b.name as bom_name, b.quantity as bom_qty, bi.qty as child_qty
+		FROM `tabBOM` b INNER JOIN `tabBOM Item` bi ON bi.parent = b.name
+		WHERE bi.item_code = %s AND b.is_active = 1 AND b.is_default = 1
+		""",
+		item_code, as_dict=True,
+	)
+
+	parent_details = []
+	total_parent_demand = 0.0
+
+	for p in bom_parents:
+		parent_item = p.parent_item
+		bom_qty = flt(p.bom_qty) or 1
+		child_qty = flt(p.child_qty)
+		ratio = child_qty / bom_qty
+
+		pi = frappe.db.get_value(
+			"Item", parent_item,
+			["custom_buffer_flag", "custom_item_type", "safety_stock", "min_order_qty", "custom_batch_size"],
+			as_dict=True,
+		) or {}
+
+		p_buffer = pi.get("custom_buffer_flag") or "Non-Buffer"
+		p_type   = pi.get("custom_item_type") or ""
+		p_tog    = flt(pi.get("safety_stock") or 0)
+		p_moq    = flt(pi.get("min_order_qty") or 0)
+		p_batch  = flt(pi.get("custom_batch_size") or 0)
+		p_sku    = calculate_sku_type(p_buffer, p_type) or ""
+
+		p_stock = flt((frappe.db.sql("SELECT SUM(actual_qty) as s FROM `tabBin` WHERE item_code = %s", parent_item, as_dict=True) or [{}])[0].get("s") or 0)
+		p_wip   = flt((frappe.db.sql("SELECT SUM(qty - produced_qty) as w FROM `tabWork Order` WHERE production_item = %s AND status NOT IN ('Completed','Stopped','Cancelled') AND docstatus = 1", parent_item, as_dict=True) or [{}])[0].get("w") or 0)
+		p_open_po = flt((frappe.db.sql("SELECT SUM(GREATEST(0, poi.qty - IFNULL(poi.received_qty,0))) as po FROM `tabPurchase Order` po INNER JOIN `tabPurchase Order Item` poi ON poi.parent = po.name WHERE po.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed') AND po.docstatus = 1 AND poi.item_code = %s", parent_item, as_dict=True) or [{}])[0].get("po") or 0)
+		p_open_so = flt((frappe.db.sql("SELECT SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty,0))) as so FROM `tabSales Order` so INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name WHERE so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed') AND so.docstatus = 1 AND IFNULL(soi.custom_closed,0) = 0 AND soi.item_code = %s", parent_item, as_dict=True) or [{}])[0].get("so") or 0)
+
+		if p_buffer == "Buffer":
+			p_qd = flt((frappe.db.sql("SELECT SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty,0))) as qty FROM `tabSales Order` so INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name WHERE so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed') AND so.docstatus = 1 AND IFNULL(soi.custom_closed,0) = 0 AND soi.item_code = %s AND IFNULL(soi.delivery_date,'1900-01-01') <= %s", (parent_item, today_date), as_dict=True) or [{}])[0].get("qty") or 0)
+			if p_sku in ["BOTA", "PTA"]:
+				p_base = max(0, p_tog + p_qd - p_stock - p_wip - p_open_po)
+			else:
+				p_base = max(0, p_tog + p_qd - p_stock - p_wip)
+			p_demand_label = f"TOG ({p_tog}) + QD ({p_qd}) - Stock ({p_stock}) - WIP ({p_wip})"
+		else:
+			p_qd = p_open_so
+			if p_sku in ["BOTO", "PTO", "TRMTO"]:
+				p_base = max(0, p_open_so - p_stock - p_wip - p_open_po)
+				p_demand_label = f"Open SO ({p_open_so}) - Stock ({p_stock}) - WIP ({p_wip}) - Open PO ({p_open_po})"
+			else:
+				p_base = max(0, p_open_so - p_stock - p_wip)
+				p_demand_label = f"Open SO ({p_open_so}) - Stock ({p_stock}) - WIP ({p_wip})"
+
+		p_net = calculate_net_order_recommendation(p_base, p_moq, p_batch)
+		demand_contributed = p_net * ratio
+		total_parent_demand += demand_contributed
+
+		parent_details.append({
+			"parent_item": parent_item,
+			"bom_name": p.bom_name,
+			"buffer_flag": p_buffer,
+			"sku_type": p_sku,
+			"stock": p_stock,
+			"wip": p_wip,
+			"open_po": p_open_po,
+			"open_so": p_open_so,
+			"moq": p_moq,
+			"batch_size": p_batch,
+			"base_order_rec": round(p_base, 3),
+			"net_order_rec": round(p_net, 3),
+			"bom_qty": bom_qty,
+			"child_qty": child_qty,
+			"ratio": round(ratio, 4),
+			"demand_contributed": round(demand_contributed, 3),
+			"demand_label": p_demand_label,
+		})
+
+	total_demand = qualified_demand + total_parent_demand
+	denominator  = tog + total_demand
+
+	if buffer_flag == "Buffer" and denominator > 0:
+		on_hand_pct = (on_hand_stock / denominator) * 100
+		on_hand_pct_rounded = round(on_hand_pct, 2)
+		if on_hand_pct_rounded == 0:
+			colour = "BLACK"
+		elif on_hand_pct_rounded <= 34:
+			colour = "RED"
+		elif on_hand_pct_rounded <= 67:
+			colour = "YELLOW"
+		elif on_hand_pct_rounded <= 100:
+			colour = "GREEN"
+		else:
+			colour = "WHITE"
+	else:
+		on_hand_pct_rounded = None
+		colour = None
+
+	return {
+		"item_code": item_code,
+		"item_name": item.item_name,
+		"buffer_flag": buffer_flag,
+		"item_type": item_type,
+		"tog": tog,
+		"on_hand_stock": on_hand_stock,
+		"till_today": till_today,
+		"spike": spike,
+		"spike_sos": spike_sos,
+		"demand_horizon": demand_horizon,
+		"spike_threshold_pct": spike_threshold_pct,
+		"spike_threshold_qty": spike_threshold_qty,
+		"raw_qualified": raw_qualified,
+		"threshold_triggered": threshold_triggered,
+		"qualified_demand": qualified_demand,
+		"parent_details": parent_details,
+		"total_parent_demand": round(total_parent_demand, 3),
+		"total_demand": round(total_demand, 3),
+		"denominator": round(denominator, 3),
+		"on_hand_status": f"{on_hand_pct_rounded:.2f}%" if on_hand_pct_rounded is not None else "N/A",
+		"on_hand_colour": colour,
+	}
