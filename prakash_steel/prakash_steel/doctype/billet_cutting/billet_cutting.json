@@ -170,6 +170,7 @@
   {
    "fieldname": "production_plan",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Production Plan",
    "link_filters": "[[\"Production Plan\",\"name\",\"like\",\"%Rolled%\"]]",
    "options": "Production Plan",
@@ -221,7 +222,8 @@
    "fieldtype": "Column Break"
   },
   {
-   "fetch_from": "production_plan.custom_shift_type",
+   "depends_on": "eval:doc.production_planning != null",
+   "fetch_from": "production_planning.shift_type",
    "fieldname": "shift_type",
    "fieldtype": "Data",
    "label": "Shift Type",
@@ -230,6 +232,7 @@
   {
    "fieldname": "billet",
    "fieldtype": "Select",
+   "hidden": 1,
    "in_list_view": 1,
    "label": "Billet Size",
    "read_only": 1
@@ -237,7 +240,7 @@
   {
    "fieldname": "production_planning",
    "fieldtype": "Link",
-   "label": "Production Planning",
+   "label": "Production Plan",
    "options": "Production Planning",
    "reqd": 1
   }
@@ -246,11 +249,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-18 11:30:57.790151",
+ "modified": "2026-06-08 15:33:12.389043",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Billet Cutting",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

@@ -10,12 +10,12 @@
   "billet_cutting_id",
   "production_plan",
   "production_planning",
-  "production_date",
   "shift_type",
   "column_break_tohi",
-  "amended_from",
+  "production_date",
   "time_from",
   "time_to",
+  "amended_from",
   "production_details_section",
   "finish_item",
   "finish_item_pcs",
@@ -222,6 +222,7 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.production_planning != null",
    "fetch_from": "production_plan.custom_shift_type",
    "fieldname": "shift_type",
    "fieldtype": "Data",
@@ -232,7 +233,7 @@
    "fetch_from": "billet_cutting_id.production_planning",
    "fieldname": "production_planning",
    "fieldtype": "Link",
-   "label": "Production Planning",
+   "label": "Production Plan",
    "options": "Production Planning",
    "read_only": 1
   }
@@ -241,11 +242,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-18 11:26:57.016453",
+ "modified": "2026-06-08 15:34:17.601896",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Hourly Production",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

@@ -13,12 +13,11 @@ def execute(filters=None):
 def get_columns():
 	return [
 		{"label": "Parent Item", "fieldname": "parent_item", "fieldtype": "Link", "options": "Item", "width": 180},
-		{"label": "BOM ID", "fieldname": "bom_id", "fieldtype": "Link", "options": "BOM", "width": 160},
-		{"label": "BOM Qty", "fieldname": "bom_qty", "fieldtype": "Float", "width": 90},
+		{"label": "BOM ID", "fieldname": "bom_id", "fieldtype": "Link", "options": "BOM", "width": 200},
 		{"label": "Default", "fieldname": "is_default", "fieldtype": "Check", "width": 80},
 		{"label": "Active", "fieldname": "is_active", "fieldtype": "Check", "width": 80},
-		{"label": "Child Item Code", "fieldname": "child_item_code", "fieldtype": "Link", "options": "Item", "width": 180},
-		{"label": "Child Qty", "fieldname": "child_qty", "fieldtype": "Float", "width": 90},
+		{"label": "Common Child Item Code", "fieldname": "child_item_code", "fieldtype": "Link", "options": "Item", "width": 200},
+		{"label": "Child Item Name", "fieldname": "child_item_name", "fieldtype": "Data", "width": 200},
 	]
 
 
@@ -38,19 +37,31 @@ def get_data(filters):
 		conditions.append("bom.is_active = %(is_active)s")
 		values["is_active"] = 1 if filters["is_active"] == "Yes" else 0
 
-	where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+	# Always include the duplicate-detection subquery condition
+	conditions.append("""
+		(bom.item, bi.item_code) IN (
+			SELECT bom2.item, bi2.item_code
+			FROM `tabBOM` bom2
+			JOIN `tabBOM Item` bi2 ON bi2.parent = bom2.name
+			GROUP BY bom2.item, bi2.item_code
+			HAVING COUNT(DISTINCT bom2.name) > 1
+		)
+	""")
 
+	where = "WHERE " + " AND ".join(conditions)
+
+	# Find (parent_item, child_item_code) pairs that appear in more than 1 BOM,
+	# then return each individual BOM row for those pairs.
 	return frappe.db.sql(f"""
 		SELECT
 			bom.item        AS parent_item,
 			bom.name        AS bom_id,
-			bom.quantity    AS bom_qty,
 			bom.is_default,
 			bom.is_active,
 			bi.item_code    AS child_item_code,
-			bi.qty          AS child_qty
+			bi.item_name    AS child_item_name
 		FROM `tabBOM` bom
-		LEFT JOIN `tabBOM Item` bi ON bi.parent = bom.name
+		JOIN `tabBOM Item` bi ON bi.parent = bom.name
 		{where}
-		ORDER BY bom.item, bom.name, bi.idx
+		ORDER BY bom.item, bi.item_code, bom.name
 	""", values, as_dict=True)

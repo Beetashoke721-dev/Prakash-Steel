@@ -24,6 +24,20 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 from prakash_steel.utils.lead_time import get_default_bom
 
 
+def get_draft_wo_map():
+	"""Returns {item_code: draft_wo_qty} — sum of qty from draft (docstatus=0) Work Orders."""
+	rows = frappe.db.sql(
+		"""
+		SELECT production_item AS item_code, SUM(qty) AS draft_wo_qty
+		FROM `tabWork Order`
+		WHERE docstatus = 0
+		GROUP BY production_item
+		""",
+		as_dict=True,
+	)
+	return {r.item_code: flt(r.draft_wo_qty) for r in rows}
+
+
 @frappe.whitelist()
 def get_item_breakdown(item_code):
 	item = frappe.db.get_value(
@@ -49,6 +63,7 @@ def get_item_breakdown(item_code):
 
 	stock_map = get_stock_map(item_codes)
 	wip_map = get_wip_map()
+	draft_wo_map = get_draft_wo_map()
 	mrq_map = get_mrq_map()
 	till_today_map, spike_map = get_qualified_demand_map()
 
@@ -67,6 +82,7 @@ def get_item_breakdown(item_code):
 
 	stock = flt(stock_map.get(item_code, 0))
 	wip = flt(wip_map.get(item_code, 0))
+	draft_wo = flt(draft_wo_map.get(item_code, 0))
 	mrq = flt(mrq_map.get(item_code, 0))
 
 	qualified_demand, _till_today, _spike = get_qualified_demand_for_item(
@@ -92,12 +108,12 @@ def get_item_breakdown(item_code):
 	# Buffer: display/OP-CP uses qualified_demand (delivery_date <= today + spike)
 	# Non-buffer: display/OP-CP uses all-time open SO
 	display_open_so = qualified_demand if is_buffer else item_open_so
-	remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
+	remaining_so_for_op_cp = max(0, display_open_so - stock - wip - draft_wo)
 	accumulated_batch_qty = 0.0
 
 	rows = []
 	for i in range(num_batches):
-		level = stock + wip + accumulated_batch_qty
+		level = stock + wip + draft_wo + accumulated_batch_qty
 
 		if is_buffer:
 			total = tog + qualified_demand
@@ -148,6 +164,7 @@ def get_item_breakdown(item_code):
 				"qty_per_row": math.ceil(qty_per_row),
 				"stock": math.ceil(stock),
 				"wip": math.ceil(wip),
+				"draft_wo": math.ceil(draft_wo),
 				"mrq": math.ceil(mrq),
 				"accumulated_batch_qty": math.ceil(accumulated_batch_qty),
 				"level": math.ceil(level),
@@ -380,6 +397,7 @@ def get_data(filters=None):
 	# Fetch shared data maps
 	stock_map = get_stock_map(item_codes)
 	wip_map = get_wip_map()
+	draft_wo_map = get_draft_wo_map()
 	open_po_map = get_open_po_map()
 	mrq_map = get_mrq_map()
 	till_today_map, spike_map = get_qualified_demand_map()
@@ -461,6 +479,7 @@ def get_data(filters=None):
 		batch_size = batch_size_map[item_code]
 		mrq = flt(mrq_map.get(item_code, 0))
 		wip = flt(wip_map.get(item_code, 0))
+		draft_wo = flt(draft_wo_map.get(item_code, 0))
 		open_po = flt(open_po_map.get(item_code, 0))
 
 		qualified_demand, till_today, spike = get_qualified_demand_for_item(
@@ -561,13 +580,12 @@ def get_data(filters=None):
 		# Buffer: open SO for display/OP-CP = qualified_demand (delivery_date <= today + spike)
 		# Non-buffer: open SO for display/OP-CP = all-time open SO (no date filter)
 		display_open_so = qualified_demand if is_buffer else item_open_so
-		remaining_so_for_op_cp = max(0, display_open_so - stock - wip)
+		remaining_so_for_op_cp = max(0, display_open_so - stock - wip - draft_wo)
 		accumulated_batch_qty = 0.0
 
 		for _i in range(num_batches):
-			# Colour: level = stock + wip + qty already produced in previous batches
-			# Mirrors open_mr_for_manufacture logic (prev_mr_qty = accumulated batches)
-			level = stock + wip + accumulated_batch_qty
+			# Colour: level = stock + submitted_wo + draft_wo + qty already produced in previous batches
+			level = stock + wip + draft_wo + accumulated_batch_qty
 			if is_buffer:
 				total = tog + qualified_demand
 				if level == 0:

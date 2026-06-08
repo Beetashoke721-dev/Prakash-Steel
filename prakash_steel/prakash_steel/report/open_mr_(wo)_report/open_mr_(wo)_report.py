@@ -8,6 +8,8 @@ from frappe import _
 from frappe.utils import flt
 
 from prakash_steel.prakash_steel.report.open_mr_for_manufacture.open_mr_for_manufacture import (
+	_PRIORITY_TO_COLOUR,
+	_STATUS_PRIORITY,
 	_buffer_colour,
 	_non_buffer_colour,
 	calculate_sku_type,
@@ -15,7 +17,6 @@ from prakash_steel.prakash_steel.report.open_mr_for_manufacture.open_mr_for_manu
 	get_open_so_map,
 	get_qualified_demand_map,
 	get_stock_map,
-	get_wip_map,
 )
 
 
@@ -130,7 +131,7 @@ def get_data(filters=None):
 
 	item_master_map = get_item_master_map(parent_item_codes)
 	stock_map = get_stock_map(parent_item_codes)
-	wip_map = get_wip_map(parent_item_codes)
+	wip_map = get_submitted_wo_map(parent_item_codes)
 	qd_map = get_qualified_demand_map(parent_item_codes, item_master_map)
 	so_map = get_open_so_map(parent_item_codes)
 	prev_wo_qty_map = get_previous_wo_qty_map(work_orders)
@@ -328,3 +329,145 @@ def get_previous_wo_qty_map(work_orders):
 			)
 		)
 	return result_map
+
+
+# ---------------------------------------------------------------------------
+# Submitted WO pending qty (used as WIP for draft WO level calculation)
+# ---------------------------------------------------------------------------
+
+
+def get_submitted_wo_map(item_codes):
+	"""
+	Returns {item_code: total_pending_qty} from submitted (docstatus=1) Work Orders
+	that are not Completed/Stopped/Cancelled/Closed.
+	This represents actual in-progress production (WIP) for the item.
+	"""
+	if not item_codes:
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			wo.production_item AS item_code,
+			SUM(GREATEST(0, wo.qty - IFNULL(wo.produced_qty, 0))) AS pending_qty
+		FROM `tabWork Order` wo
+		WHERE wo.docstatus = 1
+		  AND wo.status NOT IN ('Completed', 'Stopped', 'Cancelled', 'Closed')
+		  AND wo.production_item IN %s
+		GROUP BY wo.production_item
+		""",
+		(item_codes,),
+		as_dict=True,
+	)
+	return {r.item_code: flt(r.pending_qty) for r in rows}
+
+
+# ---------------------------------------------------------------------------
+# Debug API
+# ---------------------------------------------------------------------------
+
+
+@frappe.whitelist()
+def get_wo_item_breakdown(wo_name):
+	"""
+	Returns per-item breakdown for the given draft Work Order:
+	  buffer items  → stock, wip, tog, qualified_demand, previous_wo_qty, level, colour
+	  non-buffer    → stock, wip, previous_wo_qty, level, SO-level FIFO detail, colour
+	"""
+	wo = frappe.db.get_value(
+		"Work Order",
+		wo_name,
+		["name", "creation", "production_item", "qty", "docstatus"],
+		as_dict=True,
+	)
+	if not wo:
+		frappe.throw(f"Work Order {wo_name} not found.")
+
+	item_code = wo.production_item
+	item_codes = [item_code]
+
+	item_master_map = get_item_master_map(item_codes)
+	stock_map = get_stock_map(item_codes)
+	wip_map = get_submitted_wo_map(item_codes)
+	qd_map = get_qualified_demand_map(item_codes, item_master_map)
+	so_map = get_open_so_map(item_codes)
+
+	# Previous draft WO qty relative to this WO
+	all_open = frappe.db.sql(
+		"""
+		SELECT
+			wo2.name AS work_order,
+			wo2.creation,
+			wo2.production_item AS item_code,
+			wo2.qty AS pending_qty
+		FROM `tabWork Order` wo2
+		WHERE wo2.docstatus = 0
+		  AND wo2.production_item = %s
+		""",
+		(item_code,),
+		as_dict=True,
+	)
+	prev_qty = flt(sum(p.pending_qty for p in all_open if p.creation < wo.creation))
+
+	master = item_master_map.get(item_code, {"tog": 0.0, "buffer_flag": "Non-Buffer", "item_type": ""})
+	stock = flt(stock_map.get(item_code, 0))
+	wip = flt(wip_map.get(item_code, 0))
+	level = stock + wip + prev_qty
+	is_buffer = master["buffer_flag"] == "Buffer"
+
+	entry = {
+		"item_code": item_code,
+		"buffer_flag": master["buffer_flag"],
+		"sku_type": calculate_sku_type(master["buffer_flag"], master["item_type"]),
+		"stock": stock,
+		"wip": wip,
+		"previous_wo_qty": prev_qty,
+		"level": level,
+	}
+
+	if is_buffer:
+		tog = master["tog"]
+		qd = flt(qd_map.get(item_code, 0))
+		entry["tog"] = tog
+		entry["qualified_demand"] = qd
+		entry["colour"] = _buffer_colour(level, tog, qd)
+		entry["so_fifo_detail"] = []
+	else:
+		entry["tog"] = "N/A"
+		entry["qualified_demand"] = "N/A"
+		sos = so_map.get(item_code, [])
+		available = level
+		fifo_rows = []
+		worst_priority = 0
+
+		for so in sos:
+			required = flt(so["pending_qty"])
+			allocated = min(required, available)
+			shortage = required - allocated
+			available -= allocated
+			status = so["order_status"] or ""
+
+			if shortage > 0:
+				priority = _STATUS_PRIORITY.get(status, 0)
+				if priority > worst_priority:
+					worst_priority = priority
+
+			fifo_rows.append(
+				{
+					"delivery_date": str(so["delivery_date"]) if so["delivery_date"] else "",
+					"pending_qty": required,
+					"allocated": allocated,
+					"shortage": shortage,
+					"order_status": status,
+				}
+			)
+
+		colour = (
+			"Green"
+			if worst_priority == 0 and sos
+			else (_PRIORITY_TO_COLOUR.get(worst_priority, "") if worst_priority else "")
+		)
+		entry["colour"] = colour
+		entry["so_fifo_detail"] = fifo_rows
+
+	return [entry]
