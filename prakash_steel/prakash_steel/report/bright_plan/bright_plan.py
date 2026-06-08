@@ -665,7 +665,7 @@ def get_data(filters=None):
 					child_bom_qty = child_info["bom_qty"]
 					child_bom_quantity = child_info["bom_quantity"] or 1.0
 					normalized_qty = child_bom_qty / child_bom_quantity if child_bom_quantity else 0
-					child_requirement = math.ceil(net_order_rec * normalized_qty)
+					child_requirement = math.ceil(qty_per_row * normalized_qty)
 
 					row = base_row.copy()
 					row["child_item_code"] = child_info["item_code"]
