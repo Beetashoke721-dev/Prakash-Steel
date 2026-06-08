@@ -182,6 +182,41 @@ frappe.query_reports["PO Recomendation for PSP"] = {
 			};
 		}
 
+		// ── On Hand Status Calculator button ─────────────────────────────
+
+		// report.page.add_inner_button(__("On Hand Status Calculator"), function () {
+		// 		const d = new frappe.ui.Dialog({
+		// 			title: __("On Hand Status Calculator"),
+		// 			fields: [
+		// 				{
+		// 					label: __("Item Code"),
+		// 					fieldname: "item_code",
+		// 					fieldtype: "Link",
+		// 					options: "Item",
+		// 					reqd: 1,
+		// 				},
+		// 			],
+		// 			primary_action_label: __("Calculate"),
+		// 			primary_action({ item_code }) {
+		// 				if (!item_code) return;
+		// 				d.disable_primary_action();
+		// 				frappe.call({
+		// 					method: "prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.get_on_hand_status_breakdown",
+		// 					args: { item_code },
+		// 					callback(r) {
+		// 						d.enable_primary_action();
+		// 						if (!r.message) {
+		// 							frappe.msgprint(__("No data returned."));
+		// 							return;
+		// 						}
+		// 						show_on_hand_status_dialog(r.message);
+		// 					},
+		// 					error() { d.enable_primary_action(); },
+		// 				});
+		// 			},
+		// 		});
+		// 		d.show();
+		// 	});
 		// ── Priority Breakdown button ──────────────────────────────────────
 		// report.page.add_inner_button(__("Priority Breakdown"), function () {
 		// 	const d = new frappe.ui.Dialog({
@@ -420,6 +455,129 @@ function _fifo_table(rows) {
 		<thead><tr style="background:#eee;">${hdrs}</tr></thead>
 		<tbody>${trows}</tbody>
 	</table>`;
+}
+
+function show_on_hand_status_dialog(d) {
+	const e = v => frappe.utils.escape_html(String(v ?? "—"));
+	const n = v => (v === null || v === undefined) ? "—" : Number(v).toLocaleString();
+
+	const colour_badge = (colour) => {
+		if (!colour) return "—";
+		const map = { BLACK: ["#000", "#fff"], RED: ["#FF0000", "#fff"], YELLOW: ["#FFFF00", "#000"], GREEN: ["#00FF00", "#000"], WHITE: ["#fff", "#000"] };
+		const [bg, fg] = map[colour] || ["#eee", "#000"];
+		return `<span style="background:${bg};color:${fg};padding:2px 12px;border-radius:4px;font-weight:bold;font-size:13px;border:1px solid #ccc;">${colour}</span>`;
+	};
+
+	// ── Section 1: Item info ──────────────────────────────────────────────
+	const info_html = `
+		<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+			<tr><td style="padding:4px 10px;color:#888;font-size:12px;width:180px;">Item Code</td><td style="padding:4px 10px;font-size:13px;font-weight:bold;">${e(d.item_code)} — ${e(d.item_name)}</td></tr>
+			<tr><td style="padding:4px 10px;color:#888;font-size:12px;">Buffer Flag</td><td style="padding:4px 10px;font-size:12px;">${e(d.buffer_flag)} &nbsp;|&nbsp; Type: <b>${e(d.item_type)}</b></td></tr>
+		</table>`;
+
+	if (d.buffer_flag !== "Buffer") {
+		frappe.msgprint({ title: __("On Hand Status Calculator"), message: info_html + `<p style="color:#888;">On Hand Status is only calculated for <b>Buffer</b> items.</p>`, wide: true });
+		return;
+	}
+
+	// ── Section 2: Qualified Demand ───────────────────────────────────────
+	const threshold_note = d.threshold_triggered
+		? `<span style="color:#c0392b;font-size:11px;">⚠ Raw QD (${n(d.raw_qualified)}) &lt; Threshold (${n(d.spike_threshold_qty)}) → set to 0</span>`
+		: `<span style="color:#27ae60;font-size:11px;">✓ Raw QD (${n(d.raw_qualified)}) ≥ Threshold (${n(d.spike_threshold_qty)})</span>`;
+
+	const spike_rows_html = d.spike_sos && d.spike_sos.length
+		? d.spike_sos.map(s => `<tr><td style="padding:2px 8px;font-size:11px;">${e(s.so_name)}</td><td style="padding:2px 8px;font-size:11px;">${e(s.delivery_date)}</td><td style="padding:2px 8px;font-size:11px;">${n(s.qty)}</td></tr>`).join("")
+		: `<tr><td colspan="3" style="padding:4px 8px;font-size:11px;color:#aaa;">No spike SOs</td></tr>`;
+
+	const qd_html = `
+		<div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;padding:12px 16px;margin-bottom:12px;">
+			<h4 style="margin:0 0 8px;font-size:13px;color:#333;">① Qualified Demand</h4>
+			<table style="width:100%;border-collapse:collapse;">
+				<tr><td style="padding:3px 8px;color:#666;font-size:12px;width:220px;">Till Today (SO ≤ today)</td><td style="padding:3px 8px;font-size:12px;font-weight:bold;">${n(d.till_today)}</td></tr>
+				<tr><td style="padding:3px 8px;color:#666;font-size:12px;">Spike (next ${n(d.demand_horizon)} days)</td><td style="padding:3px 8px;font-size:12px;font-weight:bold;">${n(d.spike)}</td></tr>
+				<tr><td style="padding:3px 8px;color:#666;font-size:12px;">Raw QD (Till Today + Spike)</td><td style="padding:3px 8px;font-size:12px;">${n(d.raw_qualified)}</td></tr>
+				<tr><td style="padding:3px 8px;color:#666;font-size:12px;">Threshold (TOG ${n(d.tog)} × ${n(d.spike_threshold_pct)}%)</td><td style="padding:3px 8px;font-size:12px;">${n(d.spike_threshold_qty)}</td></tr>
+				<tr><td style="padding:3px 8px;color:#666;font-size:12px;">Threshold check</td><td style="padding:3px 8px;font-size:12px;">${threshold_note}</td></tr>
+				<tr style="background:#eef;"><td style="padding:4px 8px;font-size:13px;font-weight:bold;color:#333;">Qualified Demand</td><td style="padding:4px 8px;font-size:14px;font-weight:bold;color:#1a1aff;">${n(d.qualified_demand)}</td></tr>
+			</table>
+			${d.spike_sos && d.spike_sos.length ? `
+			<details style="margin-top:8px;"><summary style="font-size:11px;color:#555;cursor:pointer;">Spike SO Details</summary>
+			<table style="border-collapse:collapse;width:100%;margin-top:4px;">
+				<thead><tr style="background:#eee;"><th style="padding:2px 8px;font-size:11px;text-align:left;">SO</th><th style="padding:2px 8px;font-size:11px;text-align:left;">Delivery Date</th><th style="padding:2px 8px;font-size:11px;text-align:left;">Qty</th></tr></thead>
+				<tbody>${spike_rows_html}</tbody>
+			</table></details>` : ""}
+		</div>`;
+
+	// ── Section 3: Parent Demand ──────────────────────────────────────────
+	let parent_html = "";
+	if (d.parent_details && d.parent_details.length) {
+		const p_rows = d.parent_details.map(p => `
+			<tr style="border-bottom:1px solid #eee;">
+				<td style="padding:5px 8px;font-size:12px;font-weight:bold;">${e(p.parent_item)}</td>
+				<td style="padding:5px 8px;font-size:11px;color:#666;">${e(p.buffer_flag)}</td>
+				<td style="padding:5px 8px;font-size:11px;">${e(p.demand_label)}</td>
+				<td style="padding:5px 8px;font-size:11px;text-align:right;">${n(p.base_order_rec)}</td>
+				<td style="padding:5px 8px;font-size:11px;text-align:right;">${p.moq > 0 ? `MOQ=${n(p.moq)}` : p.batch_size > 0 ? `Batch=${n(p.batch_size)}` : "—"}</td>
+				<td style="padding:5px 8px;font-size:11px;font-weight:bold;text-align:right;">${n(p.net_order_rec)}</td>
+				<td style="padding:5px 8px;font-size:11px;text-align:right;">${n(p.child_qty)} / ${n(p.bom_qty)} = ${n(p.ratio)}</td>
+				<td style="padding:5px 8px;font-size:12px;font-weight:bold;color:#c0392b;text-align:right;">${n(p.demand_contributed)}</td>
+			</tr>`).join("");
+
+		parent_html = `
+			<div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;padding:12px 16px;margin-bottom:12px;">
+				<h4 style="margin:0 0 8px;font-size:13px;color:#333;">② Parent Demand (via BOM)</h4>
+				<div style="overflow-x:auto;">
+				<table style="border-collapse:collapse;width:100%;min-width:700px;">
+					<thead><tr style="background:#eee;">
+						<th style="padding:4px 8px;font-size:11px;text-align:left;">Parent Item</th>
+						<th style="padding:4px 8px;font-size:11px;text-align:left;">Type</th>
+						<th style="padding:4px 8px;font-size:11px;text-align:left;">Order Rec Formula</th>
+						<th style="padding:4px 8px;font-size:11px;text-align:right;">Base Rec</th>
+						<th style="padding:4px 8px;font-size:11px;text-align:right;">MOQ/Batch</th>
+						<th style="padding:4px 8px;font-size:11px;text-align:right;">Net Rec</th>
+						<th style="padding:4px 8px;font-size:11px;text-align:right;">BOM Ratio</th>
+						<th style="padding:4px 8px;font-size:11px;text-align:right;">Demand →</th>
+					</tr></thead>
+					<tbody>${p_rows}</tbody>
+					<tfoot><tr style="background:#eef;">
+						<td colspan="7" style="padding:4px 8px;font-size:13px;font-weight:bold;text-align:right;">Total Parent Demand</td>
+						<td style="padding:4px 8px;font-size:14px;font-weight:bold;color:#c0392b;text-align:right;">${n(d.total_parent_demand)}</td>
+					</tr></tfoot>
+				</table></div>
+			</div>`;
+	} else {
+		parent_html = `
+			<div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;padding:10px 16px;margin-bottom:12px;">
+				<h4 style="margin:0 0 4px;font-size:13px;color:#333;">② Parent Demand</h4>
+				<p style="color:#aaa;font-size:12px;margin:0;">No active BOMs use this item — parent demand = 0</p>
+			</div>`;
+	}
+
+	// ── Section 4: Final calculation ──────────────────────────────────────
+	const final_html = `
+		<div style="background:#f0f8ff;border:2px solid #aad4f5;border-radius:6px;padding:14px 16px;">
+			<h4 style="margin:0 0 10px;font-size:13px;color:#333;">③ On Hand Status Calculation</h4>
+			<table style="width:100%;border-collapse:collapse;">
+				<tr><td style="padding:3px 8px;color:#555;font-size:12px;width:260px;">TOG</td><td style="padding:3px 8px;font-size:13px;font-weight:bold;">${n(d.tog)}</td></tr>
+				<tr><td style="padding:3px 8px;color:#555;font-size:12px;">Qualified Demand</td><td style="padding:3px 8px;font-size:12px;">${n(d.qualified_demand)}</td></tr>
+				<tr><td style="padding:3px 8px;color:#555;font-size:12px;">Total Parent Demand</td><td style="padding:3px 8px;font-size:12px;">${n(d.total_parent_demand)}</td></tr>
+				<tr style="border-top:1px solid #ccc;"><td style="padding:4px 8px;color:#555;font-size:12px;">Denominator (TOG + QD + Parent)</td><td style="padding:4px 8px;font-size:13px;font-weight:bold;">${n(d.denominator)}</td></tr>
+				<tr><td style="padding:3px 8px;color:#555;font-size:12px;">On Hand Stock</td><td style="padding:3px 8px;font-size:13px;font-weight:bold;">${n(d.on_hand_stock)}</td></tr>
+			</table>
+			<div style="margin-top:10px;padding:8px 12px;background:#fff;border-radius:4px;font-size:13px;">
+				<code style="color:#333;">On Hand Status = (${n(d.on_hand_stock)} / ${n(d.denominator)}) × 100 = <b>${e(d.on_hand_status)}</b></code>
+			</div>
+			<div style="margin-top:10px;display:flex;align-items:center;gap:12px;">
+				<span style="font-size:13px;font-weight:bold;color:#333;">Colour:</span>
+				${colour_badge(d.on_hand_colour)}
+			</div>
+		</div>`;
+
+	frappe.msgprint({
+		title: __("On Hand Status Calculator — {0}", [d.item_code]),
+		message: info_html + qd_html + parent_html + final_html,
+		wide: true,
+	});
 }
 
 function show_priority_breakdown_dialog(d) {

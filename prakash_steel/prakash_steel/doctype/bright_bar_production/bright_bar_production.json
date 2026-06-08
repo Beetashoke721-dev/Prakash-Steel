@@ -12,8 +12,8 @@
   "production_planning",
   "column_break_diqx",
   "production_date",
-  "shift_type",
   "custom_posting_time",
+  "shift_type",
   "raw_material_details_section",
   "raw_material",
   "material",
@@ -77,6 +77,7 @@
   {
    "fieldname": "raw_material",
    "fieldtype": "Select",
+   "hidden": 1,
    "label": "Raw Material",
    "read_only": 1
   },
@@ -103,6 +104,7 @@
   {
    "fieldname": "production_plan",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Production Plan",
    "link_filters": "[[\"Production Plan\",\"name\",\"like\",\"%Bright%\"]]",
    "options": "Production Plan",
@@ -146,6 +148,7 @@
   {
    "fieldname": "finished_good",
    "fieldtype": "Select",
+   "hidden": 1,
    "label": "Finished Good",
    "read_only": 1
   },
@@ -269,7 +272,8 @@
    "reqd": 1
   },
   {
-   "fetch_from": "production_plan.custom_shift_type",
+   "depends_on": "eval:doc.production_planning != null",
+   "fetch_from": "production_planning.shift_type",
    "fieldname": "shift_type",
    "fieldtype": "Data",
    "label": "Shift Type",
@@ -284,7 +288,7 @@
   {
    "fieldname": "production_planning",
    "fieldtype": "Link",
-   "label": "Production plan",
+   "label": "Production Plan",
    "link_filters": "[[\"Production Planning\",\"name\",\"like\",\"%Bright%\"]]",
    "options": "Production Planning"
   },
@@ -305,11 +309,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-18 15:32:38.536308",
+ "modified": "2026-06-08 15:31:42.778287",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Bright Bar Production",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

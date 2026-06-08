@@ -28,7 +28,8 @@ function show_bright_breakdown(item_code, rows) {
 			<span><b>Item:</b> ${frappe.utils.escape_html(item_code)}</span>
 			<span><b>SKU Type:</b> ${r0.sku_type}</span>
 			<span><b>Stock:</b> ${r0.stock}</span>
-			<span><b>WIP:</b> ${r0.wip}</span>
+			<span><b>WIP (Submitted WO):</b> ${r0.wip}</span>
+			<span><b>Draft WO:</b> ${r0.draft_wo}</span>
 			<span><b>MRQ:</b> ${r0.mrq}</span>
 			<span><b>Open SO:</b> ${r0.open_so}</span>
 			${r0.is_buffer ? `<span><b>TOG:</b> ${r0.tog}</span>` : ""}
@@ -40,7 +41,7 @@ function show_bright_breakdown(item_code, rows) {
 			<span><b>Batch Size:</b> ${r0.batch_size}</span>
 		</div>`;
 
-	const hdrs = ["Row", "Qty", "Accum. Prev", "Level (S+W+P)", "On Hand Colour", "Reason", "Rem. SO before", "OP/CP", "Priority Colour"]
+	const hdrs = ["Row", "Qty", "Accum. Prev", "WIP (Sub WO)", "Draft WO", "Level (S+W+DW+P)", "On Hand Colour", "Reason", "Rem. SO before", "OP/CP", "Priority Colour"]
 		.map(h => `<th style="padding:5px 8px;border-bottom:2px solid #ddd;text-align:left;font-size:12px;white-space:nowrap;">${h}</th>`)
 		.join("");
 
@@ -66,6 +67,8 @@ function show_bright_breakdown(item_code, rows) {
 			<td style="padding:4px 8px;font-size:12px;font-weight:bold;">${r.batch_no}</td>
 			<td style="padding:4px 8px;font-size:12px;">${r.qty_per_row}</td>
 			<td style="padding:4px 8px;font-size:12px;">${r.accumulated_batch_qty}</td>
+			<td style="padding:4px 8px;font-size:12px;">${r.wip}</td>
+			<td style="padding:4px 8px;font-size:12px;">${r.draft_wo}</td>
 			<td style="padding:4px 8px;font-size:12px;font-weight:bold;">${r.level}</td>
 			<td style="padding:4px 8px;font-size:12px;">${bright_colour_badge(r.on_hand_colour)}</td>
 			<td style="padding:4px 8px;font-size:12px;color:#555;">${frappe.utils.escape_html(r.colour_reason || "")}</td>
@@ -94,40 +97,40 @@ frappe.query_reports["Bright Plan"] = {
 	filters: [],
 
 	onload(report) {
-		// report.page.add_inner_button(__("Debug Item Breakdown"), () => {
-		// 	const d = new frappe.ui.Dialog({
-		// 		title: __("Debug Item Breakdown"),
-		// 		fields: [
-		// 			{
-		// 				label: __("Item Code"),
-		// 				fieldname: "item_code",
-		// 				fieldtype: "Link",
-		// 				options: "Item",
-		// 				reqd: 1,
-		// 				get_query() {
-		// 					return { filters: { custom_item_type: "BB" } };
-		// 				},
-		// 			},
-		// 		],
-		// 		primary_action_label: __("Show Breakdown"),
-		// 		primary_action({ item_code }) {
-		// 			if (!item_code) return;
-		// 			d.disable_primary_action();
-		// 			frappe.call({
-		// 				method: "prakash_steel.prakash_steel.report.bright_plan.bright_plan.get_item_breakdown",
-		// 				args: { item_code },
-		// 				callback(r) {
-		// 					d.enable_primary_action();
-		// 					show_bright_breakdown(item_code, r.message || []);
-		// 				},
-		// 				error() {
-		// 					d.enable_primary_action();
-		// 				},
-		// 			});
-		// 		},
-		// 	});
-		// 	d.show();
-		// });
+		report.page.add_inner_button(__("Debug Item Breakdown"), () => {
+			const d = new frappe.ui.Dialog({
+				title: __("Debug Item Breakdown"),
+				fields: [
+					{
+						label: __("Item Code"),
+						fieldname: "item_code",
+						fieldtype: "Link",
+						options: "Item",
+						reqd: 1,
+						get_query() {
+							return { filters: { custom_item_type: "BB" } };
+						},
+					},
+				],
+				primary_action_label: __("Show Breakdown"),
+				primary_action({ item_code }) {
+					if (!item_code) return;
+					d.disable_primary_action();
+					frappe.call({
+						method: "prakash_steel.prakash_steel.report.bright_plan.bright_plan.get_item_breakdown",
+						args: { item_code },
+						callback(r) {
+							d.enable_primary_action();
+							show_bright_breakdown(item_code, r.message || []);
+						},
+						error() {
+							d.enable_primary_action();
+						},
+					});
+				},
+			});
+			d.show();
+		});
 	},
 
 	formatter: function (value, row, column, data, default_formatter) {
