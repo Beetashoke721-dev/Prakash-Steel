@@ -1505,7 +1505,7 @@ def get_data(filters=None):
 				base_order_rec = tog + total_demand - on_hand_stock - wip_open_po_combined
 			final_order_rec = max(0, base_order_rec - mrq)
 		else:
-			open_so_for_calc = qualify_demand  # Use qualified demand (Open SO with delivery_date <= today)
+			open_so_for_calc = open_so  # Use all-time open SO (so_qty_map) for non-buffer
 			requirement = open_so_for_calc + parent_demand
 			if sku_type in ["PTO", "BOTO"]:
 				# For PTO/BOTO: subtract open_po separately (existing logic)
@@ -1522,7 +1522,7 @@ def get_data(filters=None):
 
 		# Calculate net order recommendation for breakdown
 		net_order_rec_breakdown = calculate_net_order_recommendation(final_order_rec, moq, batch_size)
-		open_so_for_breakdown = qualify_demand if not is_item_buffer else open_so
+		open_so_for_breakdown = open_so
 		calculation_breakdown = build_calculation_breakdown_po_report(
 			item_code,
 			item_buffer_flag,
