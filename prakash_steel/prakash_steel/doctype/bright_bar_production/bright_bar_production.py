@@ -76,11 +76,13 @@ class BrightBarProduction(Document):
 						"item_code": self.end_cutting_item,
 						"qty": flt(self.end_cutting_weight),
 						"s_warehouse": "",
-						"t_warehouse": self.fg_target_warehouse,
+						"t_warehouse": self.rm_source_warehouse,
 						"stock_uom": rm_stock_uom,
 						"uom": rm_stock_uom,
 						"conversion_factor": 1.0,
 						"is_finished_item": 0,
+						"is_scrap_item": 1,
+						"is_legacy_scrap_item": 1,
 					}
 				)
 
