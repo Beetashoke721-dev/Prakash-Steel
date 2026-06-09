@@ -180,12 +180,12 @@ def get_notification_recipients():
 
 
 @frappe.whitelist()
-def make_purchase_receipt(source_name, target_doc=None):
+def make_purchase_receipt(source_name, target_doc=None, args=None):
 	from erpnext.buying.doctype.purchase_order.purchase_order import (
 		make_purchase_receipt as _make_purchase_receipt,
 	)
 
-	doc = _make_purchase_receipt(source_name, target_doc)
+	doc = _make_purchase_receipt(source_name, target_doc, args)
 
 	if not (doc and doc.items):
 		return doc
