@@ -367,8 +367,20 @@ def export_so_xlsx(snapshot_date, item_code=None):
 	data = result["data"]
 
 	rows = [[col["label"] for col in columns]]
+	date_fields = {col["fieldname"] for col in columns if col.get("fieldtype") == "Date"}
 	for row in data:
-		rows.append([row.get(col["fieldname"], "") for col in columns])
+		row_values = []
+		for col in columns:
+			val = row.get(col["fieldname"], "")
+			if val and col["fieldname"] in date_fields:
+				from datetime import date, datetime
+				if isinstance(val, (date, datetime)):
+					val = val.strftime("%d-%m-%Y")
+				else:
+					parts = str(val)[:10].split("-")
+					val = f"{parts[2]}-{parts[1]}-{parts[0]}" if len(parts) == 3 else str(val)[:10]
+			row_values.append(val)
+		rows.append(row_values)
 
 	xlsx_file = make_xlsx(rows, "Open SO Report")
 	return {
@@ -465,8 +477,20 @@ def export_open_po_xlsx(snapshot_date, item_code=None):
 	data = result["data"]
 
 	rows = [[col["label"] for col in columns]]
+	date_fields = {col["fieldname"] for col in columns if col.get("fieldtype") == "Date"}
 	for row in data:
-		rows.append([row.get(col["fieldname"], "") for col in columns])
+		row_values = []
+		for col in columns:
+			val = row.get(col["fieldname"], "")
+			if val and col["fieldname"] in date_fields:
+				from datetime import date, datetime
+				if isinstance(val, (date, datetime)):
+					val = val.strftime("%d-%m-%Y")
+				else:
+					parts = str(val)[:10].split("-")
+					val = f"{parts[2]}-{parts[1]}-{parts[0]}" if len(parts) == 3 else str(val)[:10]
+			row_values.append(val)
+		rows.append(row_values)
 
 	xlsx_file = make_xlsx(rows, "Open PO Report")
 	return {
