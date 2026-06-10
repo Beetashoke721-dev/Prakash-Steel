@@ -244,8 +244,12 @@ def _create_attendance(attendance_list, employee_map):
 			skipped += 1
 			continue
 
-		_insert_and_submit_attendance(employee, company, att_date, rec)
-		success += 1
+		try:
+			_insert_and_submit_attendance(employee, company, att_date, rec)
+			success += 1
+		except Exception as e:
+			frappe.logger().error(f"[ESSL] Attendance failed for {employee} on {att_date}: {e}")
+			failed += 1
 
 	frappe.db.commit()
 	frappe.logger().info(
@@ -320,6 +324,8 @@ def sync_essl_checkins(from_dt=None, to_dt=None):
 		from_dt = from_dt or yesterday.strftime("%Y-%m-%d") + " 00:00:00"
 		to_dt   = to_dt   or yesterday.strftime("%Y-%m-%d") + " 23:59:59"
 
+	att_date = from_dt.split(" ")[0]  # "YYYY-MM-DD"
+
 	# Convert to ESSL date format (YYYY/MM/DD HH:MM)
 	essl_from = datetime.strptime(from_dt, "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M")
 	essl_to   = datetime.strptime(to_dt,   "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M")
@@ -348,7 +354,9 @@ def sync_essl_checkins(from_dt=None, to_dt=None):
 
 	if not all_punches:
 		_update_last_synced()
-		return {"message": "No punches found for the given date range"}
+		employee_map = _get_employee_map()
+		absent_result = _mark_absent_employees(set(), employee_map, att_date)
+		return {"message": "No punches found for the given date range", **absent_result}
 
 	checkins, attendance_list = _process_punches(all_punches)
 	employee_map = _get_employee_map()
@@ -356,8 +364,58 @@ def sync_essl_checkins(from_dt=None, to_dt=None):
 	checkin_result = _create_checkins(checkins, employee_map)
 	att_result = _create_attendance(attendance_list, employee_map)
 
+	punched_user_ids = {rec["user_id"] for rec in attendance_list}
+	absent_result = _mark_absent_employees(punched_user_ids, employee_map, att_date)
+
 	_update_last_synced()
-	return {**checkin_result, **att_result}
+	return {**checkin_result, **att_result, **absent_result}
+
+
+# ---------------------------------------------------------------------------
+# Mark Absent for employees with no punch data
+# ---------------------------------------------------------------------------
+
+def _mark_absent_employees(punched_user_ids, employee_map, att_date):
+	"""
+	For every ESSL-mapped employee NOT in punched_user_ids, create a submitted
+	Absent attendance record (if one doesn't already exist for that date).
+	"""
+	success = skipped = failed = 0
+
+	for user_id, emp in employee_map.items():
+		if user_id in punched_user_ids:
+			continue  # already handled by _create_attendance
+
+		employee = emp["name"]
+		company  = emp["company"]
+
+		existing = frappe.db.get_value(
+			"Attendance",
+			{"employee": employee, "attendance_date": att_date, "docstatus": ["!=", 2]},
+			"name",
+		)
+		if existing:
+			skipped += 1
+			continue
+
+		try:
+			doc = frappe.get_doc({
+				"doctype": "Attendance",
+				"employee": employee,
+				"attendance_date": att_date,
+				"company": company,
+				"status": "Absent",
+			})
+			doc.insert(ignore_permissions=True)
+			doc.submit()
+			success += 1
+		except Exception as e:
+			frappe.logger().error(f"[ESSL] Absent marking failed for {employee} on {att_date}: {e}")
+			failed += 1
+
+	frappe.db.commit()
+	frappe.logger().info(f"[ESSL] Absent → marked: {success}, skipped: {skipped}, failed: {failed}")
+	return {"absent_success": success, "absent_skipped": skipped, "absent_failed": failed}
 
 
 def _update_last_synced():
