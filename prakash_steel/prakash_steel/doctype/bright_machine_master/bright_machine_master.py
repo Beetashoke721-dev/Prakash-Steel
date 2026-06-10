@@ -27,6 +27,8 @@ class BrightMachineMaster(Document):
 
 	def validate_is_default(self):
 		rows = self.machine_details or []
+		if not rows:
+			return
 		default_rows = [row for row in rows if row.is_default]
 
 		if len(default_rows) != 1:
