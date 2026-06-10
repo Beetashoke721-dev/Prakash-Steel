@@ -226,13 +226,21 @@ def _create_attendance(attendance_list, employee_map):
 		)
 
 		if existing:
-			# Already exists — update the custom time fields
-			in_dt  = datetime.strptime(rec["in_time"],  "%Y-%m-%d %H:%M:%S") if rec["in_time"]  else None
-			out_dt = datetime.strptime(rec["out_time"], "%Y-%m-%d %H:%M:%S") if rec["out_time"] else None
+			# Already exists — update status + custom time fields
+			has_out = bool(rec["out_time"])
+			in_dt   = datetime.strptime(rec["in_time"],  "%Y-%m-%d %H:%M:%S") if rec["in_time"] else None
+			out_dt  = datetime.strptime(rec["out_time"], "%Y-%m-%d %H:%M:%S") if has_out else None
 			wh = round((out_dt - in_dt).total_seconds() / 3600, 2) if (in_dt and out_dt and out_dt > in_dt) else 0.0
+			frappe.db.set_value("Attendance", existing.name, "status", "Present" if has_out else "Absent")
 			frappe.db.set_value("Attendance", existing.name, "custom_punch_in_time", rec["in_time"])
-			frappe.db.set_value("Attendance", existing.name, "custom_punch_out_time", rec["out_time"])
 			frappe.db.set_value("Attendance", existing.name, "custom_working_hours", wh)
+			if has_out:
+				frappe.db.set_value("Attendance", existing.name, "custom_punch_out_time", rec["out_time"])
+			else:
+				frappe.db.sql(
+					"UPDATE `tabAttendance` SET `custom_punch_out_time` = NULL WHERE `name` = %s",
+					existing.name,
+				)
 			skipped += 1
 			continue
 
@@ -248,28 +256,38 @@ def _create_attendance(attendance_list, employee_map):
 
 def _insert_and_submit_attendance(employee, company, att_date, rec):
 	"""Create a submitted Attendance record with custom punch time fields."""
+	has_out   = bool(rec["out_time"])
+	status    = "Present" if has_out else "Absent"
+
 	in_dt  = datetime.strptime(rec["in_time"],  "%Y-%m-%d %H:%M:%S") if rec["in_time"]  else None
-	out_dt = datetime.strptime(rec["out_time"], "%Y-%m-%d %H:%M:%S") if rec["out_time"] else None
+	out_dt = datetime.strptime(rec["out_time"], "%Y-%m-%d %H:%M:%S") if has_out else None
+	working_hours = round((out_dt - in_dt).total_seconds() / 3600, 2) if (in_dt and out_dt and out_dt > in_dt) else 0.0
 
-	if in_dt and out_dt and out_dt > in_dt:
-		working_hours = round((out_dt - in_dt).total_seconds() / 3600, 2)
-	else:
-		working_hours = 0.0
-
-	doc = frappe.get_doc({
+	doc_data = {
 		"doctype": "Attendance",
 		"employee": employee,
 		"attendance_date": att_date,
 		"company": company,
-		"status": "Present",
+		"status": status,
 		"custom_punch_in_time": rec["in_time"],
-		"custom_punch_out_time": rec["out_time"],
-	})
+	}
+	if has_out:
+		doc_data["custom_punch_out_time"] = rec["out_time"]
+
+	doc = frappe.get_doc(doc_data)
 	doc.insert(ignore_permissions=True)
 	doc.submit()
 
-	# Use db.set_value to bypass any controller that may reset custom float fields
+	# Always write via db.set_value to bypass field defaults set by Frappe
 	frappe.db.set_value("Attendance", doc.name, "custom_working_hours", working_hours)
+	if has_out:
+		frappe.db.set_value("Attendance", doc.name, "custom_punch_out_time", rec["out_time"])
+	else:
+		# frappe.db.set_value skips None in dicts — use raw SQL to force NULL
+		frappe.db.sql(
+			"UPDATE `tabAttendance` SET `custom_punch_out_time` = NULL WHERE `name` = %s",
+			doc.name,
+		)
 
 
 # ---------------------------------------------------------------------------
