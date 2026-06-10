@@ -31,7 +31,32 @@ class CustomStockEntry(StockEntry):
         
         # Call parent validate first
         super().validate()
-        
+
+        # For Manufacture entries: if ERPNext calculated a negative basic_rate for the FG
+        # item (happens when RM has zero cost and scrap item has an existing valuation),
+        # zero out the scrap item rates and recalculate FG rate so validation passes.
+        if self.purpose in ("Manufacture", "Repack"):
+            has_negative_fg = any(
+                flt(item.basic_rate) < 0 and item.is_finished_item
+                for item in self.items
+            )
+            if has_negative_fg:
+                # Zero scrap/by-product output items (have t_warehouse, no s_warehouse, not FG)
+                for item in self.items:
+                    if not item.is_finished_item and item.t_warehouse and not item.s_warehouse:
+                        item.basic_rate = 0
+                        item.basic_amount = 0
+                # Recalculate FG basic_rate from RM cost only (scrap now = 0)
+                rm_cost = sum(
+                    flt(item.basic_amount)
+                    for item in self.items
+                    if item.s_warehouse and not item.t_warehouse
+                )
+                for item in self.items:
+                    if item.is_finished_item and flt(item.qty):
+                        item.basic_rate = rm_cost / flt(item.qty)
+                        item.basic_amount = flt(item.basic_rate) * flt(item.qty)
+
         # Check stock availability during save (docstatus 0) and submit (docstatus 1)
         print("[CONSOLE] Calling validate_stock_availability()...")
         self.validate_stock_availability()
