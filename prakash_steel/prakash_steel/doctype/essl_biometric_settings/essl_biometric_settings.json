@@ -1,6 +1,6 @@
 {
  "actions": [],
- "creation": "2026-06-04 00:00:00.000000",
+ "creation": "2026-06-04 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -8,28 +8,30 @@
   "username",
   "password",
   "section_sync",
-  "sync_interval_hours",
   "last_synced_on",
   "section_devices",
   "devices"
  ],
  "fields": [
   {
+   "description": "e.g. http://www.esslcloud.com/PSPPL/webapiservice.asmx",
    "fieldname": "api_url",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "API URL",
-   "reqd": 1,
-   "description": "e.g. http://www.esslcloud.com/PSPPL/webapiservice.asmx"
+   "reqd": 1
   },
   {
    "fieldname": "username",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Username",
    "reqd": 1
   },
   {
    "fieldname": "password",
    "fieldtype": "Password",
+   "in_list_view": 1,
    "label": "Password",
    "reqd": 1
   },
@@ -37,13 +39,6 @@
    "fieldname": "section_sync",
    "fieldtype": "Section Break",
    "label": "Sync Settings"
-  },
-  {
-   "default": "1",
-   "fieldname": "sync_interval_hours",
-   "fieldtype": "Int",
-   "label": "Sync Interval (Hours)",
-   "description": "How many hours back to fetch logs on each scheduled run"
   },
   {
    "fieldname": "last_synced_on",
@@ -67,7 +62,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-04 12:00:00.000000",
+ "modified": "2026-06-08 11:26:21.013390",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "ESSL Biometric Settings",
@@ -91,6 +86,7 @@
   }
  ],
  "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
