@@ -126,9 +126,7 @@ doc_events = {
 scheduler_events = {
 	"cron": {
 		# Sync ESSL biometric punches daily at 1:00 AM (syncs yesterday's full day)
-		"0 1 * * *": [
-			"prakash_steel.utils.essl_biometric.sync_essl_checkins"
-		],
+		"53 10 * * *": ["prakash_steel.utils.essl_biometric.sync_essl_checkins"],
 		# Runs daily at 14:52 server time
 		"05 08 * * *": [
 			"prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.save_daily_on_hand_colour"
