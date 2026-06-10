@@ -599,6 +599,21 @@ function handle_min_order_qty_batch_size_exclusivity(frm) {
 }
 
 
+frappe.ui.form.on("CS Tog table", {
+    top_of_green: function(frm, cdt, cdn) {
+        const row = locals[cdt][cdn];
+        const top_of_green = row.top_of_green || 0;
+
+        if (top_of_green > 0) {
+            frappe.model.set_value(cdt, cdn, "top_of_yellow", Math.ceil((2 / 3) * top_of_green));
+            frappe.model.set_value(cdt, cdn, "top_of_red", Math.ceil((1 / 3) * top_of_green));
+        } else {
+            frappe.model.set_value(cdt, cdn, "top_of_yellow", null);
+            frappe.model.set_value(cdt, cdn, "top_of_red", null);
+        }
+    }
+});
+
 // Override erpnext.item.make_dashboard to use custom method that excludes custom_closed SO items
 frappe.provide("erpnext.item");
 $.extend(erpnext.item, {
