@@ -1,0 +1,35 @@
+{
+ "content": null,
+ "creation": "2026-06-11 11:37:47.146345",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-06-11 11:37:47.146345",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "psp-attendence-page",
+ "owner": "Administrator",
+ "page_name": "psp-attendence-page",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "Administrator"
+  },
+  {
+   "role": "Purchase Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Psp Attendence Summary"
+}
