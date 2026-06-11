@@ -21,6 +21,7 @@ import requests
 # SOAP API helpers
 # ---------------------------------------------------------------------------
 
+
 def _build_soap_body(from_dt, to_dt, serial, username, password):
 	return f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -82,18 +83,21 @@ def _parse_logs(xml_text, device_serial, device_label):
 			ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
 		except ValueError:
 			continue
-		punches.append({
-			"user_id": user_id,
-			"timestamp": ts,
-			"device_serial": device_serial,
-			"device_label": device_label,
-		})
+		punches.append(
+			{
+				"user_id": user_id,
+				"timestamp": ts,
+				"device_serial": device_serial,
+				"device_label": device_label,
+			}
+		)
 	return punches
 
 
 # ---------------------------------------------------------------------------
 # Group punches → IN/OUT checkins + attendance summary
 # ---------------------------------------------------------------------------
+
 
 def _process_punches(all_punches):
 	"""
@@ -116,19 +120,23 @@ def _process_punches(all_punches):
 		last = entries[-1]
 
 		# --- Employee Checkin records ---
-		checkins.append({
-			"user_id": user_id,
-			"timestamp": first["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
-			"log_type": "IN",
-			"device_label": first["device_label"],
-		})
-		if last["timestamp"] != first["timestamp"]:
-			checkins.append({
+		checkins.append(
+			{
 				"user_id": user_id,
-				"timestamp": last["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
-				"log_type": "OUT",
-				"device_label": last["device_label"],
-			})
+				"timestamp": first["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+				"log_type": "IN",
+				"device_label": first["device_label"],
+			}
+		)
+		if last["timestamp"] != first["timestamp"]:
+			checkins.append(
+				{
+					"user_id": user_id,
+					"timestamp": last["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+					"log_type": "OUT",
+					"device_label": last["device_label"],
+				}
+			)
 
 		# --- Attendance summary ---
 		out_time = last["timestamp"] if last["timestamp"] != first["timestamp"] else None
@@ -137,13 +145,15 @@ def _process_punches(all_punches):
 			diff = last["timestamp"] - first["timestamp"]
 			working_hours = round(diff.total_seconds() / 3600, 2)
 
-		attendance.append({
-			"user_id": user_id,
-			"date": date_key,
-			"in_time": first["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
-			"out_time": last["timestamp"].strftime("%Y-%m-%d %H:%M:%S") if out_time else None,
-			"working_hours": working_hours,
-		})
+		attendance.append(
+			{
+				"user_id": user_id,
+				"date": date_key,
+				"in_time": first["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+				"out_time": last["timestamp"].strftime("%Y-%m-%d %H:%M:%S") if out_time else None,
+				"working_hours": working_hours,
+			}
+		)
 
 	return checkins, attendance
 
@@ -151,6 +161,7 @@ def _process_punches(all_punches):
 # ---------------------------------------------------------------------------
 # Employee map
 # ---------------------------------------------------------------------------
+
 
 def _get_employee_map():
 	"""Return dict { essl_id_str: {name, company} } for all employees."""
@@ -161,13 +172,15 @@ def _get_employee_map():
 	)
 	return {
 		str(r.custom_essl_employee_id).strip(): {"name": r.name, "company": r.company}
-		for r in rows if r.custom_essl_employee_id
+		for r in rows
+		if r.custom_essl_employee_id
 	}
 
 
 # ---------------------------------------------------------------------------
 # Create Employee Checkins
 # ---------------------------------------------------------------------------
+
 
 def _create_checkins(checkins, employee_map):
 	success = failed = skipped = 0
@@ -184,13 +197,15 @@ def _create_checkins(checkins, employee_map):
 			continue
 
 		try:
-			frappe.get_doc({
-				"doctype": "Employee Checkin",
-				"employee": emp["name"],
-				"time": log["timestamp"],
-				"log_type": log["log_type"],
-				"device_id": log["device_label"],
-			}).insert(ignore_permissions=True)
+			frappe.get_doc(
+				{
+					"doctype": "Employee Checkin",
+					"employee": emp["name"],
+					"time": log["timestamp"],
+					"log_type": log["log_type"],
+					"device_id": log["device_label"],
+				}
+			).insert(ignore_permissions=True)
 			success += 1
 		except Exception as e:
 			frappe.logger().error(f"[ESSL] Checkin failed for {emp['name']} at {log['timestamp']}: {e}")
@@ -202,8 +217,22 @@ def _create_checkins(checkins, employee_map):
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _seconds_to_hhmmss(total_seconds):
+	"""Convert total seconds to HH:MM:SS string for Time field."""
+	h = total_seconds // 3600
+	m = (total_seconds % 3600) // 60
+	s = total_seconds % 60
+	return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+# ---------------------------------------------------------------------------
 # Create / update Attendance
 # ---------------------------------------------------------------------------
+
 
 def _create_attendance(attendance_list, employee_map):
 	success = skipped = failed = 0
@@ -228,12 +257,12 @@ def _create_attendance(attendance_list, employee_map):
 		if existing:
 			# Already exists — update status + custom time fields
 			has_out = bool(rec["out_time"])
-			in_dt   = datetime.strptime(rec["in_time"],  "%Y-%m-%d %H:%M:%S") if rec["in_time"] else None
-			out_dt  = datetime.strptime(rec["out_time"], "%Y-%m-%d %H:%M:%S") if has_out else None
-			wh = round((out_dt - in_dt).total_seconds() / 3600, 2) if (in_dt and out_dt and out_dt > in_dt) else 0.0
+			in_dt = datetime.strptime(rec["in_time"], "%Y-%m-%d %H:%M:%S") if rec["in_time"] else None
+			out_dt = datetime.strptime(rec["out_time"], "%Y-%m-%d %H:%M:%S") if has_out else None
+			wh = _seconds_to_hhmmss(int((out_dt - in_dt).total_seconds())) if (in_dt and out_dt and out_dt > in_dt) else None
 			frappe.db.set_value("Attendance", existing.name, "status", "Present" if has_out else "Absent")
 			frappe.db.set_value("Attendance", existing.name, "custom_punch_in_time", rec["in_time"])
-			frappe.db.set_value("Attendance", existing.name, "custom_working_hours", wh)
+			frappe.db.set_value("Attendance", existing.name, "custom_work_hours", wh)
 			if has_out:
 				frappe.db.set_value("Attendance", existing.name, "custom_punch_out_time", rec["out_time"])
 			else:
@@ -260,12 +289,14 @@ def _create_attendance(attendance_list, employee_map):
 
 def _insert_and_submit_attendance(employee, company, att_date, rec):
 	"""Create a submitted Attendance record with custom punch time fields."""
-	has_out   = bool(rec["out_time"])
-	status    = "Present" if has_out else "Absent"
+	has_out = bool(rec["out_time"])
+	status = "Present" if has_out else "Absent"
 
-	in_dt  = datetime.strptime(rec["in_time"],  "%Y-%m-%d %H:%M:%S") if rec["in_time"]  else None
+	in_dt = datetime.strptime(rec["in_time"], "%Y-%m-%d %H:%M:%S") if rec["in_time"] else None
 	out_dt = datetime.strptime(rec["out_time"], "%Y-%m-%d %H:%M:%S") if has_out else None
-	working_hours = round((out_dt - in_dt).total_seconds() / 3600, 2) if (in_dt and out_dt and out_dt > in_dt) else 0.0
+	working_hours = (
+		_seconds_to_hhmmss(int((out_dt - in_dt).total_seconds())) if (in_dt and out_dt and out_dt > in_dt) else None
+	)
 
 	doc_data = {
 		"doctype": "Attendance",
@@ -283,7 +314,7 @@ def _insert_and_submit_attendance(employee, company, att_date, rec):
 	doc.submit()
 
 	# Always write via db.set_value to bypass field defaults set by Frappe
-	frappe.db.set_value("Attendance", doc.name, "custom_working_hours", working_hours)
+	frappe.db.set_value("Attendance", doc.name, "custom_work_hours", working_hours)
 	if has_out:
 		frappe.db.set_value("Attendance", doc.name, "custom_punch_out_time", rec["out_time"])
 	else:
@@ -297,6 +328,7 @@ def _insert_and_submit_attendance(employee, company, att_date, rec):
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
 
 def sync_essl_checkins(from_dt=None, to_dt=None):
 	"""
@@ -322,13 +354,13 @@ def sync_essl_checkins(from_dt=None, to_dt=None):
 	if not from_dt or not to_dt:
 		yesterday = datetime.now() - timedelta(days=1)
 		from_dt = from_dt or yesterday.strftime("%Y-%m-%d") + " 00:00:00"
-		to_dt   = to_dt   or yesterday.strftime("%Y-%m-%d") + " 23:59:59"
+		to_dt = to_dt or yesterday.strftime("%Y-%m-%d") + " 23:59:59"
 
 	att_date = from_dt.split(" ")[0]  # "YYYY-MM-DD"
 
 	# Convert to ESSL date format (YYYY/MM/DD HH:MM)
 	essl_from = datetime.strptime(from_dt, "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M")
-	essl_to   = datetime.strptime(to_dt,   "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M")
+	essl_to = datetime.strptime(to_dt, "%Y-%m-%d %H:%M:%S").strftime("%Y/%m/%d %H:%M")
 
 	password = settings.get_password("password")
 
@@ -341,8 +373,12 @@ def sync_essl_checkins(from_dt=None, to_dt=None):
 		label = device.device_label or device.serial_number
 		try:
 			xml_text = _fetch_device_logs(
-				settings.api_url, device.serial_number, essl_from, essl_to,
-				settings.username, password,
+				settings.api_url,
+				device.serial_number,
+				essl_from,
+				essl_to,
+				settings.username,
+				password,
 			)
 			punches = _parse_logs(xml_text, device.serial_number, label)
 			frappe.logger().info(f"[ESSL] {label}: {len(punches)} punches")
@@ -375,6 +411,7 @@ def sync_essl_checkins(from_dt=None, to_dt=None):
 # Mark Absent for employees with no punch data
 # ---------------------------------------------------------------------------
 
+
 def _mark_absent_employees(punched_user_ids, employee_map, att_date):
 	"""
 	For every ESSL-mapped employee NOT in punched_user_ids, create a submitted
@@ -387,7 +424,7 @@ def _mark_absent_employees(punched_user_ids, employee_map, att_date):
 			continue  # already handled by _create_attendance
 
 		employee = emp["name"]
-		company  = emp["company"]
+		company = emp["company"]
 
 		existing = frappe.db.get_value(
 			"Attendance",
@@ -399,13 +436,15 @@ def _mark_absent_employees(punched_user_ids, employee_map, att_date):
 			continue
 
 		try:
-			doc = frappe.get_doc({
-				"doctype": "Attendance",
-				"employee": employee,
-				"attendance_date": att_date,
-				"company": company,
-				"status": "Absent",
-			})
+			doc = frappe.get_doc(
+				{
+					"doctype": "Attendance",
+					"employee": employee,
+					"attendance_date": att_date,
+					"company": company,
+					"status": "Absent",
+				}
+			)
 			doc.insert(ignore_permissions=True)
 			doc.submit()
 			success += 1
@@ -427,6 +466,7 @@ def _update_last_synced():
 # ---------------------------------------------------------------------------
 # Whitelisted API – manual trigger from UI / console
 # ---------------------------------------------------------------------------
+
 
 @frappe.whitelist()
 def manual_sync(from_dt=None, to_dt=None):
