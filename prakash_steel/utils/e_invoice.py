@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 
 @frappe.whitelist()
 def cancel_e_invoice(docname, values):
@@ -11,6 +13,7 @@ def cancel_e_invoice(docname, values):
     Our Sales Invoice override enforces `custom_cancel_reason` in `before_cancel`,
     so we must persist a reason *before* calling the original flow.
     """
+    require_permission("Sales Invoice", "cancel", _("Not permitted to cancel Sales Invoice."))
     try:
         from india_compliance.gst_india.utils import e_invoice as ic_e_invoice
     except Exception:
@@ -20,7 +23,6 @@ def cancel_e_invoice(docname, values):
             title=_("Missing App"),
         )
 
-    doc = ic_e_invoice.load_doc("Sales Invoice", docname, "cancel")
     values = frappe.parse_json(values)
 
     reason = (values.get("reason") or "").strip()
@@ -38,6 +40,8 @@ def cancel_e_invoice(docname, values):
             _("Please select Internal Cancel Reason before cancelling this Sales Invoice."),
             title=_("Cancel Reason Required"),
         )
+
+    doc = ic_e_invoice.load_doc("Sales Invoice", docname, "cancel")
 
     internal_reason = custom_cancel_reason
     frappe.db.set_value(

@@ -180,6 +180,9 @@ def get_default_bom(item_code):
 	Returns:
 		str: BOM name if found, None otherwise
 	"""
+	if not frappe.has_permission("Item", "read") or not frappe.has_permission("BOM", "read"):
+		frappe.throw("Not permitted to access BOM details.", frappe.PermissionError)
+
 	# First try to get default active BOM (submitted)
 	bom = frappe.db.get_value(
 		"BOM",
@@ -211,6 +214,9 @@ def get_bom_details(bom_name):
 	Returns:
 		dict with raw_material (first item), bom_fg_qty, bom_rm_qty
 	"""
+	if not frappe.has_permission("BOM", "read") or not frappe.has_permission("Item", "read"):
+		frappe.throw("Not permitted to access BOM details.", frappe.PermissionError)
+
 	if not bom_name:
 		return None
 
@@ -308,6 +314,9 @@ def debug_lead_time_calculation(item_code):
 	Returns:
 		dict: Debug information about the item and its lead time calculation
 	"""
+	if not frappe.has_permission("Item", "read"):
+		frappe.throw("Not permitted to access lead time debug data.", frappe.PermissionError)
+
 	if not item_code:
 		return {"error": "Item code is required"}
 

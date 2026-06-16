@@ -13,6 +13,7 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 	get_stock_map,
 	get_wip_map,
 )
+from prakash_steel.utils.whitelist_permissions import require_any_permission
 
 
 def _build_item_maps(items):
@@ -35,6 +36,7 @@ def _build_item_maps(items):
 @frappe.whitelist()
 def get_machine_load_colours():
 	"""Return colour rules from Machine Load Colour Master."""
+	require_any_permission([("Bright Machine", "read"), ("Machine Load Colour Master", "read")])
 	rows = frappe.get_all(
 		"Machine Load Colour Table",
 		filters={"parent": "Machine Load Colour Master"},
@@ -47,6 +49,7 @@ def get_machine_load_colours():
 @frappe.whitelist()
 def get_machine_breakdown(machine_group_name):
 	"""Return per-item calculation detail for a given machine (for the debug dialog)."""
+	require_any_permission([("Bright Machine", "read"), ("Item", "read")])
 	machine = frappe.db.get_value(
 		"Bright Machine",
 		machine_group_name,

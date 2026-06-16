@@ -6,6 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 
 def calculate_sku_type(buffer_flag, item_type):
 	"""
@@ -43,6 +45,7 @@ def get_sku_type_on_hand_status():
 	- Calculate percentage: (count_of_color / total_items) * 100
 	- Return data in format suitable for pie charts
 	"""
+	require_permission("Item", "report")
 	# Get ALL buffer items - same as po_recomendation_for_psp report
 	items_data = frappe.db.sql(
 		"""
@@ -245,6 +248,7 @@ def get_pending_so_status():
 	We calculate order_status using the same buffer logic as open_so_analysis
 	(but at SO header level).
 	"""
+	require_permission("Item", "report")
 	from frappe.utils import date_diff, today
 
 	so_data = frappe.db.sql(
@@ -344,6 +348,7 @@ def get_cs_item_on_hand_status():
 	on_hand_status = (on_hand_stock / tog) * 100
 	BLACK=0, RED=0-34, YELLOW=34-67, GREEN=67-100, WHITE=>100
 	"""
+	require_permission("Item", "report")
 	from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
 		get_stock_map,
 	)
@@ -400,6 +405,7 @@ def get_open_po_status():
 	Placeholder for Open PO pie chart.
 	For now: single black slice = 100%.
 	"""
+	require_permission("Item", "report")
 	return {
 		"total_orders": 1,
 		"colours": [

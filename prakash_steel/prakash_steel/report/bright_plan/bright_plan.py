@@ -22,6 +22,7 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 	get_wip_map,
 )
 from prakash_steel.utils.lead_time import get_default_bom
+from prakash_steel.utils.whitelist_permissions import require_permission
 
 
 def get_draft_wo_map():
@@ -40,6 +41,7 @@ def get_draft_wo_map():
 
 @frappe.whitelist()
 def get_item_breakdown(item_code):
+	require_permission("Item", "report")
 	item = frappe.db.get_value(
 		"Item",
 		item_code,

@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt
 
+from prakash_steel.utils.whitelist_permissions import require_all_permissions, require_permission
+
 
 _COMPANY = "Prakash Steel Products Pvt Ltd"
 
@@ -157,6 +159,7 @@ def update_work_items(source_name, items):
 	Same idea as ERPNext ``validate_and_delete_children`` + update: any existing child name not present
 	in the submitted list is removed.
 	"""
+	require_permission("JOB Work Order", "write")
 	import json
 
 	if isinstance(items, str):
@@ -215,6 +218,10 @@ def _build_rm_qty_map(work_item_table):
 
 @frappe.whitelist()
 def make_sales_invoice(source_name):
+	require_all_permissions(
+		[("JOB Work Order", "read"), ("Sales Invoice", "create")],
+		_("Not permitted to create Sales Invoice from JOB Work Order."),
+	)
 	source = frappe.get_doc("JOB Work Order", source_name)
 
 	si = frappe.new_doc("Sales Invoice")
@@ -252,6 +259,10 @@ def make_sales_invoice(source_name):
 
 @frappe.whitelist()
 def make_delivery_note(source_name):
+	require_all_permissions(
+		[("JOB Work Order", "read"), ("Delivery Note", "create")],
+		_("Not permitted to create Delivery Note from JOB Work Order."),
+	)
 	source = frappe.get_doc("JOB Work Order", source_name)
 
 	dn = frappe.new_doc("Delivery Note")
@@ -293,6 +304,10 @@ def make_delivery_note(source_name):
 
 @frappe.whitelist()
 def make_purchase_receipt(source_name):
+	require_all_permissions(
+		[("JOB Work Order", "read"), ("Purchase Receipt", "create")],
+		_("Not permitted to create Purchase Receipt from JOB Work Order."),
+	)
 	source = frappe.get_doc("JOB Work Order", source_name)
 
 	pr = frappe.new_doc("Purchase Receipt")

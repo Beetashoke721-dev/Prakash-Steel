@@ -23,6 +23,12 @@ def cancel_sales_order_with_reason(name: str, reason: str):
 
     reason = reason.strip()
 
+    if not frappe.has_permission("Sales Order", "cancel") or not frappe.has_permission("Sales Invoice", "cancel"):
+        frappe.throw(
+            _("Not permitted to cancel Sales Orders and linked Sales Invoices."),
+            frappe.PermissionError,
+        )
+
     so = frappe.get_doc("Sales Order", name)
 
     if so.docstatus != 1:

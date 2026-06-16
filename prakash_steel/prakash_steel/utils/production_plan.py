@@ -51,6 +51,11 @@ def create_billet_cutting_for_rolled_plan(production_plan_name: str):
 			"message": "No Production Plan provided",
 		}
 
+	if not frappe.has_permission("Production Plan", "read") or not frappe.has_permission(
+		"Billet Cutting", "create"
+	):
+		frappe.throw("Not permitted to create Billet Cutting documents.", frappe.PermissionError)
+
 	pp = frappe.get_doc("Production Plan", production_plan_name)
 
 	naming_series = (pp.naming_series or "").strip()

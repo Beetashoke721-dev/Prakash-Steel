@@ -1,10 +1,14 @@
 import math
 import frappe
+from frappe import _
 from frappe.utils import flt
+
+from prakash_steel.utils.whitelist_permissions import require_all_permissions, require_permission
 
 
 @frappe.whitelist()
 def get_bright_plan_data():
+	require_permission("Item", "report")
 	from prakash_steel.prakash_steel.report.bright_plan.bright_plan import execute
 
 	columns, data = execute()
@@ -122,6 +126,10 @@ def _build_child_options(parent_items):
 @frappe.whitelist()
 def execute_work_orders(rows):
 
+	require_all_permissions(
+		[("Work Order", "create"), ("Work Order", "write")],
+		_("Not permitted to create Work Orders from Bright Plan."),
+	)
 	import json
 
 	if isinstance(rows, str):

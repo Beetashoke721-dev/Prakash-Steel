@@ -5,6 +5,8 @@ import frappe
 from frappe import _
 from frappe.utils import date_diff, flt, nowdate
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
 	_non_buffer_priority,
 	calculate_net_order_recommendation,
@@ -1496,6 +1498,7 @@ def get_final_allocated_qty_breakdown(item_code):
 	Returns step-by-step breakdown of how final_allocated_qty is computed for an RB item.
 	Runs the full report and extracts the item's row + subgroup context.
 	"""
+	require_permission("Item", "report")
 	data = get_data()
 	if not data:
 		return None
@@ -1593,6 +1596,7 @@ def get_item_colour_breakdown(item_code):
 	RBMTA → buffer_colour breakdown.
 	RBMTO → own SO FIFO detail + parent BOM FIFO detail.
 	"""
+	require_permission("Item", "report")
 	item_doc = frappe.db.get_value(
 		"Item",
 		item_code,

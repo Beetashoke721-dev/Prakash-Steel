@@ -2020,6 +2020,17 @@ def create_material_request(item_code, qty):
 	"""
 	Create and submit a Material Request for the given item_code and quantity
 	"""
+	if not frappe.has_permission("Material Request", "create") and not frappe.has_permission(
+		"Material Request", "write"
+	):
+		frappe.throw(_("Not permitted to create Material Requests."), frappe.PermissionError)
+
+	if not frappe.has_permission("Material Request", "submit"):
+		frappe.throw(
+			_("Not permitted to submit Material Requests."),
+			frappe.PermissionError,
+		)
+
 	if not item_code:
 		return {"error": "Item code is required"}
 
@@ -2114,6 +2125,17 @@ def create_material_requests_automatically(filters=None):
 	"""
 	Create Material Requests automatically for all items with net_po_recommendation > 0
 	"""
+	if not frappe.has_permission("Material Request", "create") and not frappe.has_permission(
+		"Material Request", "write"
+	):
+		frappe.throw(_("Not permitted to create Material Requests."), frappe.PermissionError)
+
+	if not frappe.has_permission("Material Request", "submit"):
+		frappe.throw(
+			_("Not permitted to submit Material Requests."),
+			frappe.PermissionError,
+		)
+
 	# Parse filters if it's a JSON string
 	if isinstance(filters, str):
 		import json
@@ -2702,6 +2724,9 @@ def get_priority_breakdown(item_code):
 	- BOM parents and their priorities
 	- Final propagated priority
 	"""
+	if not frappe.has_permission("Item", "read"):
+		frappe.throw("Not permitted to access PO recommendation breakdowns.", frappe.PermissionError)
+
 	item = frappe.db.get_value("Item", item_code, ["custom_buffer_flag", "custom_item_type"], as_dict=True)
 	if not item:
 		frappe.throw(f"Item {item_code} not found")
@@ -3245,6 +3270,8 @@ def traverse_bom_for_po(
 @frappe.whitelist()
 def get_on_hand_status_breakdown(item_code):
 	from frappe.utils import add_days, today
+	if not frappe.has_permission("Item", "read"):
+		frappe.throw("Not permitted to access on-hand breakdowns.", frappe.PermissionError)
 
 	today_date = today()
 
@@ -3447,6 +3474,8 @@ def get_child_requirement_breakdown(item_code):
 	for a given parent item in the PO Recommendation report.
 	"""
 	from frappe.utils import nowdate
+	if not frappe.has_permission("Item", "read"):
+		frappe.throw("Not permitted to access child requirement breakdowns.", frappe.PermissionError)
 
 	today_date = nowdate()
 

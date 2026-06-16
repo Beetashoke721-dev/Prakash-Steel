@@ -7,11 +7,13 @@ import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 
 @frappe.whitelist()
 def get_attendance_data(from_date, to_date, employee=None):
 	"""Return attendance data for all ESSL-mapped employees for the given date range."""
-
+	require_permission("Attendance", "read")
 	# Build date list
 	start = datetime.strptime(from_date, "%Y-%m-%d").date()
 	end = datetime.strptime(to_date, "%Y-%m-%d").date()
@@ -108,6 +110,7 @@ def _parse_minutes(val):
 @frappe.whitelist()
 def download_attendance_excel(from_date, to_date, employee=None):
 	"""Generate and return a base64-encoded .xlsx attendance report."""
+	require_permission("Attendance", "read")
 	data = get_attendance_data(from_date, to_date, employee)
 	dates = data["dates"]
 	employees = data["employees"]

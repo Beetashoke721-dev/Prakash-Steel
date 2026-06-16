@@ -7,6 +7,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 from prakash_steel.prakash_steel.report.open_mr_for_manufacture.open_mr_for_manufacture import (
 	_buffer_colour,
 	_non_buffer_colour,
@@ -301,6 +303,7 @@ def get_wo_item_breakdown(wo_name):
 	  buffer items  → stock, wip, tog, qualified_demand, previous_wo_qty, level, colour
 	  non-buffer    → stock, wip, previous_wo_qty, level, SO-level FIFO detail, colour
 	"""
+	require_permission("Work Order", "read")
 	from prakash_steel.prakash_steel.report.open_mr_for_manufacture.open_mr_for_manufacture import (
 		_PRIORITY_TO_COLOUR,
 		_STATUS_PRIORITY,

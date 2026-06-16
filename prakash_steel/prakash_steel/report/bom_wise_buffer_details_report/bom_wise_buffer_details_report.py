@@ -4,11 +4,13 @@
 import frappe
 from frappe.utils import flt
 from prakash_steel.utils.lead_time import calculate_decoupled_lead_time, get_default_bom
+from prakash_steel.utils.whitelist_permissions import require_permission
 
 
 @frappe.whitelist()
 def check_custom_field_exists():
 	"""API method to check if custom_decoupled_lead_time field exists in database"""
+	require_permission("Item", "read")
 	try:
 		db_name = frappe.conf.db_name
 		result = frappe.db.sql(

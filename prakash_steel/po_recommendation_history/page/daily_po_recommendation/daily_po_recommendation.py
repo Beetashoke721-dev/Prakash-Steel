@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 SKU_COMBO = {
 	"PTA": {"purchase": 1, "sell": 0, "buffer_flag": 1},
 	"BOTA": {"purchase": 1, "sell": 0, "buffer_flag": 1},
@@ -189,6 +191,7 @@ def _get_latest_snapshot(snapshot_date, purchase, sell, buffer_flag):
 
 @frappe.whitelist()
 def get_sku_data(sku_type, snapshot_date, item_code=None):
+	require_permission("PO Recommendation Snapshot", "read")
 	combo = SKU_COMBO.get(sku_type)
 	if not combo:
 		frappe.throw(_(f"Unknown SKU type: {sku_type}"))
@@ -310,6 +313,7 @@ SO_FIELDS = [c["fieldname"] for c in SO_COLUMNS]
 
 @frappe.whitelist()
 def get_so_data(snapshot_date, item_code=None):
+	require_permission("SO Recommendation Snapshot", "read")
 	snap = frappe.get_all(
 		"SO Recommendation Snapshot",
 		filters={"snapshot_date": snapshot_date, "status": "Success"},
@@ -338,6 +342,7 @@ def get_so_data(snapshot_date, item_code=None):
 
 @frappe.whitelist()
 def export_sku_xlsx(sku_type, snapshot_date, item_code=None):
+	require_permission("PO Recommendation Snapshot", "read")
 	import base64
 	from frappe.utils.xlsxutils import make_xlsx
 
@@ -359,6 +364,7 @@ def export_sku_xlsx(sku_type, snapshot_date, item_code=None):
 
 @frappe.whitelist()
 def export_so_xlsx(snapshot_date, item_code=None):
+	require_permission("SO Recommendation Snapshot", "read")
 	import base64
 	from frappe.utils.xlsxutils import make_xlsx
 
@@ -413,6 +419,7 @@ OPEN_PO_FIELDS = [c["fieldname"] for c in OPEN_PO_COLUMNS]
 
 @frappe.whitelist()
 def get_open_po_data(snapshot_date, item_code=None):
+	require_permission("Purchase Order Recommendation Snapshot", "read")
 	snap = frappe.get_all(
 		"Purchase Order Recommendation Snapshot",
 		filters={"snapshot_date": snapshot_date, "status": "Success"},
@@ -469,6 +476,7 @@ def get_open_po_data(snapshot_date, item_code=None):
 
 @frappe.whitelist()
 def export_open_po_xlsx(snapshot_date, item_code=None):
+	require_permission("Purchase Order Recommendation Snapshot", "read")
 	import base64
 	from frappe.utils.xlsxutils import make_xlsx
 
@@ -513,6 +521,7 @@ STOCK_BALANCE_FIELDS = [c["fieldname"] for c in STOCK_BALANCE_COLUMNS]
 
 @frappe.whitelist()
 def get_stock_balance_data(snapshot_date, item_code=None):
+	require_permission("Stock Balance Snapshot", "read")
 	snap = frappe.get_all(
 		"Stock Balance Snapshot",
 		filters={"snapshot_date": snapshot_date, "status": "Success"},
@@ -541,6 +550,7 @@ def get_stock_balance_data(snapshot_date, item_code=None):
 
 @frappe.whitelist()
 def export_stock_balance_xlsx(snapshot_date, item_code=None):
+	require_permission("Stock Balance Snapshot", "read")
 	import base64
 	from frappe.utils.xlsxutils import make_xlsx
 

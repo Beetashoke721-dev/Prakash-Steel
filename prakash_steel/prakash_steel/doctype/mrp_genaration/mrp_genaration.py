@@ -48,6 +48,9 @@ def generate_mrp_order_recommendations():
 	- System Health Report
 	- Worker logs
 	"""
+	if not frappe.has_permission("Item", "report"):
+		frappe.throw("Not permitted to generate MRP recommendations.", frappe.PermissionError)
+
 	# Enqueue the worker function as a background job
 	job = frappe.enqueue(
 		"prakash_steel.prakash_steel.doctype.mrp_genaration.mrp_genaration._generate_mrp_order_recommendations_worker",
@@ -510,6 +513,9 @@ def get_mr_creation_progress(job_id):
 	Get progress of Material Request creation job.
 	Returns: current, total, percent, current_item, success_count, error_count
 	"""
+	if not frappe.has_permission("Item", "report"):
+		frappe.throw("Not permitted to access MRP job progress.", frappe.PermissionError)
+
 	if not job_id:
 		return {"error": "Job ID is required"}
 
@@ -535,6 +541,9 @@ def get_mrp_job_status(job_id):
 	Check the status of an MRP generation job.
 	Returns: status (queued/running/completed/failed), result (if completed), error (if failed)
 	"""
+	if not frappe.has_permission("Item", "report"):
+		frappe.throw("Not permitted to access MRP job status.", frappe.PermissionError)
+
 	if not job_id:
 		return {"error": "Job ID is required"}
 
@@ -603,6 +612,9 @@ def get_mrp_job_result(job_id):
 	"""
 	Get the result of a completed MRP generation job.
 	"""
+	if not frappe.has_permission("Item", "report"):
+		frappe.throw("Not permitted to access MRP job results.", frappe.PermissionError)
+
 	if not job_id:
 		return {"error": "Job ID is required"}
 
@@ -623,6 +635,9 @@ def get_mr_creation_progress(job_id):  # noqa: F811
 	Get progress of Material Request creation job.
 	Returns: current, total, percent, current_item, success_count, error_count
 	"""
+	if not frappe.has_permission("Item", "report"):
+		frappe.throw("Not permitted to access MRP job progress.", frappe.PermissionError)
+
 	if not job_id:
 		return {"error": "Job ID is required"}
 
@@ -657,6 +672,9 @@ def list_active_mrp_jobs():
 	List all active MRP-related jobs for the current user.
 	This helps users see what jobs are running.
 	"""
+	if not frappe.has_permission("Item", "report"):
+		frappe.throw("Not permitted to list MRP jobs.", frappe.PermissionError)
+
 	import time
 
 	active_jobs = []
@@ -724,6 +742,14 @@ def create_material_request(item_code, qty):
 	"""
 	Create and submit a Material Request for the given item_code and quantity
 	"""
+	if not frappe.has_permission("Material Request", "create") and not frappe.has_permission(
+		"Material Request", "write"
+	):
+		frappe.throw("Not permitted to create Material Requests.", frappe.PermissionError)
+
+	if not frappe.has_permission("Material Request", "submit"):
+		frappe.throw("Not permitted to submit Material Requests.", frappe.PermissionError)
+
 	if not item_code:
 		return {"error": "Item code is required"}
 
@@ -841,6 +867,14 @@ def create_material_requests_automatically(net_order_recommendations=None):
 	        net_order_recommendations: Dict of item_code -> net_order_recommendation (optional)
 	                Can be a dict or JSON string. If not provided, will enqueue as background job
 	"""
+	if not frappe.has_permission("Material Request", "create") and not frappe.has_permission(
+		"Material Request", "write"
+	):
+		frappe.throw("Not permitted to create Material Requests.", frappe.PermissionError)
+
+	if not frappe.has_permission("Material Request", "submit"):
+		frappe.throw("Not permitted to submit Material Requests.", frappe.PermissionError)
+
 	# Parse net_order_recommendations if it's a string (JSON)
 	if isinstance(net_order_recommendations, str):
 		import json
