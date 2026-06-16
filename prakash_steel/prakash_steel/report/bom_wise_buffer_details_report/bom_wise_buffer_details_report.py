@@ -153,18 +153,13 @@ def get_all_items_recursively(bom_name, parent_item=None, level=0, visited_boms=
 		if bom_item_codes:
 			items_to_fetch = [code for code in bom_item_codes if code not in item_groups_cache]
 			if items_to_fetch:
-				if len(items_to_fetch) == 1:
-					item_codes_tuple = (items_to_fetch[0],)
-				else:
-					item_codes_tuple = tuple(items_to_fetch)
-
 				item_group_data = frappe.db.sql(
 					"""
 					SELECT name, item_group
 					FROM `tabItem`
 					WHERE name IN %s
 					""",
-					(item_codes_tuple,),
+					(tuple(items_to_fetch),),
 					as_dict=True,
 				)
 
@@ -270,16 +265,10 @@ def get_data(filters):
 		if not unique_item_codes:
 			return data
 
-		# Query all items at once using SQL for better performance
-		if len(unique_item_codes) == 1:
-			item_codes_tuple = (unique_item_codes[0],)
-		else:
-			item_codes_tuple = tuple(unique_item_codes)
-
 		# Query items from database (we don't need custom_decoupled_lead_time since we calculate it)
 		items_data = frappe.db.sql(
 			"""
-			SELECT 
+			SELECT
 				name as item_code,
 				item_name,
 				lead_time_days,
@@ -287,7 +276,7 @@ def get_data(filters):
 			FROM `tabItem`
 			WHERE name IN %s
 			""",
-			(item_codes_tuple,),
+			(tuple(unique_item_codes),),
 			as_dict=True,
 		)
 

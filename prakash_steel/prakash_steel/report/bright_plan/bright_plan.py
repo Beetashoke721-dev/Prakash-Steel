@@ -467,6 +467,7 @@ def get_data(filters=None):
 	data = []
 	child_stock_map = {}
 	child_wip_open_po_map = {}
+	child_item_detail_map = {}  # cache: item_code -> (custom_item_type, custom_buffer_flag)
 
 	for item_code in sorted(item_codes):
 		buffer_flag = item_buffer_map[item_code]
@@ -533,9 +534,19 @@ def get_data(filters=None):
 					child_wip_open_po = 0
 
 					try:
-						child_doc = frappe.get_doc("Item", child_item_code)
-						child_item_type = child_doc.get("custom_item_type")
-						child_buffer_flag = child_doc.get("custom_buffer_flag") or "Non-Buffer"
+						if child_item_code not in child_item_detail_map:
+							child_item_detail_map[child_item_code] = (
+								frappe.db.get_value(
+									"Item",
+									child_item_code,
+									["custom_item_type", "custom_buffer_flag"],
+									as_dict=True,
+								)
+								or {}
+							)
+						child_detail = child_item_detail_map[child_item_code]
+						child_item_type = child_detail.get("custom_item_type")
+						child_buffer_flag = child_detail.get("custom_buffer_flag") or "Non-Buffer"
 						child_sku_type = calculate_sku_type(child_buffer_flag, child_item_type)
 
 						if child_item_code not in child_stock_map:
@@ -613,14 +624,20 @@ def get_data(filters=None):
 				op_cp = "CP"
 			remaining_so_for_op_cp -= qty_per_row
 
+			machine_info = machine_map.get(item_code) or {}
+			machine_name = machine_info.get("machine")
+			per_hour = machine_info.get("per_hour_production")
+			priority_colour = (
+				(("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
+				if sku_type == "BBMTA"
+				else ("MTO" + on_hand_colour_priority.upper()))
+				if on_hand_colour_priority else ""
+			)
+
 			base_row = {
-				"machine": (machine_map.get(item_code) or {}).get("machine"),
-				"per_hour_production": (machine_map.get(item_code) or {}).get("per_hour_production"),
-				"process_time": (
-					round(qty_per_row / flt((machine_map.get(item_code) or {}).get("per_hour_production")), 2)
-					if (machine_map.get(item_code) or {}).get("per_hour_production")
-					else None
-				),
+				"machine": machine_name,
+				"per_hour_production": per_hour,
+				"process_time": round(qty_per_row / flt(per_hour), 2) if per_hour else None,
 				"item_code": item_code,
 				"item_name": item_name_map[item_code],
 				"sku_type": sku_type,
@@ -629,20 +646,8 @@ def get_data(filters=None):
 				"on_hand_stock": math.ceil(stock),
 				"on_hand_colour_priority": on_hand_colour_priority,
 				"op_cp": op_cp,
-				"priority_colour": (
-					("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
-					if sku_type == "BBMTA"
-					else ("MTO" + on_hand_colour_priority.upper())
-				)
-				if on_hand_colour_priority
-				else "",
-				"priority_sequence": priority_seq_map.get(
-					("MTA" + (op_cp or "") + on_hand_colour_priority.upper())
-					if sku_type == "BBMTA"
-					else ("MTO" + on_hand_colour_priority.upper())
-				)
-				if on_hand_colour_priority
-				else None,
+				"priority_colour": priority_colour,
+				"priority_sequence": priority_seq_map.get(priority_colour) if priority_colour else None,
 				"or_with_moq_batch_size": math.ceil(qty_per_row),
 				"moq": math.ceil(moq),
 				"batch_size": math.ceil(batch_size),

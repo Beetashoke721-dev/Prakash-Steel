@@ -74,29 +74,57 @@ def get_columns():
     ]
 
 
-def get_closing_balance(account, date):
-    """Fetch cumulative closing balance from GL Entry up to given date."""
-    if not account:
-        return 0.0
+def _get_daily_balances(account, loop_start, loop_end):
+    """
+    Pre-fetch closing balances for every date in [loop_start, loop_end] using
+    2 SQL queries instead of one per day.
 
+    Returns dict: {date_str: closing_balance}
+    """
+    opening_date = add_days(loop_start, -1)
+
+    # 1. Signed opening balance (credit - debit) up to the day before loop_start
     result = frappe.db.sql(
         """
         SELECT SUM(credit) - SUM(debit) AS balance
         FROM `tabGL Entry`
-        WHERE
-            account = %(account)s
-            AND posting_date <= %(date)s
-            AND is_cancelled = 0
-            AND docstatus = 1
+        WHERE account = %(account)s
+          AND posting_date <= %(date)s
+          AND is_cancelled = 0
+          AND docstatus = 1
         """,
-        {"account": account, "date": str(date)},
+        {"account": account, "date": str(opening_date)},
         as_dict=True,
     )
+    running = flt((result[0].get("balance") or 0) if result else 0)
 
-    if result and result[0].get("balance") is not None:
-        return abs(flt(result[0]["balance"]))
+    # 2. Net daily movement within the range (one row per day that has activity)
+    daily_rows = frappe.db.sql(
+        """
+        SELECT posting_date, SUM(credit) - SUM(debit) AS net
+        FROM `tabGL Entry`
+        WHERE account = %(account)s
+          AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+          AND is_cancelled = 0
+          AND docstatus = 1
+        GROUP BY posting_date
+        ORDER BY posting_date ASC
+        """,
+        {"account": account, "from_date": str(loop_start), "to_date": str(loop_end)},
+        as_dict=True,
+    )
+    daily_change = {str(r.posting_date): flt(r.net) for r in daily_rows}
 
-    return 0.0
+    # Build cumulative closing balance for each day in the range
+    balances = {}
+    current = loop_start
+    while current <= loop_end:
+        date_str = str(current)
+        running += daily_change.get(date_str, 0.0)
+        balances[date_str] = abs(running)
+        current = add_days(current, 1)
+
+    return balances
 
 
 # Month mapping
@@ -182,6 +210,9 @@ def get_data(filters):
         if loop_start > loop_end:
             continue
 
+        # Pre-fetch all closing balances for this account in the date range (2 queries total)
+        daily_balances = _get_daily_balances(account, loop_start, loop_end)
+
         is_first_row = True
         current = loop_start
 
@@ -193,7 +224,7 @@ def get_data(filters):
             # Daily Interest Calculation
             day_interest_pct = round((interest_pct / 12.0) / days_in_month, 6)
 
-            closing_bal = get_closing_balance(account, current)
+            closing_bal = daily_balances.get(str(current), 0.0)
 
             interest_amount = round(closing_bal * (day_interest_pct / 100), 2)
 

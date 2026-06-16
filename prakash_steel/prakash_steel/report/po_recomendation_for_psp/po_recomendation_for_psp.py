@@ -995,10 +995,7 @@ def get_data(filters=None):
 	all_item_codes = all_items_to_process
 
 	if all_item_codes:
-		if len(all_item_codes) == 1:
-			all_items_tuple = (next(iter(all_item_codes)),)
-		else:
-			all_items_tuple = tuple(all_item_codes)
+		all_items_tuple = tuple(all_item_codes)
 
 		items_details_all = frappe.db.sql(
 			"""
@@ -1006,7 +1003,9 @@ def get_data(filters=None):
 				i.name as item_code,
 				i.custom_buffer_flag as buffer_flag,
 				i.custom_item_type as item_type,
-				i.safety_stock as tog
+				i.safety_stock as tog,
+				i.min_order_qty as moq,
+				i.custom_batch_size as batch_size
 			FROM
 				`tabItem` i
 			WHERE
@@ -1020,6 +1019,8 @@ def get_data(filters=None):
 		item_sku_type_map_all = {}
 		item_tog_map_all = {}
 		item_type_map_all = {}
+		moq_map_all = {}
+		batch_size_map_all = {}
 		for item in items_details_all:
 			item_buffer_map_all[item.item_code] = item.buffer_flag or "Non-Buffer"
 			item_sku_type_map_all[item.item_code] = calculate_sku_type(
@@ -1027,11 +1028,15 @@ def get_data(filters=None):
 			)
 			item_tog_map_all[item.item_code] = flt(item.tog or 0)
 			item_type_map_all[item.item_code] = item.item_type
+			moq_map_all[item.item_code] = flt(item.moq or 0)
+			batch_size_map_all[item.item_code] = flt(item.batch_size or 0)
 	else:
 		item_buffer_map_all = {}
 		item_sku_type_map_all = {}
 		item_tog_map_all = {}
 		item_type_map_all = {}
+		moq_map_all = {}
+		batch_size_map_all = {}
 
 	spike_master_records = frappe.get_all(
 		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
@@ -1044,7 +1049,7 @@ def get_data(filters=None):
 		}
 
 	calculated_spike_map = calculate_spike_map(
-		all_item_codes, item_buffer_map_all, item_type_map_all, item_tog_map_all
+		all_item_codes, item_buffer_map_all, item_type_map_all, item_tog_map_all, spike_master_map
 	)
 	spike_map.update(calculated_spike_map)
 
@@ -1079,34 +1084,12 @@ def get_data(filters=None):
 
 	initial_net_order_recommendations = {}
 
-	if all_item_codes:
-		items_moq_batch_data = frappe.db.sql(
-			"""
-			SELECT
-				i.name as item_code,
-				i.min_order_qty as moq,
-				i.custom_batch_size as batch_size
-			FROM
-				`tabItem` i
-			WHERE
-				i.name IN %s
-			""",
-			(all_items_tuple,),
-			as_dict=1,
-		)
-
-		moq_map_all = {item.item_code: flt(item.moq or 0) for item in items_moq_batch_data}
-		batch_size_map_all = {item.item_code: flt(item.batch_size or 0) for item in items_moq_batch_data}
-
-		for item_code in all_item_codes:
-			base_order_rec = initial_order_recommendations.get(item_code, 0)
-			moq = moq_map_all.get(item_code, 0)
-			batch_size = batch_size_map_all.get(item_code, 0)
-			net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
-			initial_net_order_recommendations[item_code] = net_order_rec
-	else:
-		moq_map_all = {}
-		batch_size_map_all = {}
+	for item_code in all_item_codes:
+		base_order_rec = initial_order_recommendations.get(item_code, 0)
+		moq = moq_map_all.get(item_code, 0)
+		batch_size = batch_size_map_all.get(item_code, 0)
+		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
+		initial_net_order_recommendations[item_code] = net_order_rec
 
 	items_to_process = [
 		(item_code, net_order_rec)
@@ -1332,10 +1315,7 @@ def get_data(filters=None):
 	if not all_items_to_show:
 		return []
 
-	if len(all_items_to_show) == 1:
-		item_codes_tuple = (next(iter(all_items_to_show)),)
-	else:
-		item_codes_tuple = tuple(all_items_to_show)
+	item_codes_tuple = tuple(all_items_to_show)
 
 	if buffer_flag:
 		items_data = frappe.db.sql(
@@ -1387,6 +1367,76 @@ def get_data(filters=None):
 
 	child_stock_map = {}
 	child_wip_open_po_map = {}
+
+	# ── Bulk pre-fetch BOM items, child item details, child stock ─────────────
+	# Replaces N x frappe.get_doc("BOM") + N x M x frappe.get_doc("Item") + N x M x Bin queries
+	_bom_rows = frappe.db.sql(
+		"""
+		SELECT b.item AS item_code, b.name AS bom_name, b.quantity AS bom_quantity
+		FROM `tabBOM` b
+		WHERE b.item IN %s AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
+		""",
+		(item_codes_tuple,),
+		as_dict=True,
+	)
+	_default_bom_map = {r.item_code: (r.bom_name, flt(r.bom_quantity) or 1.0) for r in _bom_rows}
+
+	_bom_items_map = defaultdict(list)
+	if _default_bom_map:
+		_bom_names = list({bom_name for bom_name, _ in _default_bom_map.values()})
+		_bom_names_tuple = tuple(_bom_names) if len(_bom_names) > 1 else (_bom_names[0],)
+		_bom_item_rows = frappe.db.sql(
+			"""
+			SELECT bi.parent AS bom_name, bi.item_code, bi.qty
+			FROM `tabBOM Item` bi
+			WHERE bi.parent IN %s AND bi.parenttype = 'BOM'
+			""",
+			(_bom_names_tuple,),
+			as_dict=True,
+		)
+		_bom_name_to_item = {v[0]: k for k, v in _default_bom_map.items()}
+		for _bir in _bom_item_rows:
+			_parent = _bom_name_to_item.get(_bir.bom_name)
+			if _parent:
+				_, _bom_qty = _default_bom_map[_parent]
+				_bom_items_map[_parent].append({
+					"item_code": _bir.item_code,
+					"bom_qty": flt(_bir.qty),
+					"bom_quantity": _bom_qty,
+				})
+
+	_all_child_codes = {c["item_code"] for children in _bom_items_map.values() for c in children}
+	_child_detail_map = {}
+	if _all_child_codes:
+		_child_tuple = tuple(_all_child_codes)
+		_child_item_rows = frappe.db.sql(
+			"""
+			SELECT name AS item_code, custom_item_type AS item_type, custom_buffer_flag AS buffer_flag
+			FROM `tabItem`
+			WHERE name IN %s
+			""",
+			(_child_tuple,),
+			as_dict=True,
+		)
+		for _ci in _child_item_rows:
+			_child_detail_map[_ci.item_code] = {
+				"item_type": _ci.item_type,
+				"buffer_flag": _ci.buffer_flag or "Non-Buffer",
+				"sku_type": calculate_sku_type(_ci.buffer_flag or "Non-Buffer", _ci.item_type),
+			}
+		_child_stock_rows = frappe.db.sql(
+			"""
+			SELECT item_code, SUM(actual_qty) AS stock
+			FROM `tabBin`
+			WHERE item_code IN %s
+			GROUP BY item_code
+			""",
+			(_child_tuple,),
+			as_dict=True,
+		)
+		for _csr in _child_stock_rows:
+			child_stock_map[_csr.item_code] = math.ceil(flt(_csr.stock))
+	# ─────────────────────────────────────────────────────────────────────────
 
 	data = []
 	for item_code in sorted(all_items_to_show):
@@ -1731,7 +1781,7 @@ def get_data(filters=None):
 		_all_items = set(_report_item_set)
 		_frontier = set(_report_item_set)
 		while _frontier:
-			_f_tuple = tuple(_frontier) if len(_frontier) > 1 else (next(iter(_frontier)),)
+			_f_tuple = tuple(_frontier)
 			_up_rows = frappe.db.sql(
 				"""
 				SELECT b.item AS parent_item, bi.item_code AS child_item
@@ -1754,9 +1804,7 @@ def get_data(filters=None):
 		# Phase 3: compute own FIFO priority for ancestors not already in the report
 		_external_items = _all_items - _report_item_set
 		if _external_items:
-			_ext_tuple = (
-				tuple(_external_items) if len(_external_items) > 1 else (next(iter(_external_items)),)
-			)
+			_ext_tuple = tuple(_external_items)
 			_ext_so_map = get_open_so_map_for_priority(list(_external_items))
 			_ext_item_rows = frappe.db.sql(
 				"SELECT item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE item_code IN %s",
@@ -2144,11 +2192,6 @@ def get_stock_map(item_codes):
 	if not item_codes:
 		return {}
 
-	if len(item_codes) == 1:
-		item_codes_tuple = (next(iter(item_codes)),)
-	else:
-		item_codes_tuple = tuple(item_codes)
-
 	# Use current live stock from Bin
 	bin_rows = frappe.db.sql(
 		"""
@@ -2157,7 +2200,7 @@ def get_stock_map(item_codes):
 		WHERE item_code IN %s
 		GROUP BY item_code
 		""",
-		(item_codes_tuple,),
+		(tuple(item_codes),),
 		as_dict=True,
 	)
 
@@ -2219,25 +2262,26 @@ def get_qualified_demand_map():
 	return till_today_map, spike_map
 
 
-def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map):
+def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map, spike_master_map=None):
 
 	from frappe.utils import today, add_days
 
 	today_date = today()
 	spike_map = {}
 
-	# Get all Spike Master records
-	spike_master_records = frappe.get_all(
-		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
-	)
+	# Get all Spike Master records only if not already provided
+	if spike_master_map is None:
+		spike_master_records = frappe.get_all(
+			"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
+		)
 
-	# Create a map of item_type -> spike master config
-	spike_master_map = {}
-	for sm in spike_master_records:
-		spike_master_map[sm.item_type] = {
-			"demand_horizon": flt(sm.demand_horizon),
-			"spike_threshold": flt(sm.spike_threshold),
-		}
+		# Create a map of item_type -> spike master config
+		spike_master_map = {}
+		for sm in spike_master_records:
+			spike_master_map[sm.item_type] = {
+				"demand_horizon": flt(sm.demand_horizon),
+				"spike_threshold": flt(sm.spike_threshold),
+			}
 
 	# IMPORTANT: Spike logic ONLY applies to buffer items
 	# Get all buffer items only
@@ -2299,10 +2343,7 @@ def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map
 			continue
 
 		# Build SQL query for items in this type
-		if len(item_codes_for_type) == 1:
-			item_codes_tuple = (item_codes_for_type[0],)
-		else:
-			item_codes_tuple = tuple(item_codes_for_type)
+		item_codes_tuple = tuple(item_codes_for_type)
 
 		if end_date:
 			so_rows = frappe.db.sql(
@@ -2622,10 +2663,7 @@ def get_open_so_map_for_priority(item_codes):
 	"""
 	if not item_codes:
 		return {}
-	if len(item_codes) == 1:
-		items_tuple = (next(iter(item_codes)),)
-	else:
-		items_tuple = tuple(item_codes)
+	items_tuple = tuple(item_codes)
 	result = frappe.db.sql(
 		"""
 		SELECT
@@ -2753,7 +2791,7 @@ def get_priority_breakdown(item_code):
 	_bd_all_items = {item_code}
 	_bd_frontier = {item_code}
 	while _bd_frontier:
-		_bd_f_tuple = tuple(_bd_frontier) if len(_bd_frontier) > 1 else (next(iter(_bd_frontier)),)
+		_bd_f_tuple = tuple(_bd_frontier)
 		_bd_up = frappe.db.sql(
 			"""
 			SELECT b.item AS parent_item, bi.item_code AS child_item
@@ -2777,7 +2815,7 @@ def get_priority_breakdown(item_code):
 	_bd_ancestors = _bd_all_items - {item_code}
 	_bd_priority_map = {item_code: own_priority}
 	if _bd_ancestors:
-		_bd_anc_tuple = tuple(_bd_ancestors) if len(_bd_ancestors) > 1 else (next(iter(_bd_ancestors)),)
+		_bd_anc_tuple = tuple(_bd_ancestors)
 		_bd_item_rows = frappe.db.sql(
 			"SELECT item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE item_code IN %s",
 			(_bd_anc_tuple,),
@@ -3400,3 +3438,336 @@ def get_on_hand_status_breakdown(item_code):
 		"on_hand_status": f"{on_hand_pct_rounded:.2f}%" if on_hand_pct_rounded is not None else "N/A",
 		"on_hand_colour": colour,
 	}
+
+
+@frappe.whitelist()
+def get_child_requirement_breakdown(item_code):
+	"""
+	Return a step-by-step breakdown of how child requirements are computed
+	for a given parent item in the PO Recommendation report.
+	"""
+	from frappe.utils import nowdate
+
+	today_date = nowdate()
+
+	# ── Step 1: Parent item info ───────────────────────────────────────────
+	item = frappe.db.get_value(
+		"Item", item_code,
+		["name", "item_name", "safety_stock", "custom_buffer_flag", "custom_item_type",
+		 "min_order_qty", "custom_batch_size"],
+		as_dict=True,
+	)
+	if not item:
+		frappe.throw(f"Item {item_code} not found")
+
+	buffer_flag  = item.custom_buffer_flag or "Non-Buffer"
+	item_type    = item.custom_item_type or ""
+	tog          = flt(item.safety_stock)
+	moq          = flt(item.min_order_qty)
+	batch_size   = flt(item.custom_batch_size)
+	sku_type     = calculate_sku_type(buffer_flag, item_type) or ""
+
+	# ── Step 2: Parent stock, WIP, open PO, open SO ────────────────────────
+	stock_row = frappe.db.sql(
+		"SELECT SUM(actual_qty) as stock FROM `tabBin` WHERE item_code = %s",
+		item_code, as_dict=True,
+	)
+	stock = flt(stock_row[0].stock if stock_row else 0)
+
+	wip_row = frappe.db.sql(
+		"""SELECT SUM(GREATEST(0, IFNULL(qty,0) - IFNULL(produced_qty,0))) as w
+		   FROM `tabWork Order`
+		   WHERE production_item = %s AND status NOT IN ('Completed','Stopped','Cancelled') AND docstatus = 1""",
+		item_code, as_dict=True,
+	)
+	wip = flt(wip_row[0].w if wip_row else 0)
+	if sku_type in ["RBMTA", "RBMTO"]:
+		wip = 0  # RBMTA/RBMTO do not count WIP
+
+	open_po_row = frappe.db.sql(
+		"""SELECT SUM(GREATEST(0, poi.qty - IFNULL(poi.received_qty,0))) as po
+		   FROM `tabPurchase Order` po
+		   INNER JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
+		   WHERE po.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+		     AND po.docstatus = 1 AND poi.item_code = %s""",
+		item_code, as_dict=True,
+	)
+	open_po = flt(open_po_row[0].po if open_po_row else 0)
+
+	open_so_row = frappe.db.sql(
+		"""SELECT SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty,0))) as so
+		   FROM `tabSales Order` so
+		   INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+		   WHERE so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+		     AND so.docstatus = 1 AND IFNULL(soi.custom_closed,0) = 0
+		     AND soi.item_code = %s""",
+		item_code, as_dict=True,
+	)
+	open_so = flt(open_so_row[0].so if open_so_row else 0)
+
+	# ── Step 3: Qualified demand ───────────────────────────────────────────
+	till_today_row = frappe.db.sql(
+		"""SELECT SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty,0))) as qty
+		   FROM `tabSales Order` so
+		   INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+		   WHERE so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+		     AND so.docstatus = 1 AND IFNULL(soi.custom_closed,0) = 0
+		     AND soi.item_code = %s AND IFNULL(soi.delivery_date,'1900-01-01') <= %s""",
+		(item_code, today_date), as_dict=True,
+	)
+	till_today = flt(till_today_row[0].qty if till_today_row else 0)
+
+	spike = 0.0
+	demand_horizon = 0
+	spike_threshold_pct = 0.0
+	spike_threshold_qty = 0.0
+	spike_sos = []
+	threshold_triggered = False
+
+	if buffer_flag == "Buffer" and item_type:
+		spike_config = frappe.db.get_value(
+			"Spike Master", item_type, ["demand_horizon", "spike_threshold"], as_dict=True
+		)
+		if spike_config:
+			demand_horizon = flt(spike_config.demand_horizon)
+			spike_threshold_pct = flt(spike_config.spike_threshold)
+			spike_threshold_qty = tog * spike_threshold_pct / 100
+
+			if demand_horizon > 0:
+				from frappe.utils import add_days
+				end_date = add_days(today_date, int(demand_horizon))
+				spike_rows = frappe.db.sql(
+					"""SELECT so.name as so_name,
+					          GREATEST(0, soi.qty - IFNULL(soi.delivered_qty,0)) as qty,
+					          soi.delivery_date
+					   FROM `tabSales Order` so
+					   INNER JOIN `tabSales Order Item` soi ON soi.parent = so.name
+					   WHERE so.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+					     AND so.docstatus = 1 AND IFNULL(soi.custom_closed,0) = 0
+					     AND soi.item_code = %s
+					     AND IFNULL(soi.delivery_date,'1900-01-01') > %s
+					     AND IFNULL(soi.delivery_date,'1900-01-01') <= %s""",
+					(item_code, today_date, end_date), as_dict=True,
+				)
+				for r in spike_rows:
+					if flt(r.qty) > 0:
+						spike += flt(r.qty)
+						spike_sos.append({"so_name": r.so_name, "qty": flt(r.qty), "delivery_date": str(r.delivery_date)})
+
+	qualified_demand = till_today + spike
+	if buffer_flag == "Buffer" and spike_threshold_qty > 0:
+		if qualified_demand < spike_threshold_qty:
+			qualified_demand = 0.0
+			threshold_triggered = True
+
+	# ── Step 4: Base & Net order recommendation ────────────────────────────
+	if buffer_flag == "Buffer":
+		if sku_type in ["BOTA", "PTA"]:
+			base_order_rec = max(0.0, tog + qualified_demand - stock - wip - open_po)
+			order_rec_formula = f"TOG ({tog}) + QD ({qualified_demand}) - Stock ({stock}) - WIP ({wip}) - Open PO ({open_po})"
+		else:
+			base_order_rec = max(0.0, tog + qualified_demand - stock - wip)
+			order_rec_formula = f"TOG ({tog}) + QD ({qualified_demand}) - Stock ({stock}) - WIP ({wip})"
+	else:
+		if sku_type in ["BOTA", "PTA", "PTO", "BOTO", "TRMTO"]:
+			base_order_rec = max(0.0, open_so - stock - wip - open_po)
+			order_rec_formula = f"Open SO ({open_so}) - Stock ({stock}) - WIP ({wip}) - Open PO ({open_po})"
+		else:
+			base_order_rec = max(0.0, open_so - stock - wip)
+			order_rec_formula = f"Open SO ({open_so}) - Stock ({stock}) - WIP ({wip})"
+
+	net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
+
+	if moq > 0:
+		if moq < base_order_rec:
+			moq_batch_note = f"MOQ ({moq}) < Base Rec ({round(base_order_rec,2)}) → use Base Rec"
+		else:
+			moq_batch_note = f"MOQ ({moq}) ≥ Base Rec ({round(base_order_rec,2)}) → use MOQ"
+	elif batch_size > 0:
+		moq_batch_note = f"Batch Size ({batch_size}) → ceil({round(base_order_rec,2)} / {batch_size}) × {batch_size} = {net_order_rec}"
+	else:
+		moq_batch_note = "No MOQ / Batch Size → use Base Rec as-is"
+
+	or_with_moq_batch_size = math.ceil(flt(net_order_rec))
+
+	# ── Step 5: BOM lookup ─────────────────────────────────────────────────
+	bom_row = frappe.db.sql(
+		"""SELECT b.name AS bom_name, b.quantity AS bom_quantity
+		   FROM `tabBOM` b
+		   WHERE b.item = %s AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
+		   LIMIT 1""",
+		item_code, as_dict=True,
+	)
+
+	if not bom_row:
+		return {
+			"item_code": item_code,
+			"item_name": item.item_name,
+			"buffer_flag": buffer_flag,
+			"sku_type": sku_type,
+			"item_type": item_type,
+			"tog": tog,
+			"moq": moq,
+			"batch_size": batch_size,
+			"stock": stock,
+			"wip": wip,
+			"open_po": open_po,
+			"open_so": open_so,
+			"till_today": till_today,
+			"spike": spike,
+			"qualified_demand": round(qualified_demand, 3),
+			"threshold_triggered": threshold_triggered,
+			"spike_threshold_qty": round(spike_threshold_qty, 3),
+			"demand_horizon": demand_horizon,
+			"base_order_rec": round(base_order_rec, 3),
+			"order_rec_formula": order_rec_formula,
+			"moq_batch_note": moq_batch_note,
+			"net_order_rec": round(net_order_rec, 3),
+			"or_with_moq_batch_size": or_with_moq_batch_size,
+			"bom_name": None,
+			"bom_quantity": None,
+			"child_items": [],
+			"no_bom": True,
+		}
+
+	bom_name     = bom_row[0].bom_name
+	bom_quantity = flt(bom_row[0].bom_quantity) or 1.0
+
+	# ── Step 6: Child items ────────────────────────────────────────────────
+	bom_items = frappe.db.sql(
+		"""SELECT bi.item_code, bi.qty AS bom_qty, bi.item_name AS child_item_name
+		   FROM `tabBOM Item` bi
+		   WHERE bi.parent = %s AND bi.parenttype = 'BOM'""",
+		bom_name, as_dict=True,
+	)
+
+	all_child_codes = [r.item_code for r in bom_items]
+	child_detail_map = {}
+	child_stock_map = {}
+	child_wip_map = {}
+	child_open_po_map = {}
+
+	if all_child_codes:
+		child_tuple = tuple(all_child_codes) if len(all_child_codes) > 1 else (all_child_codes[0],)
+
+		# Child item types
+		ci_rows = frappe.db.sql(
+			"SELECT name, custom_item_type AS item_type, custom_buffer_flag AS buffer_flag FROM `tabItem` WHERE name IN %s",
+			(child_tuple,), as_dict=True,
+		)
+		for ci in ci_rows:
+			child_detail_map[ci.name] = {
+				"item_type": ci.item_type,
+				"buffer_flag": ci.buffer_flag or "Non-Buffer",
+				"sku_type": calculate_sku_type(ci.buffer_flag or "Non-Buffer", ci.item_type),
+			}
+
+		# Child stock
+		cs_rows = frappe.db.sql(
+			"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
+			(child_tuple,), as_dict=True,
+		)
+		for cs in cs_rows:
+			child_stock_map[cs.item_code] = math.ceil(flt(cs.stock))
+
+		# Child WIP
+		cw_rows = frappe.db.sql(
+			"""SELECT production_item, SUM(GREATEST(0, IFNULL(qty,0) - IFNULL(produced_qty,0))) AS w
+			   FROM `tabWork Order`
+			   WHERE production_item IN %s AND status NOT IN ('Completed','Stopped','Cancelled') AND docstatus = 1
+			   GROUP BY production_item""",
+			(child_tuple,), as_dict=True,
+		)
+		for cw in cw_rows:
+			child_wip_map[cw.production_item] = flt(cw.w)
+
+		# Child open PO
+		cp_rows = frappe.db.sql(
+			"""SELECT poi.item_code, SUM(GREATEST(0, poi.qty - IFNULL(poi.received_qty,0))) AS po
+			   FROM `tabPurchase Order` po
+			   INNER JOIN `tabPurchase Order Item` poi ON poi.parent = po.name
+			   WHERE po.status NOT IN ('Stopped','On Hold','Closed','Cancelled','Completed')
+			     AND po.docstatus = 1 AND poi.item_code IN %s
+			   GROUP BY poi.item_code""",
+			(child_tuple,), as_dict=True,
+		)
+		for cp in cp_rows:
+			child_open_po_map[cp.item_code] = flt(cp.po)
+
+	child_items = []
+	for bi in bom_items:
+		child_code    = bi.item_code
+		child_bom_qty = flt(bi.bom_qty)
+		normalized    = child_bom_qty / bom_quantity if bom_quantity else 0
+		child_req     = math.ceil(flt(or_with_moq_batch_size) * normalized)
+
+		cd = child_detail_map.get(child_code, {})
+		c_item_type  = cd.get("item_type") or ""
+		c_buffer     = cd.get("buffer_flag") or "Non-Buffer"
+		c_sku_type   = cd.get("sku_type") or ""
+
+		c_stock   = child_stock_map.get(child_code, 0)
+		c_wip     = 0 if c_sku_type in ["RBMTA", "RBMTO"] else child_wip_map.get(child_code, 0)
+		c_open_po = child_open_po_map.get(child_code, 0)
+		c_wip_open_po = math.ceil(flt(c_wip) + flt(c_open_po))
+
+		stock_shortage      = max(0, child_req - c_stock)
+		wip_po_shortage     = max(0, child_req - c_stock - c_wip_open_po)
+		full_kit_stock      = "Full Kit" if stock_shortage == 0 else f"Short {stock_shortage}"
+		full_kit_wip_po     = "Full Kit" if wip_po_shortage <= 0 else f"Short {math.ceil(wip_po_shortage)}"
+
+		child_items.append({
+			"child_item_code":  child_code,
+			"child_item_name":  bi.child_item_name or "",
+			"item_type":        c_item_type,
+			"buffer_flag":      c_buffer,
+			"sku_type":         c_sku_type,
+			"bom_qty":          child_bom_qty,
+			"bom_quantity":     bom_quantity,
+			"normalized_ratio": round(normalized, 4),
+			"child_requirement": child_req,
+			"req_formula":      f"ceil({or_with_moq_batch_size} × {round(normalized,4)}) = {child_req}",
+			"child_stock":      c_stock,
+			"child_wip":        round(c_wip, 2),
+			"child_open_po":    round(c_open_po, 2),
+			"child_wip_open_po": c_wip_open_po,
+			"stock_shortage":   stock_shortage,
+			"wip_po_shortage":  math.ceil(wip_po_shortage) if wip_po_shortage > 0 else 0,
+			"full_kit_stock":   full_kit_stock,
+			"full_kit_wip_po":  full_kit_wip_po,
+		})
+
+	return {
+		"item_code":             item_code,
+		"item_name":             item.item_name,
+		"buffer_flag":           buffer_flag,
+		"sku_type":              sku_type,
+		"item_type":             item_type,
+		"tog":                   tog,
+		"moq":                   moq,
+		"batch_size":            batch_size,
+		"stock":                 round(stock, 2),
+		"wip":                   round(wip, 2),
+		"open_po":               round(open_po, 2),
+		"open_so":               round(open_so, 2),
+		"till_today":            round(till_today, 2),
+		"spike":                 round(spike, 2),
+		"spike_sos":             spike_sos,
+		"demand_horizon":        demand_horizon,
+		"spike_threshold_pct":   spike_threshold_pct,
+		"spike_threshold_qty":   round(spike_threshold_qty, 2),
+		"threshold_triggered":   threshold_triggered,
+		"qualified_demand":      round(qualified_demand, 3),
+		"base_order_rec":        round(base_order_rec, 3),
+		"order_rec_formula":     order_rec_formula,
+		"moq_batch_note":        moq_batch_note,
+		"net_order_rec":         round(net_order_rec, 3),
+		"or_with_moq_batch_size": or_with_moq_batch_size,
+		"bom_name":              bom_name,
+		"bom_quantity":          bom_quantity,
+		"child_items":           child_items,
+		"no_bom":                False,
+	}
+
+
+

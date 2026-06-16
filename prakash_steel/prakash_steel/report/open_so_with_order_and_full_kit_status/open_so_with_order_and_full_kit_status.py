@@ -52,17 +52,12 @@ def get_allowed_customers_for_user():
 	# Find the child doctype name by querying DocType for Customer's child tables
 	# The child table field name in Customer is "portal_users"
 	try:
-		customer_doc = frappe.get_doc("DocType", "Customer")
-		portal_users_field = None
-		for field in customer_doc.fields:
-			if field.fieldname == "portal_users":
-				portal_users_field = field
-				break
-		
+		portal_users_field = frappe.get_meta("Customer").get_field("portal_users")
+
 		if not portal_users_field:
 			# Field not found, return None (no restrictions)
 			return None
-		
+
 		child_doctype = portal_users_field.options
 		child_table = f"tab{child_doctype}"
 		
