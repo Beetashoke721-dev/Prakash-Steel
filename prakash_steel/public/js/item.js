@@ -65,11 +65,12 @@ frappe.ui.form.on("Item", {
     },
 
     custom_item_type: function (frm) {
+        toggle_buffer_fields_visibility(frm);
         calculate_sku_type(frm);
     },
 
     validate: function (frm) {
-        if (frm.doc.custom_buffer_flag === 'Buffer') {
+        if (frm.doc.custom_buffer_flag === 'Buffer' && frm.doc.custom_item_type !== 'CS') {
             const safety_stock = frm.doc.safety_stock;
 
             if (safety_stock === null || safety_stock === undefined || safety_stock === '' || safety_stock <= 0) {
@@ -465,7 +466,7 @@ function toggle_buffer_fields_visibility(frm) {
 
     if (frm.fields_dict['safety_stock']) {
         frm.set_df_property('safety_stock', 'hidden', !is_buffer);
-        frm.set_df_property('safety_stock', 'reqd', is_buffer);
+        frm.set_df_property('safety_stock', 'reqd', is_buffer && frm.doc.custom_item_type !== 'CS');
     }
 
     if (frm.fields_dict['custom_top_of_red']) {
