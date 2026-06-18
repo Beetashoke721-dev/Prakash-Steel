@@ -25,7 +25,7 @@ from prakash_steel.utils.lead_time import get_default_bom
 from prakash_steel.utils.whitelist_permissions import require_permission
 
 
-def get_draft_wo_map():
+def get_draft_wo_map() -> dict:
 	"""Returns {item_code: draft_wo_qty} — sum of qty from draft (docstatus=0) Work Orders."""
 	rows = frappe.db.sql(
 		"""
@@ -40,7 +40,7 @@ def get_draft_wo_map():
 
 
 @frappe.whitelist()
-def get_item_breakdown(item_code):
+def get_item_breakdown(item_code) -> list[dict]:
 	require_permission("Item", "report")
 	item = frappe.db.get_value(
 		"Item",
@@ -194,13 +194,13 @@ def get_item_breakdown(item_code):
 	return rows
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": _("Machine"),
@@ -356,7 +356,7 @@ def get_columns():
 	]
 
 
-def get_data(filters=None):
+def get_data(filters=None) -> list[dict]:
 	# Fetch all BB items (both buffer BBMTA and non-buffer BBMTO)
 	bb_items = frappe.db.sql(
 		"""
@@ -699,31 +699,28 @@ def get_data(filters=None):
 		)
 	)
 
-	# Per-item allocation: each parent item independently allocates from actual child stock.
-	# All batch rows of the same item show the same item-level values (cached per pair).
-	allocation_cache = {}  # (item_code, child_item_code) -> computed allocation dict
+	# FIFO child stock allocation: deplete stock row by row in sorted order.
+	# Each row sees the remaining child stock after all previous rows have consumed their share.
+	remaining_child_stock = {k: flt(v) for k, v in child_stock_map.items()}
+	remaining_child_wip_open_po = {k: flt(v) for k, v in child_wip_open_po_map.items()}
 
 	for row in data:
 		child_item_code = row.get("child_item_code")
-		item_code = row.get("item_code")
 		if not child_item_code:
 			continue
 
-		pair = (item_code, child_item_code)
-
-		if pair in allocation_cache:
-			row.update(allocation_cache[pair])
-			continue
-
 		child_requirement = flt(row.get("child_requirement", 0))
-		# Use actual child stock — no cross-item depletion
-		actual_child_stock = flt(child_stock_map.get(child_item_code, 0))
-		actual_child_wip_open_po = flt(child_wip_open_po_map.get(child_item_code, 0))
+		available_child_stock = flt(remaining_child_stock.get(child_item_code, 0))
+		available_child_wip_open_po = flt(remaining_child_wip_open_po.get(child_item_code, 0))
 
-		stock_allocated = min(child_requirement, actual_child_stock)
+		stock_allocated = min(child_requirement, available_child_stock)
 		stock_shortage = child_requirement - stock_allocated
-		wip_open_po_allocated = min(stock_shortage, actual_child_wip_open_po)
+		wip_open_po_allocated = min(stock_shortage, available_child_wip_open_po)
 		total_allocated = stock_allocated + wip_open_po_allocated
+
+		# Deplete for subsequent rows
+		remaining_child_stock[child_item_code] = available_child_stock - stock_allocated
+		remaining_child_wip_open_po[child_item_code] = available_child_wip_open_po - wip_open_po_allocated
 
 		child_bom_qty = flt(row.get("child_bom_qty", 0))
 		child_bom_quantity = flt(row.get("child_bom_quantity", 1.0)) or 1.0
@@ -740,16 +737,11 @@ def get_data(filters=None):
 		# Cap at net order recommendation — can't produce more than what's actually needed
 		prod_qty_child_stock_wip = min(prod_qty_child_stock_wip, net_order_recommendation)
 
-		cached = {
-			"child_stock_soft_allocation_qty": math.ceil(stock_allocated),
-			"child_stock_shortage": math.ceil(stock_shortage),
-			"production_qty_based_on_child_stock": prod_qty_child_stock,
-			"process_time_based_on_child_stock": round(prod_qty_child_stock / per_hour, 2)
-			if per_hour
-			else None,
-			"production_qty_based_on_child_stock_wip_open_po": prod_qty_child_stock_wip,
-		}
-		allocation_cache[pair] = cached
-		row.update(cached)
+		row["child_stock"] = math.ceil(available_child_stock)
+		row["child_stock_soft_allocation_qty"] = math.ceil(stock_allocated)
+		row["child_stock_shortage"] = math.ceil(stock_shortage)
+		row["production_qty_based_on_child_stock"] = prod_qty_child_stock
+		row["process_time_based_on_child_stock"] = round(prod_qty_child_stock / per_hour, 2) if per_hour else None
+		row["production_qty_based_on_child_stock_wip_open_po"] = prod_qty_child_stock_wip
 
 	return data
