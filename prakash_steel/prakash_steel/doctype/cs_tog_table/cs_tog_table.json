@@ -16,18 +16,18 @@
   {
    "fieldname": "top_of_green",
    "fieldtype": "Int",
-   "label": "Top Of Green"
+   "label": "Top of Green"
   },
   {
    "fieldname": "top_of_red",
    "fieldtype": "Int",
-   "label": "Top Of Red",
+   "label": "Top of Red",
    "read_only": 1
   },
   {
    "fieldname": "top_of_yellow",
    "fieldtype": "Int",
-   "label": "Top Of Yellow",
+   "label": "Top of Yellow",
    "read_only": 1
   },
   {
