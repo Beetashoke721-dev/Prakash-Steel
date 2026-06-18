@@ -82,6 +82,29 @@ frappe.ui.form.on("Item", {
             }
         }
 
+        if (frm.doc.custom_buffer_flag === 'Buffer' && frm.doc.custom_item_type === 'CS') {
+            const tog_rows = frm.doc.custom_cs_tog_table || [];
+
+            if (tog_rows.length === 0) {
+                frappe.throw({
+                    title: __('Validation Error'),
+                    indicator: 'red',
+                    message: __('CS Tog Table must have at least one row with Top Of Green when Buffer Flag is Buffer and Item Type is CS.')
+                });
+            }
+
+            for (let i = 0; i < tog_rows.length; i++) {
+                const row = tog_rows[i];
+                if (!row.top_of_green || row.top_of_green <= 0) {
+                    frappe.throw({
+                        title: __('Validation Error'),
+                        indicator: 'red',
+                        message: __(`Row ${i + 1} in CS Tog Table: Top Of Green is required and must be greater than 0.`)
+                    });
+                }
+            }
+        }
+
         const min_order_qty = parseFloat(frm.doc.min_order_qty) || 0;
         const custom_batch_size = parseInt(frm.doc.custom_batch_size) || 0;
 
