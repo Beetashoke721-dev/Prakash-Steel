@@ -97,40 +97,40 @@ frappe.query_reports["Bright Plan"] = {
 	filters: [],
 
 	onload(report) {
-		report.page.add_inner_button(__("Debug Item Breakdown"), () => {
-			const d = new frappe.ui.Dialog({
-				title: __("Debug Item Breakdown"),
-				fields: [
-					{
-						label: __("Item Code"),
-						fieldname: "item_code",
-						fieldtype: "Link",
-						options: "Item",
-						reqd: 1,
-						get_query() {
-							return { filters: { custom_item_type: "BB" } };
-						},
-					},
-				],
-				primary_action_label: __("Show Breakdown"),
-				primary_action({ item_code }) {
-					if (!item_code) return;
-					d.disable_primary_action();
-					frappe.call({
-						method: "prakash_steel.prakash_steel.report.bright_plan.bright_plan.get_item_breakdown",
-						args: { item_code },
-						callback(r) {
-							d.enable_primary_action();
-							show_bright_breakdown(item_code, r.message || []);
-						},
-						error() {
-							d.enable_primary_action();
-						},
-					});
-				},
-			});
-			d.show();
-		});
+		// report.page.add_inner_button(__("Debug Item Breakdown"), () => {
+		// 	const d = new frappe.ui.Dialog({
+		// 		title: __("Debug Item Breakdown"),
+		// 		fields: [
+		// 			{
+		// 				label: __("Item Code"),
+		// 				fieldname: "item_code",
+		// 				fieldtype: "Link",
+		// 				options: "Item",
+		// 				reqd: 1,
+		// 				get_query() {
+		// 					return { filters: { custom_item_type: "BB" } };
+		// 				},
+		// 			},
+		// 		],
+		// 		primary_action_label: __("Show Breakdown"),
+		// 		primary_action({ item_code }) {
+		// 			if (!item_code) return;
+		// 			d.disable_primary_action();
+		// 			frappe.call({
+		// 				method: "prakash_steel.prakash_steel.report.bright_plan.bright_plan.get_item_breakdown",
+		// 				args: { item_code },
+		// 				callback(r) {
+		// 					d.enable_primary_action();
+		// 					show_bright_breakdown(item_code, r.message || []);
+		// 				},
+		// 				error() {
+		// 					d.enable_primary_action();
+		// 				},
+		// 			});
+		// 		},
+		// 	});
+		// 	d.show();
+		// });
 	},
 
 	formatter: function (value, row, column, data, default_formatter) {

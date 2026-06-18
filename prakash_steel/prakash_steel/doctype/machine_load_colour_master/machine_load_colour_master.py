@@ -16,10 +16,11 @@ class MachineLoadColourMaster(Document):
 	def validate(self):
 		self.validate_colour_day_chain()
 
+	def _rows_by_colour(self):
+		return {row.colour: row for row in (self.table_iobk or []) if row.colour}
+
 	def normalize_colour_day_chain(self):
-		rows_by_colour = {
-			row.colour: row for row in (self.table_iobk or []) if row.colour
-		}
+		rows_by_colour = self._rows_by_colour()
 
 		black = rows_by_colour.get("Black")
 		if black:
@@ -30,18 +31,14 @@ class MachineLoadColourMaster(Document):
 		if white:
 			white.to_days = 0
 
-		for idx in range(1, len(MACHINE_LOAD_COLOUR_CHAIN)):
-			colour = MACHINE_LOAD_COLOUR_CHAIN[idx]
-			prev_colour = MACHINE_LOAD_COLOUR_CHAIN[idx - 1]
+		for prev_colour, colour in zip(MACHINE_LOAD_COLOUR_CHAIN, MACHINE_LOAD_COLOUR_CHAIN[1:]):
 			row = rows_by_colour.get(colour)
 			prev_row = rows_by_colour.get(prev_colour)
 			if row and prev_row:
 				row.from_days = cint(prev_row.to_days)
 
 	def validate_colour_day_chain(self):
-		rows_by_colour = {
-			row.colour: row for row in (self.table_iobk or []) if row.colour
-		}
+		rows_by_colour = self._rows_by_colour()
 
 		for colour in MACHINE_LOAD_COLOUR_CHAIN:
 			row = rows_by_colour.get(colour)

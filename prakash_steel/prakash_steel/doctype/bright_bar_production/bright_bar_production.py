@@ -222,14 +222,13 @@ class BrightBarProduction(Document):
 			(self.production_planning, self.finished),
 		)[0][0] or 0
 
-		rows = frappe.get_all(
+		frappe.db.set_value(
 			"Production Planning FG Table",
-			filters={"parent": self.production_planning, "fg_item": self.finished},
-			fields=["name"],
+			{"parent": self.production_planning, "fg_item": self.finished},
+			"produced_qty",
+			total,
+			update_modified=False,
 		)
-		for row in rows:
-			frappe.db.set_value("Production Planning FG Table", row.name, "produced_qty", total)
-
 		frappe.db.commit()
 
 	def before_cancel(self):

@@ -2,6 +2,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime, today
 
+from prakash_steel.utils.whitelist_permissions import require_all_permissions
+
 
 class PORecommendationSnapshot(Document):
 	def before_save(self):
@@ -125,6 +127,9 @@ def capture_daily_po_snapshot():
 
 @frappe.whitelist()
 def run_manual_snapshot(purchase=1, sell=0, buffer_flag=1, sku_type_filter=None, item_code_filter=None):
+	require_all_permissions(
+		[("PO Recommendation Snapshot", "create"), ("PO Recommendation Snapshot", "write")],
+	)
 	name = _capture_snapshot(
 		purchase=int(purchase),
 		sell=int(sell),

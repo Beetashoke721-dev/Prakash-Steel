@@ -9,6 +9,9 @@ def get_data(
 	item_code=None, warehouse=None, item_group=None, start=0, sort_by="actual_qty", sort_order="desc"
 ):
 	"""Return item dashboard data, excluding qty from custom_closed Sales Order items."""
+	if not frappe.has_permission("Item", "read"):
+		frappe.throw("Not permitted to access item dashboard data.", frappe.PermissionError)
+
 	items = _original_get_data(
 		item_code=item_code,
 		warehouse=warehouse,

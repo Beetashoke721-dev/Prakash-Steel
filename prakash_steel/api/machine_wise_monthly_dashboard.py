@@ -25,6 +25,11 @@ MONTH_LABELS = {
 
 @frappe.whitelist()
 def get_machine_wise_monthly_data(fiscal_year=None, machine_name=None):
+    if not frappe.has_permission("Bright Bar Production", "read") and not frappe.has_permission(
+        "Machine Master", "read"
+    ):
+        frappe.throw(_("Not permitted to access machine dashboard data."), frappe.PermissionError)
+
     fiscal_year_doc = _get_fiscal_year_doc(fiscal_year)
     month_periods = _get_fiscal_month_periods(fiscal_year_doc)
 
@@ -238,6 +243,11 @@ def _build_flat_sheet_rows(machines, rows):
 
 @frappe.whitelist()
 def export_machine_wise_monthly_excel(fiscal_year=None, machine_name=None):
+    if not frappe.has_permission("Bright Bar Production", "read") and not frappe.has_permission(
+        "Machine Master", "read"
+    ):
+        frappe.throw(_("Not permitted to access machine dashboard data."), frappe.PermissionError)
+
     result = get_machine_wise_monthly_data(fiscal_year, machine_name)
     machines = result.get("machines") or []
     rows = result.get("rows") or []
@@ -260,6 +270,11 @@ def export_machine_wise_monthly_excel(fiscal_year=None, machine_name=None):
 
 @frappe.whitelist()
 def export_machine_wise_monthly_pdf(fiscal_year=None, machine_name=None):
+    if not frappe.has_permission("Bright Bar Production", "read") and not frappe.has_permission(
+        "Machine Master", "read"
+    ):
+        frappe.throw(_("Not permitted to access machine dashboard data."), frappe.PermissionError)
+
     result = get_machine_wise_monthly_data(fiscal_year, machine_name)
     machines = result.get("machines") or []
     rows = result.get("rows") or []

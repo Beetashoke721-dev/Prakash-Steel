@@ -65,11 +65,12 @@ frappe.ui.form.on("Item", {
     },
 
     custom_item_type: function (frm) {
+        toggle_buffer_fields_visibility(frm);
         calculate_sku_type(frm);
     },
 
     validate: function (frm) {
-        if (frm.doc.custom_buffer_flag === 'Buffer') {
+        if (frm.doc.custom_buffer_flag === 'Buffer' && frm.doc.custom_item_type !== 'CS') {
             const safety_stock = frm.doc.safety_stock;
 
             if (safety_stock === null || safety_stock === undefined || safety_stock === '' || safety_stock <= 0) {
@@ -78,6 +79,29 @@ frappe.ui.form.on("Item", {
                     indicator: 'red',
                     message: __('Safety Stock is required and must be greater than 0 when Buffer Flag is set to Buffer.')
                 });
+            }
+        }
+
+        if (frm.doc.custom_buffer_flag === 'Buffer' && frm.doc.custom_item_type === 'CS') {
+            const tog_rows = frm.doc.custom_cs_tog_table || [];
+
+            if (tog_rows.length === 0) {
+                frappe.throw({
+                    title: __('Validation Error'),
+                    indicator: 'red',
+                    message: __('CS Tog Table must have at least one row with Top Of Green when Buffer Flag is Buffer and Item Type is CS.')
+                });
+            }
+
+            for (let i = 0; i < tog_rows.length; i++) {
+                const row = tog_rows[i];
+                if (!row.top_of_green || row.top_of_green <= 0) {
+                    frappe.throw({
+                        title: __('Validation Error'),
+                        indicator: 'red',
+                        message: __(`Row ${i + 1} in CS Tog Table: Top Of Green is required and must be greater than 0.`)
+                    });
+                }
             }
         }
 
@@ -465,7 +489,7 @@ function toggle_buffer_fields_visibility(frm) {
 
     if (frm.fields_dict['safety_stock']) {
         frm.set_df_property('safety_stock', 'hidden', !is_buffer);
-        frm.set_df_property('safety_stock', 'reqd', is_buffer);
+        frm.set_df_property('safety_stock', 'reqd', is_buffer && frm.doc.custom_item_type !== 'CS');
     }
 
     if (frm.fields_dict['custom_top_of_red']) {

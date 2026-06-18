@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 @frappe.whitelist()
@@ -9,6 +10,9 @@ def get_available_stock(item_code):
 
     Returns available quantity in KG.
     """
+    if not frappe.has_permission("Item", "read"):
+        frappe.throw(_("Not permitted to access stock information."), frappe.PermissionError)
+
     try:
         total_qty = frappe.db.sql(
             """
@@ -37,6 +41,9 @@ def get_available_stock_for_warehouse(item_code, warehouse):
     Fetch available stock for an Item in a specific Warehouse from Bin table.
     Returns available quantity in KG.
     """
+    if not frappe.has_permission("Item", "read"):
+        frappe.throw(_("Not permitted to access stock information."), frappe.PermissionError)
+
     try:
         if not item_code or not warehouse:
             return 0

@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 @frappe.whitelist()
@@ -20,6 +21,9 @@ def get_last_purchase_or_production(item_code: str):
             - date: date of the latest relevant transaction (production or PO)
             - qty: corresponding quantity
     """
+    if not frappe.has_permission("Item", "read"):
+        frappe.throw(_("Not permitted to access last purchase/production data."), frappe.PermissionError)
+
     if not item_code:
         return {"date": None, "qty": 0}
 

@@ -3,6 +3,7 @@ from io import BytesIO
 from typing import Any
 
 import frappe
+from frappe import _
 from frappe.utils import flt
 from frappe.utils.file_manager import save_file
 from frappe.utils.pdf import get_pdf
@@ -23,6 +24,8 @@ def get_item_insight_data(
     Instead of querying per-item in a loop, all data is fetched in a handful
     of batch SQL queries and merged in Python.
     """
+    if not frappe.has_permission("Item", "report"):
+        frappe.throw(_("Not permitted to access item insight data."), frappe.PermissionError)
 
     # Build item filter
     item_filter: dict[str, object] = {"is_stock_item": 1}
@@ -495,6 +498,9 @@ def _bulk_inventory_data(item_codes):
 
 @frappe.whitelist()
 def search_items(query, limit=20):
+    if not frappe.has_permission("Item", "read"):
+        frappe.throw(_("Not permitted to access item search data."), frappe.PermissionError)
+
     """
     Search for items by item code or item name
     Returns items with their name, item_name, and item_group
@@ -561,6 +567,11 @@ def search_item_categories(
 
     This is used to populate the Category Name suggestions based on the selected Item Grade.
     """
+    if not frappe.has_permission("Item", "read"):
+        frappe.throw(
+            _("Not permitted to access item category search data."),
+            frappe.PermissionError,
+        )
     filters = filters or {}
     item_grade = filters.get("item_grade")
 
@@ -612,6 +623,8 @@ def search_item_categories(
 @frappe.whitelist()
 def export_item_insight_excel(filters: str | None = None) -> dict[str, Any]:
     """Export item insight data to Excel and return file URL."""
+    if not frappe.has_permission("Item", "report"):
+        frappe.throw(_("Not permitted to export item insight data."), frappe.PermissionError)
 
     filters_dict: dict[str, Any] = {}
     if filters:
@@ -792,6 +805,8 @@ def export_item_insight_excel(filters: str | None = None) -> dict[str, Any]:
 @frappe.whitelist()
 def export_item_insight_pdf(filters: str | None = None) -> dict[str, Any]:
     """Export item insight data to PDF and return file URL."""
+    if not frappe.has_permission("Item", "report"):
+        frappe.throw(_("Not permitted to export item insight data."), frappe.PermissionError)
 
     filters_dict: dict[str, Any] = {}
     if filters:

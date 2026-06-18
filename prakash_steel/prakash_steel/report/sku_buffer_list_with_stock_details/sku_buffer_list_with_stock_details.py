@@ -203,7 +203,7 @@ def get_data(filters=None):
 			GROUP BY
 				item_code
 			""",
-			(tuple(item_codes) if len(item_codes) > 1 else (item_codes[0],),),
+			(tuple(item_codes),),
 			as_dict=True,
 		)
 		stock_map = {d.item_code: flt(d.stock) for d in stock_data}

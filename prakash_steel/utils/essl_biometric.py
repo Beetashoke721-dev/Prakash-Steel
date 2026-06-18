@@ -471,5 +471,15 @@ def _update_last_synced():
 @frappe.whitelist()
 def manual_sync(from_dt=None, to_dt=None):
 	"""Trigger ESSL sync manually. Defaults to yesterday if no dates given."""
+	if not frappe.has_permission("Attendance", "write") and not frappe.has_permission(
+		"Attendance", "submit"
+	):
+		frappe.throw("Not permitted to sync Attendance.", frappe.PermissionError)
+
+	if not frappe.has_permission("Employee Checkin", "create") and not frappe.has_permission(
+		"Employee Checkin", "write"
+	):
+		frappe.throw("Not permitted to create Employee Checkins.", frappe.PermissionError)
+
 	result = sync_essl_checkins(from_dt=from_dt, to_dt=to_dt)
 	return result or {"message": "Sync complete"}
