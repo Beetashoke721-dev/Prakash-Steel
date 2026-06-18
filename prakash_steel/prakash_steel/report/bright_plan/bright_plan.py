@@ -334,6 +334,12 @@ def get_columns() -> list[dict]:
 			"width": 160,
 		},
 		{
+			"label": _("Child WIP/Open PO"),
+			"fieldname": "child_wip_open_po",
+			"fieldtype": "Int",
+			"width": 160,
+		},
+		{
 			"label": _("Child SKU Type"),
 			"fieldname": "child_sku_type",
 			"fieldtype": "Data",
