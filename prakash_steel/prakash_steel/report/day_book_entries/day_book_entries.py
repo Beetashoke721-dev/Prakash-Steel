@@ -2,6 +2,8 @@ import frappe
 from frappe import _
 from frappe.utils import getdate, today
 
+from prakash_steel.utils.whitelist_permissions import require_any_permission
+
 
 def _normalize_filter_value(value):
 	if isinstance(value, (list, tuple)):
@@ -139,6 +141,14 @@ def get_data(filters):
 
 @frappe.whitelist()
 def get_filter_options(fieldname, txt="", date=None):
+	require_any_permission(
+		[
+			("Journal Entry", "read"),
+			("Payment Entry", "read"),
+			("Sales Invoice", "read"),
+		],
+		_("Not permitted to access day book filter options."),
+	)
 	field_map = {
 		"party_name": "entries.particulars",
 		"vch_type": "entries.vch_type",

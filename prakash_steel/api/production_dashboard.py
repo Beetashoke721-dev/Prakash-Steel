@@ -31,6 +31,9 @@ def get_rolled_production_data(
 
     Returns dict with 'rows' (table data) and 'totals' (KPI aggregates).
     """
+    if not frappe.has_permission("Billet Cutting", "report"):
+        frappe.throw(_("Not permitted to access production dashboard data."), frappe.PermissionError)
+
     # ── 1.  Fetch Billet Cutting records ────────────────────────────
     conditions = "bc.docstatus = 1"
     params = {}
@@ -384,6 +387,9 @@ def get_bright_production_data(
 
     Returns dict with 'rows' (table data) and 'totals' (KPI aggregates).
     """
+    if not frappe.has_permission("Bright Bar Production", "read"):
+        frappe.throw(_("Not permitted to access bright production dashboard data."), frappe.PermissionError)
+
     # ── 1.  Fetch Bright Bar Production records ────────────────────
     conditions = "bbp.docstatus = 1"
     params = {}
@@ -635,6 +641,9 @@ def get_bend_weight_details(
 
     Source: Finish Weight (submitted)
     """
+    if not frappe.has_permission("Finish Weight", "read"):
+        frappe.throw(_("Not permitted to access bend weight details data."), frappe.PermissionError)
+
     conditions = "fw.docstatus = 1"
     params = {}
 
@@ -801,14 +810,20 @@ def export_production_dashboard(
     selected_columns: comma-separated list of column keys; if empty, all columns are included.
     """
     if tab_id == "rolled_production":
+        if not frappe.has_permission("Billet Cutting", "report") and not frappe.has_permission("Billet Cutting", "read"):
+            frappe.throw(_("Not permitted to export rolled production dashboard."), frappe.PermissionError)
         data = get_rolled_production_data(
             from_date, to_date, item_code, production_plan, machine_name, category_name
         )
     elif tab_id == "bright_production":
+        if not frappe.has_permission("Bright Bar Production", "read"):
+            frappe.throw(_("Not permitted to export bright production dashboard."), frappe.PermissionError)
         data = get_bright_production_data(
             from_date, to_date, item_code, production_plan, machine_name, category_name
         )
     elif tab_id == "bend_weight_details":
+        if not frappe.has_permission("Finish Weight", "read"):
+            frappe.throw(_("Not permitted to export bend weight details."), frappe.PermissionError)
         data = get_bend_weight_details(
             from_date, to_date, item_code, production_plan, category_name=category_name
         )

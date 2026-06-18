@@ -18,6 +18,9 @@ def check_item_has_bom(item_code):
 	"""
 	if not item_code:
 		return False
+
+	if not frappe.has_permission("Item", "read"):
+		frappe.throw(frappe._("Not permitted to access BOM information."), frappe.PermissionError)
 	
 	# Check if item exists in database
 	if not frappe.db.exists("Item", item_code):

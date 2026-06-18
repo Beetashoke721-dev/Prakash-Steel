@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from prakash_steel.utils.lead_time import calculate_decoupled_lead_time
 
 
@@ -17,6 +18,9 @@ def get_decoupled_lead_time(item_code):
 	Returns:
 		float: Decoupled lead time value
 	"""
+	if not frappe.has_permission("Item", "read"):
+		frappe.throw(_("Not permitted to access decoupled lead time."), frappe.PermissionError)
+
 	if not item_code:
 		return 0
 

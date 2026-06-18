@@ -1,8 +1,12 @@
 import frappe
+from frappe import _
 
 
 @frappe.whitelist()
 def get_last_sales_invoice_rate(item_code):
+	if not frappe.has_permission("Sales Invoice", "read"):
+		frappe.throw(_("Not permitted to access Sales Invoice data."), frappe.PermissionError)
+
 	result = frappe.db.sql(
 		"""
         SELECT sii.rate

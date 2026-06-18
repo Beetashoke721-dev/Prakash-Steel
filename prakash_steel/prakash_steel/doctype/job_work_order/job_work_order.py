@@ -6,6 +6,11 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt
 
+from prakash_steel.utils.whitelist_permissions import require_all_permissions, require_permission
+
+
+_COMPANY = "Prakash Steel Products Pvt Ltd"
+
 
 class JOBWorkOrder(Document):
 	def on_submit(self):
@@ -154,6 +159,7 @@ def update_work_items(source_name, items):
 	Same idea as ERPNext ``validate_and_delete_children`` + update: any existing child name not present
 	in the submitted list is removed.
 	"""
+	require_permission("JOB Work Order", "write")
 	import json
 
 	if isinstance(items, str):
@@ -201,21 +207,30 @@ def update_work_items(source_name, items):
 	frappe.db.commit()
 
 
+def _build_rm_qty_map(work_item_table):
+	"""Sum rm_qty_required by raw_material across all work item rows."""
+	rm_qty_map = {}
+	for row in work_item_table:
+		if row.raw_material and row.rm_qty_required:
+			rm_qty_map[row.raw_material] = rm_qty_map.get(row.raw_material, 0) + (row.rm_qty_required or 0)
+	return rm_qty_map
+
+
 @frappe.whitelist()
 def make_sales_invoice(source_name):
+	require_all_permissions(
+		[("JOB Work Order", "read"), ("Sales Invoice", "create")],
+		_("Not permitted to create Sales Invoice from JOB Work Order."),
+	)
 	source = frappe.get_doc("JOB Work Order", source_name)
 
 	si = frappe.new_doc("Sales Invoice")
-	si.company = "Prakash Steel Products Pvt Ltd"
+	si.company = _COMPANY
 	si.customer = source.customer
 	si.posting_date = source.job_work_date
 	si.custom_job_work_order = source_name
 
-	# Group rm_qty_required by raw_material
-	rm_qty_map = {}
-	for row in source.work_item_table:
-		if row.raw_material and row.rm_qty_required:
-			rm_qty_map[row.raw_material] = rm_qty_map.get(row.raw_material, 0) + (row.rm_qty_required or 0)
+	rm_qty_map = _build_rm_qty_map(source.work_item_table)
 
 	for raw_material, total_required in rm_qty_map.items():
 		already = (
@@ -244,10 +259,14 @@ def make_sales_invoice(source_name):
 
 @frappe.whitelist()
 def make_delivery_note(source_name):
+	require_all_permissions(
+		[("JOB Work Order", "read"), ("Delivery Note", "create")],
+		_("Not permitted to create Delivery Note from JOB Work Order."),
+	)
 	source = frappe.get_doc("JOB Work Order", source_name)
 
 	dn = frappe.new_doc("Delivery Note")
-	dn.company = "Prakash Steel Products Pvt Ltd"
+	dn.company = _COMPANY
 	dn.posting_date = source.job_work_date
 	dn.customer = source.customer
 	dn.custom_job_work_order = source_name
@@ -256,11 +275,7 @@ def make_delivery_note(source_name):
 	dn.currency = company_currency
 	dn.conversion_rate = 1
 
-	# Group rm_qty_required by raw_material
-	rm_qty_map = {}
-	for row in source.work_item_table:
-		if row.raw_material and row.rm_qty_required:
-			rm_qty_map[row.raw_material] = rm_qty_map.get(row.raw_material, 0) + (row.rm_qty_required or 0)
+	rm_qty_map = _build_rm_qty_map(source.work_item_table)
 
 	for raw_material, total_required in rm_qty_map.items():
 		already = (
@@ -289,10 +304,14 @@ def make_delivery_note(source_name):
 
 @frappe.whitelist()
 def make_purchase_receipt(source_name):
+	require_all_permissions(
+		[("JOB Work Order", "read"), ("Purchase Receipt", "create")],
+		_("Not permitted to create Purchase Receipt from JOB Work Order."),
+	)
 	source = frappe.get_doc("JOB Work Order", source_name)
 
 	pr = frappe.new_doc("Purchase Receipt")
-	pr.company = "Prakash Steel Products Pvt Ltd"
+	pr.company = _COMPANY
 	pr.supplier = source.customer
 	pr.posting_date = source.job_work_date
 	pr.custom_job_work_order = source_name

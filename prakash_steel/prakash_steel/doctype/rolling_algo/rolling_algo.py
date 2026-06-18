@@ -11,10 +11,11 @@ class RollingAlgo(Document):
 	def update_final_sub_group_fields(self):
 		custom_shape = (self.shape or "").strip()
 
-		if self.planning_sub_group:
-			sub_group_name = (self.planning_sub_group_name or "").strip()
-		else:
-			sub_group_name = (self.item_sub_group or "").strip()
+		sub_group_name = (
+			(self.planning_sub_group_name if self.planning_sub_group else None)
+			or self.item_sub_group
+			or ""
+		).strip()
 
 		self.final_sub_group = sub_group_name
 		self.final_sub_group_shape = (

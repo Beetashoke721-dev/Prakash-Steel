@@ -7,6 +7,8 @@ from collections import defaultdict
 import frappe
 from frappe.utils import date_diff, flt, nowdate
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 from prakash_steel.prakash_steel.report.rolled_plan.rolled_plan import (
 	_rbmto_colour,
 	get_parent_bom_map,
@@ -605,6 +607,7 @@ def get_item_breakdown(mr_name):
 	  buffer items  → stock, wip, tog, qualified_demand, previous_mr_qty, level, colour
 	  non-buffer    → stock, wip, previous_mr_qty, level, SO-level FIFO detail, colour
 	"""
+	require_permission("Material Request", "read")
 	mr = frappe.db.get_value(
 		"Material Request",
 		mr_name,

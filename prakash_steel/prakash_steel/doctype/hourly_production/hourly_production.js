@@ -64,46 +64,25 @@ frappe.ui.form.on('Hourly Production', {
     }
 });
 
-function toggle_miss_roll_fields(frm) {
-    if (frm.doc.miss_roll_pcs && frm.doc.miss_roll_pcs > 0) {
-        frm.set_df_property("miss_roll_weight", "reqd", 1);
-        frm.set_df_property("miss_roll_weight", "hidden", 0);
-
-        frm.set_df_property("remarks_for_miss_roll", "reqd", 1);
-        frm.set_df_property("remarks_for_miss_roll", "hidden", 0);
-    } else {
-        // First remove mandatory requirement, then hide and clear
-        frm.set_df_property("miss_roll_weight", "reqd", 0);
-        frm.set_df_property("miss_roll_weight", "hidden", 1);
+function _toggle_miss_fields(frm, count_field, weight_field, reason_field) {
+    const has_pcs = frm.doc[count_field] && frm.doc[count_field] > 0;
+    frm.set_df_property(weight_field, "reqd",   has_pcs ? 1 : 0);
+    frm.set_df_property(weight_field, "hidden",  has_pcs ? 0 : 1);
+    frm.set_df_property(reason_field, "reqd",   has_pcs ? 1 : 0);
+    frm.set_df_property(reason_field, "hidden",  has_pcs ? 0 : 1);
+    if (!has_pcs) {
         // Direct assignment to avoid marking form as dirty
-        frm.doc.miss_roll_weight = null;
-
-        frm.set_df_property("remarks_for_miss_roll", "reqd", 0);
-        frm.set_df_property("remarks_for_miss_roll", "hidden", 1);
-        // Direct assignment to avoid marking form as dirty
-        frm.doc.remarks_for_miss_roll = null;
+        frm.doc[weight_field] = null;
+        frm.doc[reason_field] = null;
     }
 }
 
+function toggle_miss_roll_fields(frm) {
+    _toggle_miss_fields(frm, "miss_roll_pcs", "miss_roll_weight", "remarks_for_miss_roll");
+}
+
 function toggle_miss_ingot_fields(frm) {
-    if (frm.doc.miss_ingot_pcs && frm.doc.miss_ingot_pcs > 0) {
-        frm.set_df_property("miss_ingot__billet_weight", "reqd", 1);
-        frm.set_df_property("miss_ingot__billet_weight", "hidden", 0);
-
-        frm.set_df_property("reason_for_miss_ingot__billet", "reqd", 1);
-        frm.set_df_property("reason_for_miss_ingot__billet", "hidden", 0);
-    } else {
-        // First remove mandatory requirement, then hide and clear
-        frm.set_df_property("miss_ingot__billet_weight", "reqd", 0);
-        frm.set_df_property("miss_ingot__billet_weight", "hidden", 1);
-        // Direct assignment to avoid marking form as dirty
-        frm.doc.miss_ingot__billet_weight = null;
-
-        frm.set_df_property("reason_for_miss_ingot__billet", "reqd", 0);
-        frm.set_df_property("reason_for_miss_ingot__billet", "hidden", 1);
-        // Direct assignment to avoid marking form as dirty
-        frm.doc.reason_for_miss_ingot__billet = null;
-    }
+    _toggle_miss_fields(frm, "miss_ingot_pcs", "miss_ingot__billet_weight", "reason_for_miss_ingot__billet");
 }
 
 function calculate_total_pcs(frm) {

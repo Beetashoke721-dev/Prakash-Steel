@@ -13,11 +13,30 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 	get_stock_map,
 	get_wip_map,
 )
+from prakash_steel.utils.whitelist_permissions import require_any_permission
+
+
+def _build_item_maps(items):
+	"""Build lookup dicts from a list of item rows (output of Item SQL query).
+	Returns: (item_codes, buffer_map, type_map, tog_map, moq_map, batch_size_map)
+	"""
+	item_codes = set()
+	item_buffer_map, item_type_map, item_tog_map, moq_map, batch_size_map = {}, {}, {}, {}, {}
+	for item in items:
+		ic = item.item_code
+		item_codes.add(ic)
+		item_buffer_map[ic] = item.buffer_flag or "Non-Buffer"
+		item_type_map[ic]   = item.item_type
+		item_tog_map[ic]    = flt(item.tog or 0)
+		moq_map[ic]         = flt(item.moq or 0)
+		batch_size_map[ic]  = flt(item.batch_size or 0)
+	return item_codes, item_buffer_map, item_type_map, item_tog_map, moq_map, batch_size_map
 
 
 @frappe.whitelist()
 def get_machine_load_colours():
 	"""Return colour rules from Machine Load Colour Master."""
+	require_any_permission([("Bright Machine", "read"), ("Machine Load Colour Master", "read")])
 	rows = frappe.get_all(
 		"Machine Load Colour Table",
 		filters={"parent": "Machine Load Colour Master"},
@@ -30,6 +49,7 @@ def get_machine_load_colours():
 @frappe.whitelist()
 def get_machine_breakdown(machine_group_name):
 	"""Return per-item calculation detail for a given machine (for the debug dialog)."""
+	require_any_permission([("Bright Machine", "read"), ("Item", "read")])
 	machine = frappe.db.get_value(
 		"Bright Machine",
 		machine_group_name,
@@ -89,15 +109,7 @@ def get_machine_breakdown(machine_group_name):
 		as_dict=True,
 	)
 
-	item_codes = set(item.item_code for item in bb_items)
-	item_buffer_map, item_type_map, item_tog_map, moq_map, batch_size_map = {}, {}, {}, {}, {}
-	for item in bb_items:
-		ic = item.item_code
-		item_buffer_map[ic] = item.buffer_flag or "Non-Buffer"
-		item_type_map[ic] = item.item_type
-		item_tog_map[ic] = flt(item.tog or 0)
-		moq_map[ic] = flt(item.moq or 0)
-		batch_size_map[ic] = flt(item.batch_size or 0)
+	item_codes, item_buffer_map, item_type_map, item_tog_map, moq_map, batch_size_map = _build_item_maps(bb_items)
 
 	stock_map = get_stock_map(item_codes)
 	wip_map = get_wip_map()
@@ -274,20 +286,7 @@ def get_data():
 	if not bb_items:
 		return _build_zero_rows(machines)
 
-	item_codes = set(item.item_code for item in bb_items)
-	item_buffer_map = {}
-	item_type_map = {}
-	item_tog_map = {}
-	moq_map = {}
-	batch_size_map = {}
-
-	for item in bb_items:
-		ic = item.item_code
-		item_buffer_map[ic] = item.buffer_flag or "Non-Buffer"
-		item_type_map[ic] = item.item_type
-		item_tog_map[ic] = flt(item.tog or 0)
-		moq_map[ic] = flt(item.moq or 0)
-		batch_size_map[ic] = flt(item.batch_size or 0)
+	item_codes, item_buffer_map, item_type_map, item_tog_map, moq_map, batch_size_map = _build_item_maps(bb_items)
 
 	# 5. Fetch shared maps (same as bright_plan)
 	stock_map = get_stock_map(item_codes)

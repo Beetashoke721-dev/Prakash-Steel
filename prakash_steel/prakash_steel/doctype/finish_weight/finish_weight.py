@@ -168,7 +168,7 @@ class FinishWeight(Document):
 				frappe.db.commit()
 
 				frappe.msgprint(
-					_("Cooling PIT {0} ").format(frappe.bold(cp.name)), indicator="blue", alert=True
+					_("Cooling PIT {0} created.").format(frappe.bold(cp.name)), indicator="blue", alert=True
 				)
 
 		except Exception as e:
@@ -254,14 +254,13 @@ class FinishWeight(Document):
 			as_dict=False,
 		)[0][0] or 0
 
-		rows = frappe.get_all(
+		frappe.db.set_value(
 			"Production Planning FG Table",
-			filters={"parent": self.production_planning, "fg_item": self.item_code},
-			fields=["name"],
+			{"parent": self.production_planning, "fg_item": self.item_code},
+			"produced_qty",
+			total,
+			update_modified=False,
 		)
-		for row in rows:
-			frappe.db.set_value("Production Planning FG Table", row.name, "produced_qty", total)
-
 		frappe.db.commit()
 
 	def before_cancel(self):

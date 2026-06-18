@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils import now_datetime
 
 from erpnext.accounts.doctype.payment_entry.payment_entry import (
@@ -22,6 +23,15 @@ def get_reference_details(
 	`due_date` (no separate round-trip, no race condition with the grid
 	refresh).
 	"""
+	if reference_doctype not in INVOICE_DOCTYPES:
+		frappe.throw(_("Invalid reference doctype."), frappe.PermissionError)
+
+	if not frappe.has_permission(reference_doctype, "read"):
+		frappe.throw(
+			_("Not permitted to access reference details for {0}.").format(reference_doctype),
+			frappe.PermissionError,
+		)
+
 	ref_details = _erpnext_get_reference_details(
 		reference_doctype, reference_name, party_account_currency, party_type, party
 	)

@@ -5,6 +5,8 @@ import frappe
 from frappe import _
 from frappe.utils import date_diff, flt, nowdate
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
 	_non_buffer_priority,
 	calculate_net_order_recommendation,
@@ -43,7 +45,6 @@ def _buffer_colour(level, tog, qualified_demand):
 
 
 _COLOUR_RANK = {"Black": 5, "Red": 4, "Yellow": 3, "Green": 2, "White": 1}
-_RANK_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
 
 
 def _compute_order_status(delivery_date, transaction_date):
@@ -73,7 +74,7 @@ def get_rbmto_so_detail_map(item_codes):
 	"""Returns {item_code: [{pending_qty, colour}, ...]} sorted delivery_date ASC for FIFO."""
 	if not item_codes:
 		return {}
-	t = tuple(item_codes) if len(item_codes) > 1 else (next(iter(item_codes)),)
+	t = tuple(item_codes)
 	rows = frappe.db.sql(
 		"""
 		SELECT soi.item_code, so.transaction_date, soi.delivery_date,
@@ -102,7 +103,7 @@ def get_parent_bom_map(item_codes):
 	"""Returns {child_item_code: [{parent_item, bom_qty, bom_quantity}, ...]} from default BOMs."""
 	if not item_codes:
 		return {}
-	t = tuple(item_codes) if len(item_codes) > 1 else (next(iter(item_codes)),)
+	t = tuple(item_codes)
 	rows = frappe.db.sql(
 		"""
 		SELECT b.item AS parent_item, bi.item_code AS child_item,
@@ -194,7 +195,6 @@ def _build_parent_batches(
 	return batches
 
 
-_COLOUR_PRIORITY = {"Black": 5, "Red": 4, "Yellow": 3, "Green": 2, "White": 1}
 _PRIORITY_TO_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
 
 
@@ -215,7 +215,7 @@ def _rbmto_on_hand_colour(level, own_so_list):
 		allocated = min(required, available)
 		shortage = required - allocated
 		available -= allocated
-		priority = _COLOUR_PRIORITY.get(so["colour"], 0)
+		priority = _COLOUR_RANK.get(so["colour"], 0)
 		if shortage > 0:
 			if priority > worst_shortage:
 				worst_shortage = priority
@@ -655,7 +655,7 @@ def get_data(filters=None):
 		return []
 
 	item_codes = set(item.item_code for item in rb_items)
-	item_codes_tuple = tuple(item_codes) if len(item_codes) > 1 else (next(iter(item_codes)),)
+	item_codes_tuple = tuple(item_codes)
 
 	# Build lookup maps
 	item_buffer_map = {}
@@ -819,9 +819,7 @@ def get_data(filters=None):
 
 		all_parent_codes = {p["parent_item"] for plist in parent_bom_map.values() for p in plist}
 		if all_parent_codes:
-			parent_tuple = (
-				tuple(all_parent_codes) if len(all_parent_codes) > 1 else (next(iter(all_parent_codes)),)
-			)
+			parent_tuple = tuple(all_parent_codes)
 
 			# Parent item master
 			parent_master_rows = frappe.db.sql(
@@ -1374,7 +1372,7 @@ def get_data(filters=None):
 	child_stock_map_bom = {}
 	child_item_sku_map = {}
 	if all_child_codes:
-		child_tuple = tuple(all_child_codes) if len(all_child_codes) > 1 else (next(iter(all_child_codes)),)
+		child_tuple = tuple(all_child_codes)
 
 		# Child stock
 		child_stock_rows = frappe.db.sql(
@@ -1500,6 +1498,7 @@ def get_final_allocated_qty_breakdown(item_code):
 	Returns step-by-step breakdown of how final_allocated_qty is computed for an RB item.
 	Runs the full report and extracts the item's row + subgroup context.
 	"""
+	require_permission("Item", "report")
 	data = get_data()
 	if not data:
 		return None
@@ -1597,6 +1596,7 @@ def get_item_colour_breakdown(item_code):
 	RBMTA → buffer_colour breakdown.
 	RBMTO → own SO FIFO detail + parent BOM FIFO detail.
 	"""
+	require_permission("Item", "report")
 	item_doc = frappe.db.get_value(
 		"Item",
 		item_code,
@@ -1725,9 +1725,7 @@ def get_item_colour_breakdown(item_code):
 
 		if parent_bom_list:
 			all_parent_codes = {p["parent_item"] for p in parent_bom_list}
-			parent_tuple = (
-				tuple(all_parent_codes) if len(all_parent_codes) > 1 else (next(iter(all_parent_codes)),)
-			)
+			parent_tuple = tuple(all_parent_codes)
 
 			parent_rows = frappe.db.sql(
 				"""SELECT name AS item_code, custom_buffer_flag AS buffer_flag,

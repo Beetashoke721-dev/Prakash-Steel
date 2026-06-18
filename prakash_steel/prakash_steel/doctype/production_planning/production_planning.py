@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import today
 
+from prakash_steel.utils.whitelist_permissions import require_all_permissions, require_permission
+
 
 class ProductionPlanning(Document):
 	def on_submit(self):
@@ -64,6 +66,7 @@ def _create_billet_cutting_for_rows(production_planning_name, rows, shift_type, 
 @frappe.whitelist()
 def get_fg_items_for_production_planning(production_planning):
 	"""Return fg_item and raw_material rows from Production Planning FG Table."""
+	require_permission("Production Planning", "read")
 	rows = frappe.get_all(
 		"Production Planning FG Table",
 		filters={"parent": production_planning},
@@ -75,6 +78,13 @@ def get_fg_items_for_production_planning(production_planning):
 @frappe.whitelist()
 def update_production_plan(source_name, items):
 	"""Sync production_plan child table from the Update Items dialog."""
+	require_all_permissions(
+		[
+			("Production Planning", "write"),
+			("Billet Cutting", "create"),
+		],
+		_("Not permitted to update Production Planning."),
+	)
 	import json
 
 	if isinstance(items, str):

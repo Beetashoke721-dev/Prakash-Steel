@@ -21,6 +21,12 @@ def cancel_purchase_receipt_with_reason(name: str, reason: str):
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
 
+    if not frappe.has_permission("Purchase Receipt", "cancel"):
+        frappe.throw(
+            _("Not permitted to cancel Purchase Receipt."),
+            frappe.PermissionError,
+        )
+
     doc = frappe.get_doc("Purchase Receipt", name)
 
     if doc.docstatus != 1:

@@ -1,6 +1,7 @@
 import math
 
 import frappe
+from frappe import _
 from frappe.utils import cint, flt, today, add_days
 
 
@@ -139,6 +140,9 @@ def update_item_adu(item_code: str) -> int:
     Usage (JS):
         frappe.call('prakash_steel.api.adu.update_item_adu', { item_code: 'ITEM-0001' })
     """
+    if not frappe.has_permission("Item", "write"):
+        frappe.throw(_("Not permitted to update ADU for Items."), frappe.PermissionError)
+
     if not item_code:
         frappe.throw("Item Code is required to update ADU.")
 
@@ -176,6 +180,9 @@ def recalculate_adu_for_all_items() -> None:
 
     Intended to be called from a daily scheduler event.
     """
+    if not frappe.has_permission("Item", "write"):
+        frappe.throw(_("Not permitted to recalculate ADU for Items."), frappe.PermissionError)
+
     days = _get_horizon_days()
     if days <= 0:
         return
