@@ -116,6 +116,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         { label: "Child Stock", key: "child_stock", right: true, width: 100 },
         { label: "Child Stock Soft Allocation", key: "child_stock_soft_allocation_qty", right: true, width: 180 },
         { label: "Child Stock Shortage", key: "child_stock_shortage", right: true, width: 150 },
+        { label: "Child WIP/Open PO", key: "child_wip_open_po", right: true, width: 150 },
         { label: "Child SKU Type", key: "child_sku_type", width: 110 },
         { label: "Prod Qty based on Child Stock", key: "production_qty_based_on_child_stock", right: true, width: 200 },
         { label: "Process Time based on Child Stock", key: "process_time_based_on_child_stock", right: true, width: 210 },
@@ -191,6 +192,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
         row.child_sku_type = child_opt.child_sku_type;
         row.child_requirement = child_requirement;
         row.child_stock = child_stock;
+        row.child_wip_open_po = child_wip_open_po;
         row.child_stock_soft_allocation_qty = Math.ceil(stock_allocated);
         row.child_stock_shortage = Math.ceil(stock_shortage);
         row.production_qty_based_on_child_stock = prod_qty_child_stock;
@@ -320,6 +322,9 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
                 } else if (c.key === "child_stock_shortage") {
                     dt_col.format = (val, _row, _col, d) =>
                         `<span class="bp-child-shortage" data-idx="${d._idx}">${val !== null && val !== undefined ? val : "—"}</span>`;
+                } else if (c.key === "child_wip_open_po") {
+                    dt_col.format = (val, _row, _col, d) =>
+                        `<span class="bp-child-wip-po" data-idx="${d._idx}">${val !== null && val !== undefined ? val : "—"}</span>`;
                 } else if (c.key === "child_sku_type") {
                     dt_col.format = (val, _row, _col, d) =>
                         `<span class="bp-child-sku" data-idx="${d._idx}">${val !== null && val !== undefined ? esc(val) : "—"}</span>`;

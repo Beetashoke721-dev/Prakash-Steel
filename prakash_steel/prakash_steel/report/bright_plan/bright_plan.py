@@ -334,6 +334,12 @@ def get_columns() -> list[dict]:
 			"width": 160,
 		},
 		{
+			"label": _("Child WIP/Open PO"),
+			"fieldname": "child_wip_open_po",
+			"fieldtype": "Int",
+			"width": 160,
+		},
+		{
 			"label": _("Child SKU Type"),
 			"fieldname": "child_sku_type",
 			"fieldtype": "Data",
@@ -737,7 +743,7 @@ def get_data(filters=None) -> list[dict]:
 		# Cap at net order recommendation — can't produce more than what's actually needed
 		prod_qty_child_stock_wip = min(prod_qty_child_stock_wip, net_order_recommendation)
 
-		row["child_stock"] = math.ceil(available_child_stock)
+		row["child_stock"] = math.ceil(flt(child_stock_map.get(child_item_code, 0)))
 		row["child_stock_soft_allocation_qty"] = math.ceil(stock_allocated)
 		row["child_stock_shortage"] = math.ceil(stock_shortage)
 		row["production_qty_based_on_child_stock"] = prod_qty_child_stock
