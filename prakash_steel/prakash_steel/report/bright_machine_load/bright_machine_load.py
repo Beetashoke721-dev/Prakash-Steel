@@ -16,7 +16,7 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 from prakash_steel.utils.whitelist_permissions import require_any_permission
 
 
-def _build_item_maps(items):
+def _build_item_maps(items) -> tuple:
 	"""Build lookup dicts from a list of item rows (output of Item SQL query).
 	Returns: (item_codes, buffer_map, type_map, tog_map, moq_map, batch_size_map)
 	"""
@@ -34,7 +34,7 @@ def _build_item_maps(items):
 
 
 @frappe.whitelist()
-def get_machine_load_colours():
+def get_machine_load_colours() -> list | dict:
 	"""Return colour rules from Machine Load Colour Master."""
 	require_any_permission([("Bright Machine", "read"), ("Machine Load Colour Master", "read")])
 	rows = frappe.get_all(
@@ -47,7 +47,7 @@ def get_machine_load_colours():
 
 
 @frappe.whitelist()
-def get_machine_breakdown(machine_group_name):
+def get_machine_breakdown(machine_group_name) -> list | dict:
 	"""Return per-item calculation detail for a given machine (for the debug dialog)."""
 	require_any_permission([("Bright Machine", "read"), ("Item", "read")])
 	machine = frappe.db.get_value(
@@ -198,13 +198,13 @@ def get_machine_breakdown(machine_group_name):
 	}
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data()
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "Machine Name",
@@ -235,7 +235,7 @@ def get_columns():
 	]
 
 
-def get_data():
+def get_data() -> list[dict]:
 	# 1. Fetch all Bright Machine records
 	machines = frappe.get_all(
 		"Bright Machine",
@@ -381,7 +381,7 @@ def get_data():
 	return data
 
 
-def _build_zero_rows(machines):
+def _build_zero_rows(machines) -> list[dict]:
 	return [
 		{
 			"machine_name": m.machine_group_name,

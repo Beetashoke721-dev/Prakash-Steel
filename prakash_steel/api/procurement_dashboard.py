@@ -6,7 +6,7 @@ from frappe import _
 
 
 @frappe.whitelist()
-def get_overview_data(from_date, to_date, supplier=None):
+def get_overview_data(from_date, to_date, supplier=None) -> list[dict]:
 	"""
 	Return accurate overview counts for the Procurement Tracker Dashboard.
 

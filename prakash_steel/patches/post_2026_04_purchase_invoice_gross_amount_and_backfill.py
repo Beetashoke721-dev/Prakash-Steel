@@ -15,7 +15,7 @@ def _compute_gross(item: dict) -> float:
     return taxable_value + gst_component
 
 
-def _ensure_custom_field():
+def _ensure_custom_field() -> None:
     if frappe.db.exists("Custom Field", "Purchase Invoice Item-custom_gross_amount"):
         return
 
@@ -35,7 +35,7 @@ def _ensure_custom_field():
     )
 
 
-def _backfill_existing():
+def _backfill_existing() -> None:
     rows = frappe.db.sql(
         """
         SELECT
@@ -55,6 +55,6 @@ def _backfill_existing():
         )
 
 
-def execute():
+def execute() -> tuple[list, list]:
     _ensure_custom_field()
     _backfill_existing()

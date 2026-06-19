@@ -3,7 +3,7 @@
 import frappe
 
 
-def execute():
+def execute() -> tuple[list, list]:
 	"""Update NULL values in custom_decoupled_lead_time to 0 before schema change"""
 	try:
 		# Check if column exists using information_schema

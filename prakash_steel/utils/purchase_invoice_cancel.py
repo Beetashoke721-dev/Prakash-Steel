@@ -52,12 +52,12 @@ from frappe import _
 from frappe.utils import cint, flt
 
 
-def clear_cancel_reason_on_amend(doc, method=None):
+def clear_cancel_reason_on_amend(doc, method=None) -> None:
     """Clear cancel reason on an amended (draft) Purchase Invoice."""
     if doc.amended_from and doc.docstatus == 0 and doc.custom_cancel_reason:
         doc.custom_cancel_reason = ""
 
-def update_gross_amount_on_items(doc, method=None):
+def update_gross_amount_on_items(doc, method=None) -> None:
     """Compute custom_gross_amount on each Purchase Invoice Item row.
 
     Formula:
@@ -76,7 +76,7 @@ def update_gross_amount_on_items(doc, method=None):
         item.custom_gross_amount = taxable_value + gst_component
 
 
-def update_total_weight_slip_qty(doc, method=None):
+def update_total_weight_slip_qty(doc, method=None) -> None:
     """Sum weight slip qty from items; shortage = total_qty - total weight slip qty."""
     doc.custom_total_weight_slip_qty = sum(
         flt(item.get("custom_weight_slip_qty") or 0) for item in (doc.get("items") or [])
@@ -86,7 +86,7 @@ def update_total_weight_slip_qty(doc, method=None):
     )
 
 
-def validate_cancel_reason(doc, method=None):
+def validate_cancel_reason(doc, method=None) -> None:
     """Server-side guard: block cancellation if Cancel Reason is missing.
 
     This runs for ALL cancellation paths, including list view bulk cancel.
@@ -100,16 +100,10 @@ def validate_cancel_reason(doc, method=None):
 
 
 @frappe.whitelist()
-def set_purchase_invoice_cancel_reason(name: str, reason: str):
+def set_purchase_invoice_cancel_reason(name: str, reason: str) -> None:
     """Set cancel reason on Purchase Invoice before running standard cancel flow."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
-
-    if not frappe.has_permission("Purchase Invoice", "cancel"):
-        frappe.throw(
-            _("Not permitted to cancel Purchase Invoice."),
-            frappe.PermissionError,
-        )
 
     doc = frappe.get_doc("Purchase Invoice", name)
 
@@ -131,16 +125,10 @@ def set_purchase_invoice_cancel_reason(name: str, reason: str):
 
 
 @frappe.whitelist()
-def cancel_purchase_invoice_with_reason(name: str, reason: str):
+def cancel_purchase_invoice_with_reason(name: str, reason: str) -> None:
     """Cancel a submitted Purchase Invoice after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
-
-    if not frappe.has_permission("Purchase Invoice", "cancel"):
-        frappe.throw(
-            _("Not permitted to cancel Purchase Invoice."),
-            frappe.PermissionError,
-        )
 
     doc = frappe.get_doc("Purchase Invoice", name)
 

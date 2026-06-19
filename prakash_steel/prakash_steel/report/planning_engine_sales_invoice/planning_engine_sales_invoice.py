@@ -19,7 +19,7 @@ MONTH_MAP = {
 }
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = filters or {}
 	apply_financial_year_dates(filters)
 
@@ -29,7 +29,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "Months (Invoice Date)",
@@ -100,7 +100,7 @@ def get_columns():
 	]
 
 
-def apply_financial_year_dates(filters):
+def apply_financial_year_dates(filters) -> None:
 	if not filters.get("financial_year"):
 		return
 
@@ -121,7 +121,7 @@ def apply_financial_year_dates(filters):
 		filters["to_date"] = year_dates.year_end_date
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	conditions = ["si.docstatus = 1"]
 
 	if filters.get("from_date"):

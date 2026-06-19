@@ -6,7 +6,7 @@ from prakash_steel.utils.whitelist_permissions import require_all_permissions
 
 
 class PurchaseOrderRecommendationSnapshot(Document):
-	def before_save(self):
+	def before_save(self) -> None:
 		self.row_count = len(self.items)
 
 
@@ -14,7 +14,7 @@ class PurchaseOrderRecommendationSnapshot(Document):
 # Core capture logic
 # ---------------------------------------------------------------------------
 
-def _capture_snapshot(trigger="Scheduled"):
+def _capture_snapshot(trigger="Scheduled") -> None:
 	"""
 	Run the Open PO Analysis report and save results as a snapshot.
 	Returns the new snapshot document name.
@@ -82,7 +82,7 @@ def _capture_snapshot(trigger="Scheduled"):
 # Scheduled job — runs daily at 4:00 PM IST (wired in hooks.py)
 # ---------------------------------------------------------------------------
 
-def capture_daily_po_rec_snapshot():
+def capture_daily_po_rec_snapshot() -> None:
 	"""Capture Open PO Analysis snapshot at 4:00 PM IST."""
 	_capture_snapshot(trigger="Scheduled")
 
@@ -92,7 +92,7 @@ def capture_daily_po_rec_snapshot():
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def run_manual_snapshot():
+def run_manual_snapshot() -> None:
 	require_all_permissions(
 		[
 			("Purchase Order Recommendation Snapshot", "create"),

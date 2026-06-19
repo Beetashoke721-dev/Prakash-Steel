@@ -9,7 +9,7 @@ from frappe.query_builder.functions import Max
 from frappe.utils import date_diff, flt, getdate
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	if not filters:
 		return [], [], None, []
 
@@ -28,7 +28,7 @@ def execute(filters=None):
 	return columns, data, None, None
 
 
-def validate_filters(filters):
+def validate_filters(filters) -> str:
 	from_date, to_date = filters.get("from_date"), filters.get("to_date")
 
 	if not from_date and to_date:
@@ -37,7 +37,7 @@ def validate_filters(filters):
 		frappe.throw(_("To Date cannot be before From Date."))
 
 
-def get_conditions(filters):
+def get_conditions(filters) -> str:
 	conditions = ""
 	if filters.get("from_date") and filters.get("to_date"):
 		conditions += " and so.transaction_date between %(from_date)s and %(to_date)s"
@@ -57,7 +57,7 @@ def get_conditions(filters):
 	return conditions
 
 
-def get_data(conditions, filters):
+def get_data(conditions, filters) -> list[dict]:
 	# Fetch buffer_flag and item_type from Item, then calculate sku_type in Python
 	data = frappe.db.sql(
 		f"""
@@ -112,7 +112,7 @@ def get_data(conditions, filters):
 	return data
 
 
-def get_so_elapsed_time(data):
+def get_so_elapsed_time(data) -> dict | list:
 	"""
 	query SO's elapsed time till latest delivery note
 	"""
@@ -153,7 +153,7 @@ def get_so_elapsed_time(data):
 	return so_elapsed_time
 
 
-def calculate_sku_type(buffer_flag, item_type):
+def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	"""
 	Same mapping logic as calculate_sku_type in item.js, but on server.
 	buffer_flag: 'Buffer' or other
@@ -178,7 +178,7 @@ def calculate_sku_type(buffer_flag, item_type):
 	return None
 
 
-def prepare_data(data, so_elapsed_time, filters):
+def prepare_data(data, so_elapsed_time, filters) -> list[dict]:
 	# Filter out rows where pending_qty (qty_to_deliver) is 0 or negative
 	# Only show items that still need to be delivered (Open SO items)
 	# Also filter out rows where sales order status is "Closed" or "Cancelled"
@@ -404,7 +404,7 @@ def prepare_data(data, so_elapsed_time, filters):
 	return data, None
 
 
-def get_columns(filters):
+def get_columns(filters) -> list[dict]:
 	columns = [
 		{"label": _("Sales Order Date"), "fieldname": "date", "fieldtype": "Date", "width": 90},
 		{

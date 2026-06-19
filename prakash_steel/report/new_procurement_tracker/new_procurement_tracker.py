@@ -4,7 +4,7 @@
 import frappe
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = filters or {}
 
 	columns = get_columns()
@@ -13,7 +13,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "Material Request",
@@ -80,7 +80,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	conditions = """
         mr.docstatus = 1
         AND mr.transaction_date BETWEEN %(from_date)s AND %(to_date)s

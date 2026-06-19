@@ -7,7 +7,7 @@ from prakash_steel.utils.lead_time import calculate_decoupled_lead_time
 
 
 @frappe.whitelist()
-def get_decoupled_lead_time(item_code):
+def get_decoupled_lead_time(item_code) -> float | None:
 	"""
 	API method to get decoupled lead time for an item.
 	This is called from the Item form to display the decoupled lead time.

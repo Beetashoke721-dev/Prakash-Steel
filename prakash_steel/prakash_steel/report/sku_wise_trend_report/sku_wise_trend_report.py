@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import getdate, date_diff, add_days
 
 
-def calculate_sku_type(buffer_flag, item_type):
+def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	"""
 	Calculate SKU type based on buffer_flag and item_type
 	buffer_flag: 'Buffer' or 'Non-Buffer'
@@ -31,7 +31,7 @@ def calculate_sku_type(buffer_flag, item_type):
 	return None
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	if not filters:
 		filters = {}
 	
@@ -56,7 +56,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns(from_date, to_date):
+def get_columns(from_date, to_date) -> list[dict]:
 	"""Generate columns: Item Name, then one column for each date in range"""
 	columns = [
 		{
@@ -86,7 +86,7 @@ def get_columns(from_date, to_date):
 	return columns
 
 
-def get_data(from_date, to_date, sku_type, item_code_filter=None):
+def get_data(from_date, to_date, sku_type, item_code_filter=None) -> list[dict]:
 	"""Query Item wise Daily On Hand Colour and build report data"""
 	
 	# Get all dates in range

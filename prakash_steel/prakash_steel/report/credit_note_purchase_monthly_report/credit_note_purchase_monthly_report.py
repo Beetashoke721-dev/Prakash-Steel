@@ -9,7 +9,7 @@ import frappe
 from frappe.utils import get_first_day, get_last_day, nowdate
 
 
-def execute(filters: dict[str, Any] | None = None):
+def execute(filters: dict[str, Any] | None = None) -> tuple[list, list]:
 	filters = _prepare_filters(filters)
 	columns = get_columns()
 	data = get_data(filters)
@@ -17,7 +17,7 @@ def execute(filters: dict[str, Any] | None = None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "Party Name",
@@ -105,7 +105,7 @@ def _prepare_filters(filters: dict[str, Any] | None) -> dict[str, Any]:
 	return filters
 
 
-def get_data(filters: dict[str, Any]):
+def get_data(filters: dict[str, Any]) -> list[dict]:
 	conditions = """
 		cn.docstatus = 1
 		AND cn.is_return = 1
@@ -153,7 +153,7 @@ def get_data(filters: dict[str, Any]):
 	return frappe.db.sql(query, filters, as_dict=True)
 
 
-def get_grand_total_row(data):
+def get_grand_total_row(data) -> dict:
 	return {
 		"party_name": "Grand Total",
 		"return_against": "",

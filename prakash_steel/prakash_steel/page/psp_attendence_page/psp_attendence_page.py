@@ -11,7 +11,7 @@ from prakash_steel.utils.whitelist_permissions import require_permission
 
 
 @frappe.whitelist()
-def get_attendance_data(from_date, to_date, employee=None):
+def get_attendance_data(from_date, to_date, employee=None) -> list[dict]:
 	"""Return attendance data for all ESSL-mapped employees for the given date range."""
 	require_permission("Attendance", "read")
 	# Build date list
@@ -86,7 +86,7 @@ def get_attendance_data(from_date, to_date, employee=None):
 	return {"dates": dates, "employees": result}
 
 
-def _extract_time(val):
+def _extract_time(val) -> int | None:
 	"""Return HH:MM:SS from 'YYYY-MM-DD HH:MM:SS' or 'HH:MM:SS', else empty string."""
 	if not val:
 		return ""
@@ -95,7 +95,7 @@ def _extract_time(val):
 	return parts[1] if len(parts) > 1 else parts[0]
 
 
-def _parse_minutes(val):
+def _parse_minutes(val) -> int | None:
 	"""Parse HH:MM:SS time string into total minutes (int)."""
 	s = _extract_time(val)
 	if not s:
@@ -108,7 +108,7 @@ def _parse_minutes(val):
 
 
 @frappe.whitelist()
-def download_attendance_excel(from_date, to_date, employee=None):
+def download_attendance_excel(from_date, to_date, employee=None) -> dict:
 	"""Generate and return a base64-encoded .xlsx attendance report."""
 	require_permission("Attendance", "read")
 	data = get_attendance_data(from_date, to_date, employee)

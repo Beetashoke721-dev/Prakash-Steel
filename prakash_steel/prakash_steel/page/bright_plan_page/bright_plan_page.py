@@ -7,7 +7,7 @@ from prakash_steel.utils.whitelist_permissions import require_all_permissions, r
 
 
 @frappe.whitelist()
-def get_bright_plan_data():
+def get_bright_plan_data() -> list[dict]:
 	require_permission("Item", "report")
 	from prakash_steel.prakash_steel.report.bright_plan.bright_plan import execute
 
@@ -39,7 +39,7 @@ def get_bright_plan_data():
 	}
 
 
-def _build_child_options(parent_items):
+def _build_child_options(parent_items) -> list:
 	"""Return {parent_item_code: [{child_item_code, child_bom_qty, child_bom_quantity,
 	child_stock, child_wip_open_po, child_sku_type}, ...]} for all active BOMs."""
 	from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
@@ -124,7 +124,7 @@ def _build_child_options(parent_items):
 
 
 @frappe.whitelist()
-def execute_work_orders(rows):
+def execute_work_orders(rows) -> None:
 
 	require_all_permissions(
 		[("Work Order", "create"), ("Work Order", "write")],

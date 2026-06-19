@@ -16,13 +16,13 @@ from prakash_steel.prakash_steel.report.rolled_plan.rolled_plan import (
 )
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "MR No",
@@ -77,7 +77,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	rows = frappe.db.sql(
 		"""
 		SELECT
@@ -143,7 +143,7 @@ def get_data(filters):
 # ---------------------------------------------------------------------------
 
 
-def calculate_sku_type(buffer_flag, item_type):
+def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	is_buffer = buffer_flag == "Buffer"
 	mapping = {
 		"BB": ("BBMTA", "BBMTO"),
@@ -163,7 +163,7 @@ def calculate_sku_type(buffer_flag, item_type):
 # ---------------------------------------------------------------------------
 
 
-def _buffer_colour(level, tog, qualified_demand):
+def _buffer_colour(level, tog, qualified_demand) -> str:
 	total = flt(tog) + flt(qualified_demand)
 	if level == 0:
 		return "Black"
@@ -183,7 +183,7 @@ _STATUS_PRIORITY = {"BLACK": 5, "RED": 4, "YELLOW": 3, "GREEN": 2, "WHITE": 1}
 _PRIORITY_TO_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
 
 
-def _non_buffer_colour(item_code, level, so_map):
+def _non_buffer_colour(item_code, level, so_map) -> str:
 	"""
 	FIFO-allocate `level` across open SOs (sorted by delivery_date ASC).
 	Return the worst order_status colour among SOs that have a shortage.
@@ -212,7 +212,7 @@ def _non_buffer_colour(item_code, level, so_map):
 	return _PRIORITY_TO_COLOUR.get(worst_priority, "")
 
 
-def _compute_order_status(delivery_date, transaction_date):
+def _compute_order_status(delivery_date, transaction_date) -> str | None:
 	if not delivery_date:
 		return None
 
@@ -246,7 +246,7 @@ def _compute_order_status(delivery_date, transaction_date):
 # ---------------------------------------------------------------------------
 
 
-def get_stock_map(item_codes):
+def get_stock_map(item_codes) -> dict:
 	if not item_codes:
 		return {}
 	result = frappe.db.sql(
@@ -267,7 +267,7 @@ def get_stock_map(item_codes):
 # ---------------------------------------------------------------------------
 
 
-def get_open_po_map(item_codes):
+def get_open_po_map(item_codes) -> dict:
 	if not item_codes:
 		return {}
 	po_rows = frappe.db.sql(
@@ -304,7 +304,7 @@ def get_open_po_map(item_codes):
 # ---------------------------------------------------------------------------
 
 
-def get_item_master_map(item_codes):
+def get_item_master_map(item_codes) -> dict:
 	if not item_codes:
 		return {}
 	result = frappe.db.sql(
@@ -334,7 +334,7 @@ def get_item_master_map(item_codes):
 # ---------------------------------------------------------------------------
 
 
-def get_qualified_demand_map(item_codes, item_master_map):
+def get_qualified_demand_map(item_codes, item_master_map) -> dict:
 	if not item_codes:
 		return {}
 	today = nowdate()
@@ -396,7 +396,7 @@ def get_qualified_demand_map(item_codes, item_master_map):
 	return qd_map
 
 
-def _calculate_spike_map(item_codes, item_master_map, spike_master_map):
+def _calculate_spike_map(item_codes, item_master_map, spike_master_map) -> dict:
 	from frappe.utils import add_days
 
 	spike_map = {ic: 0.0 for ic in item_codes}
@@ -447,7 +447,7 @@ def _calculate_spike_map(item_codes, item_master_map, spike_master_map):
 # ---------------------------------------------------------------------------
 
 
-def _build_parent_fifo_data(item_codes, item_master_map):
+def _build_parent_fifo_data(item_codes, item_master_map) -> dict:
 	"""
 	For non-buffer items: build own-SO FIFO list and parent-SO FIFO list.
 	Parent open SOs are fetched directly — no net_order_rec guard.
@@ -538,7 +538,7 @@ def _build_parent_fifo_data(item_codes, item_master_map):
 # ---------------------------------------------------------------------------
 
 
-def get_open_so_map(item_codes):
+def get_open_so_map(item_codes) -> dict:
 	if not item_codes:
 		return {}
 	result = frappe.db.sql(
@@ -579,7 +579,7 @@ def get_open_so_map(item_codes):
 # ---------------------------------------------------------------------------
 
 
-def get_previous_mr_qty_map(rows):
+def get_previous_mr_qty_map(rows) -> dict:
 	"""
 	Returns {(mr_no, item_code): previous_pending_qty}.
 	Only counts MRs whose status is not Ordered or Received.
@@ -625,7 +625,7 @@ def get_previous_mr_qty_map(rows):
 
 
 @frappe.whitelist()
-def get_item_breakdown(mr_name):
+def get_item_breakdown(mr_name) -> list[dict]:
 	"""
 	Returns per-item breakdown for the given MR:
 	  buffer items  → stock, open_po, tog, qualified_demand, previous_mr_qty, level, colour

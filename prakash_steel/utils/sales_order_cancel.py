@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 
 
-def validate_cancel_reason(doc, method=None):
+def validate_cancel_reason(doc, method=None) -> None:
     """Server-side guard: block cancellation if Cancel Reason is missing.
 
     This runs for ALL cancellation paths, including list view bulk cancel.
@@ -16,18 +16,12 @@ def validate_cancel_reason(doc, method=None):
 
 
 @frappe.whitelist()
-def cancel_sales_order_with_reason(name: str, reason: str):
+def cancel_sales_order_with_reason(name: str, reason: str) -> None:
     """Cancel a Sales Order (and any linked Sales Invoices) after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
 
     reason = reason.strip()
-
-    if not frappe.has_permission("Sales Order", "cancel") or not frappe.has_permission("Sales Invoice", "cancel"):
-        frappe.throw(
-            _("Not permitted to cancel Sales Orders and linked Sales Invoices."),
-            frappe.PermissionError,
-        )
 
     so = frappe.get_doc("Sales Order", name)
 

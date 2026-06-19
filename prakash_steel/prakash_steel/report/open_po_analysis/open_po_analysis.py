@@ -13,7 +13,7 @@ from frappe.query_builder.functions import IfNull, Sum
 from frappe.utils import date_diff, flt, getdate
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	if not filters:
 		return [], []
 
@@ -32,7 +32,7 @@ def execute(filters=None):
 	return columns, data, None, chart_data
 
 
-def validate_filters(filters):
+def validate_filters(filters) -> str:
 	from_date, to_date = filters.get("from_date"), filters.get("to_date")
 
 	if not from_date and to_date:
@@ -41,7 +41,7 @@ def validate_filters(filters):
 		frappe.throw(_("To Date cannot be before From Date."))
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	po = frappe.qb.DocType("Purchase Order")
 	po_item = frappe.qb.DocType("Purchase Order Item")
 	pi_item = frappe.qb.DocType("Purchase Invoice Item")
@@ -103,14 +103,14 @@ def get_data(filters):
 	return data
 
 
-def update_received_amount(data):
+def update_received_amount(data) -> dict | list:
 	pr_data = get_received_amount_data(data)
 
 	for row in data:
 		row.received_qty_amount = flt(pr_data.get(row.name))
 
 
-def get_received_amount_data(data):
+def get_received_amount_data(data) -> list[dict]:
 	pr = frappe.qb.DocType("Purchase Receipt")
 	pr_item = frappe.qb.DocType("Purchase Receipt Item")
 
@@ -139,7 +139,7 @@ def get_received_amount_data(data):
 	return frappe._dict(data)
 
 
-def prepare_data(data, filters):
+def prepare_data(data, filters) -> list[dict]:
 	completed, pending = 0, 0
 	pending_field = "pending_amount"
 	completed_field = "billed_amount"
@@ -200,7 +200,7 @@ def prepare_data(data, filters):
 	return data, chart_data
 
 
-def prepare_chart_data(pending, completed):
+def prepare_chart_data(pending, completed) -> dict:
 	labels = [_("Amount to Bill"), _("Billed Amount")]
 
 	return {
@@ -210,7 +210,7 @@ def prepare_chart_data(pending, completed):
 	}
 
 
-def get_columns(filters):
+def get_columns(filters) -> list[dict]:
 	columns = [
 		{"label": _("Date"), "fieldname": "date", "fieldtype": "Date", "width": 90},
 		{"label": _("Required By"), "fieldname": "required_date", "fieldtype": "Date", "width": 90},

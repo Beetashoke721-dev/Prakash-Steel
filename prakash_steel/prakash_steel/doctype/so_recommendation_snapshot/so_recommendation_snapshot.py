@@ -6,7 +6,7 @@ from prakash_steel.utils.whitelist_permissions import require_all_permissions
 
 
 class SORecommendationSnapshot(Document):
-	def before_save(self):
+	def before_save(self) -> None:
 		self.row_count = len(self.items)
 
 
@@ -15,7 +15,7 @@ class SORecommendationSnapshot(Document):
 # ---------------------------------------------------------------------------
 
 
-def _capture_snapshot(trigger="Scheduled"):
+def _capture_snapshot(trigger="Scheduled") -> None:
 	"""
 	Run the Open SO Analysis report and save results as a snapshot.
 	Returns the new snapshot document name.
@@ -110,7 +110,7 @@ def _capture_snapshot(trigger="Scheduled"):
 # ---------------------------------------------------------------------------
 
 
-def capture_daily_so_snapshot():
+def capture_daily_so_snapshot() -> None:
 	"""Capture Open SO Analysis snapshot at 4:30 PM IST."""
 	_capture_snapshot(trigger="Scheduled")
 
@@ -121,7 +121,7 @@ def capture_daily_so_snapshot():
 
 
 @frappe.whitelist()
-def run_manual_snapshot():
+def run_manual_snapshot() -> None:
 	require_all_permissions(
 		[("SO Recommendation Snapshot", "create"), ("SO Recommendation Snapshot", "write")],
 	)

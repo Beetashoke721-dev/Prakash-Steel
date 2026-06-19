@@ -6,11 +6,11 @@ from prakash_steel.utils.whitelist_permissions import require_all_permissions
 
 
 class StockBalanceSnapshot(Document):
-	def before_save(self):
+	def before_save(self) -> None:
 		self.row_count = len(self.items)
 
 
-def _capture_snapshot(trigger="Scheduled", filters=None):
+def _capture_snapshot(trigger="Scheduled", filters=None) -> None:
 	"""
 	Run the Item Wise Stock Balance report and save results as a snapshot.
 	Always sets include_zero_stock so every active item appears (zero balance included).
@@ -61,13 +61,13 @@ def _capture_snapshot(trigger="Scheduled", filters=None):
 	return snap.name
 
 
-def capture_daily_stock_balance_snapshot():
+def capture_daily_stock_balance_snapshot() -> None:
 	"""Capture Item Wise Stock Balance snapshot on schedule (see hooks.py cron)."""
 	_capture_snapshot(trigger="Scheduled")
 
 
 @frappe.whitelist()
-def run_manual_snapshot():
+def run_manual_snapshot() -> None:
 	require_all_permissions(
 		[("Stock Balance Snapshot", "create"), ("Stock Balance Snapshot", "write")],
 	)

@@ -3,7 +3,7 @@ from frappe import _
 
 
 @frappe.whitelist()
-def get_available_stock(item_code):
+def get_available_stock(item_code) -> float:
     """
     Fetch total available stock from Bin table for the given item
     across ALL warehouses.
@@ -36,7 +36,7 @@ def get_available_stock(item_code):
 
 
 @frappe.whitelist()
-def get_available_stock_for_warehouse(item_code, warehouse):
+def get_available_stock_for_warehouse(item_code, warehouse) -> float:
     """
     Fetch available stock for an Item in a specific Warehouse from Bin table.
     Returns available quantity in KG.

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = filters or {}
 	
 	# Get calculation mode (default to Monthly)
@@ -31,7 +31,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns(from_date, to_date, calculation_mode):
+def get_columns(from_date, to_date, calculation_mode) -> list[dict]:
 	"""Generate dynamic columns based on calculation mode and date range"""
 	columns = [
 		{
@@ -95,7 +95,7 @@ def get_columns(from_date, to_date, calculation_mode):
 	return columns
 
 
-def get_allowed_customers_for_user():
+def get_allowed_customers_for_user() -> list[str]:
 	"""
 	Get list of customers associated with the current user via portal_users child table.
 	Returns None if user has no restrictions (e.g., admin/system user), 
@@ -149,7 +149,7 @@ def get_allowed_customers_for_user():
 		return None
 
 
-def get_data(from_date, to_date, calculation_mode, allowed_customers=None):
+def get_data(from_date, to_date, calculation_mode, allowed_customers=None) -> list[dict]:
 	"""Get sales invoice data grouped by item and period"""
 	
 	# Build query with customer filter if user has restrictions
@@ -264,7 +264,7 @@ def get_data(from_date, to_date, calculation_mode, allowed_customers=None):
 	return result
 
 
-def get_week_number(date):
+def get_week_number(date) -> int:
 	"""
 	Get week number for a date within its year (Monday to Sunday weeks)
 	Week 1 starts from January 1st and ends on the first Sunday
@@ -302,7 +302,7 @@ def get_week_number(date):
 	return min(week_num, 52)
 
 
-def get_week_key(date):
+def get_week_key(date) -> str:
 	"""
 	Get unique week key for a date (includes year and week number)
 	Returns format: week_YYYY_WW
@@ -312,7 +312,7 @@ def get_week_key(date):
 	return f"week_{year}_{week_num:02d}"
 
 
-def get_weeks_in_range(from_date, to_date):
+def get_weeks_in_range(from_date, to_date) -> list:
 	"""
 	Get all weeks that fall within the date range
 	Returns list of tuples: (label, fieldname)

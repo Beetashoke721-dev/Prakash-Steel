@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 
 
-def validate_no_zero_rate_items(doc, event=None):
+def validate_no_zero_rate_items(doc, event=None) -> None:
 	"""
 	Raise an error if any item in the order has rate = 0.
 	Applies to both Sales Order and Purchase Order.

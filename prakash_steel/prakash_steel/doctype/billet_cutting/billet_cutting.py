@@ -8,7 +8,7 @@ from frappe.utils import flt
 
 
 class BilletCutting(Document):
-	def validate(self):
+	def validate(self) -> None:
 		"""Validate Billet Cutting document before save/submit"""
 		self.validate_miss_billet_weight()
 		self.validate_calculations()
@@ -47,7 +47,7 @@ class BilletCutting(Document):
 		if abs(expected_total - actual_total) > 0.01:
 			self.total_raw_material_pcs = expected_total
 
-	def on_submit(self):
+	def on_submit(self) -> None:
 		"""Create Stock Entry on submit"""
 		try:
 			# Validate required fields
@@ -157,7 +157,7 @@ class BilletCutting(Document):
 			)
 			frappe.throw(_("Error creating Stock Entry: {0}").format(str(e)))
 
-	def before_cancel(self):
+	def before_cancel(self) -> None:
 		"""Prevent cancellation if linked Stock Entry is not cancelled.
 
 		Note: When cancelling from the linked Stock Entry using
@@ -189,7 +189,7 @@ class BilletCutting(Document):
 				).format(frappe.bold(stock_entry_id))
 			)
 
-	def on_cancel(self):
+	def on_cancel(self) -> None:
 		"""Clear linked Stock Entry ID on cancel so amended docs don't copy old reference."""
 		if getattr(self, "custom_stock_entry_id", None):
 			# Clear in memory and in the database

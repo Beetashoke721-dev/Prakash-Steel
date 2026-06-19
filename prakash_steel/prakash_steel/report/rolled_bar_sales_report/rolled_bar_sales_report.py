@@ -15,7 +15,7 @@
 import frappe
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = filters or {}
 
 	columns = get_columns()
@@ -24,7 +24,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 100},
 		{"label": "Date", "fieldname": "date", "fieldtype": "Date", "width": 100},
@@ -76,7 +76,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	if not filters.get("from_date"):
 		filters["from_date"] = frappe.utils.add_months(frappe.utils.today(), -1)
 	if not filters.get("to_date"):

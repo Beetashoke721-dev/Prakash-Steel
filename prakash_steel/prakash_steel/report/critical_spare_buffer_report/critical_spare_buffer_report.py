@@ -11,13 +11,13 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 )
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data()
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": _("Item Code"),
@@ -94,7 +94,7 @@ def get_columns():
 	]
 
 
-def get_data():
+def get_data() -> list[dict]:
 	items = frappe.db.get_all(
 		"Item",
 		filters={"custom_item_type": "CS", "disabled": 0},

@@ -17,7 +17,7 @@ RECIPIENTS = [
 ]
 
 
-def send_daily_payment_entry_email():
+def send_daily_payment_entry_email() -> None:
 	"""Send Payment Entry rows submitted today (by custom_submitted_time) within the configured window."""
 	rows = _get_payment_entry_rows_for_24h_window()
 
@@ -45,7 +45,7 @@ def send_daily_payment_entry_email():
 	)
 
 
-def _get_payment_entry_rows_for_24h_window():
+def _get_payment_entry_rows_for_24h_window() -> list[dict]:
 	"""Fetch Payment Entries from yesterday's 11:15 AM to today's 11:15 AM."""
 	return frappe.db.sql(
 		"""
@@ -77,7 +77,7 @@ def _get_payment_entry_rows_for_24h_window():
 	)
 
 
-def _prepare_axis_bank_table_rows(rows):
+def _prepare_axis_bank_table_rows(rows) -> list[dict]:
 	"""Normalize SQL rows into display dicts for HTML and Excel (same columns as the email table)."""
 	table_rows = []
 	total_amount = 0
@@ -111,7 +111,7 @@ def _prepare_axis_bank_table_rows(rows):
 	return table_rows, total_amount
 
 
-def _build_email_body(table_rows, total_amount, report_date_display):
+def _build_email_body(table_rows, total_amount, report_date_display) -> str:
 	"""Build the HTML table body for payment entry rows."""
 	table_rows_html = []
 
@@ -164,7 +164,7 @@ def _build_email_body(table_rows, total_amount, report_date_display):
 	"""
 
 
-def _build_axis_bank_excel_bytes(table_rows, total_amount, report_date_display):
+def _build_axis_bank_excel_bytes(table_rows, total_amount, report_date_display) -> bytes:
 	"""Build .xlsx bytes matching the AXIS BANK table in the email."""
 	wb = Workbook()
 	ws = wb.active

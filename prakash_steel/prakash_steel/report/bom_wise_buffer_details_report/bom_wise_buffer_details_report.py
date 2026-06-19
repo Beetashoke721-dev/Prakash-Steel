@@ -8,7 +8,7 @@ from prakash_steel.utils.whitelist_permissions import require_permission
 
 
 @frappe.whitelist()
-def check_custom_field_exists():
+def check_custom_field_exists() -> None:
 	"""API method to check if custom_decoupled_lead_time field exists in database"""
 	require_permission("Item", "read")
 	try:
@@ -60,13 +60,13 @@ def check_custom_field_exists():
 		return {"error": str(e), "traceback": frappe.get_traceback()}
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	"""Define report columns"""
 	return [
 		{
@@ -117,7 +117,7 @@ def get_columns():
 	]
 
 
-def get_all_items_recursively(bom_name, parent_item=None, level=0, visited_boms=None, item_groups_cache=None):
+def get_all_items_recursively(bom_name, parent_item=None, level=0, visited_boms=None, item_groups_cache=None) -> list:
 	"""
 	Recursively get all items from a BOM and its nested BOMs.
 
@@ -221,7 +221,7 @@ def get_all_items_recursively(bom_name, parent_item=None, level=0, visited_boms=
 	return items_list
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	"""Get report data based on filters"""
 	data = []
 

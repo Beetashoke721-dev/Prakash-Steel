@@ -12,7 +12,7 @@ class MRPGenaration(Document):
 	pass
 
 
-def calculate_sku_type(buffer_flag, item_type):
+def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	"""
 	Same mapping logic as calculate_sku_type in item.js and open_so_analysis.py
 	buffer_flag: 'Buffer' or other
@@ -38,7 +38,7 @@ def calculate_sku_type(buffer_flag, item_type):
 
 
 @frappe.whitelist()
-def generate_mrp_order_recommendations():
+def generate_mrp_order_recommendations() -> None:
 	"""
 	Enqueue MRP order recommendations calculation as a background job.
 	Returns job_id for status polling.
@@ -77,7 +77,7 @@ def generate_mrp_order_recommendations():
 	}
 
 
-def _generate_mrp_order_recommendations_worker():
+def _generate_mrp_order_recommendations_worker() -> None:
 	"""
 	Worker function that performs the actual MRP calculation.
 	This runs as a background job to prevent UI blocking.
@@ -508,7 +508,7 @@ def _generate_mrp_order_recommendations_worker():
 
 
 @frappe.whitelist()
-def get_mr_creation_progress(job_id):
+def get_mr_creation_progress(job_id) -> dict | list:
 	"""
 	Get progress of Material Request creation job.
 	Returns: current, total, percent, current_item, success_count, error_count
@@ -536,7 +536,7 @@ def get_mr_creation_progress(job_id):
 
 
 @frappe.whitelist()
-def get_mrp_job_status(job_id):
+def get_mrp_job_status(job_id) -> dict | list:
 	"""
 	Check the status of an MRP generation job.
 	Returns: status (queued/running/completed/failed), result (if completed), error (if failed)
@@ -608,7 +608,7 @@ def get_mrp_job_status(job_id):
 
 
 @frappe.whitelist()
-def get_mrp_job_result(job_id):
+def get_mrp_job_result(job_id) -> dict | list:
 	"""
 	Get the result of a completed MRP generation job.
 	"""
@@ -630,7 +630,7 @@ def get_mrp_job_result(job_id):
 
 
 @frappe.whitelist()
-def get_mr_creation_progress(job_id):  # noqa: F811
+def get_mr_creation_progress(job_id) -> dict | None:  # noqa: F811
 	"""
 	Get progress of Material Request creation job.
 	Returns: current, total, percent, current_item, success_count, error_count
@@ -667,7 +667,7 @@ def get_mr_creation_progress(job_id):  # noqa: F811
 
 
 @frappe.whitelist()
-def list_active_mrp_jobs():
+def list_active_mrp_jobs() -> None:
 	"""
 	List all active MRP-related jobs for the current user.
 	This helps users see what jobs are running.
@@ -738,7 +738,7 @@ def list_active_mrp_jobs():
 
 
 @frappe.whitelist()
-def create_material_request(item_code, qty):
+def create_material_request(item_code, qty) -> None:
 	"""
 	Create and submit a Material Request for the given item_code and quantity
 	"""
@@ -858,7 +858,7 @@ def create_material_request(item_code, qty):
 
 
 @frappe.whitelist()
-def create_material_requests_automatically(net_order_recommendations=None):
+def create_material_requests_automatically(net_order_recommendations=None) -> None:
 	"""
 	Create Material Requests automatically for all items with order_recommendation > 0
 	If an item has batch_size, create multiple Material Requests, each with batch_size quantity
@@ -944,7 +944,7 @@ def create_material_requests_automatically(net_order_recommendations=None):
 		}
 
 
-def _create_material_requests_worker(net_order_recommendations=None):
+def _create_material_requests_worker(net_order_recommendations=None) -> None:
 	"""
 	Worker function that creates Material Requests.
 	This runs as a background job to prevent UI blocking.
@@ -1167,7 +1167,7 @@ def _create_material_requests_worker(net_order_recommendations=None):
 	return result
 
 
-def calculate_net_order_recommendation(base_order_rec, moq, batch_size):
+def calculate_net_order_recommendation(base_order_rec, moq, batch_size) -> float:
 	"""
 	Calculate net order recommendation by applying MOQ/Batch Size logic.
 
@@ -1218,7 +1218,7 @@ def calculate_initial_order_recommendation(
 	open_so_map,
 	qualified_demand_map,
 	open_po_map,
-):
+) -> float:
 	"""
 	Calculate initial order recommendation for a single item (before BOM traversal).
 	- Buffer: TOG + Qualified Demand - Stock - WIP/Open PO
@@ -1274,7 +1274,7 @@ def calculate_final_order_recommendation(
 	open_po_map,
 	mrq_map,
 	parent_demand_map,
-):
+) -> float:
 	"""
 	Calculate final order recommendation for a single item (after BOM traversal).
 	- Buffer: TOG + (Qualified Demand + Parent Demand) - Stock - WIP/Open PO - MRQ
@@ -1349,7 +1349,7 @@ def traverse_bom_for_mrp(
 	detailed_info,
 	visited_items,
 	level=0,
-):
+) -> None:
 	"""
 	Recursively traverse BOM to calculate parent demands for child items.
 	For buffer child items: Don't add parent demand (they use TOG-based calculation)
@@ -1576,7 +1576,7 @@ def traverse_bom_for_mrp_with_net_rec(
 	detailed_info,
 	visited_items,
 	level=0,
-):
+) -> None:
 	"""
 	Recursively traverse BOM using net_order_recommendations (after MOQ/Batch Size).
 	This ensures children get the adjusted values from their parents.
@@ -1722,7 +1722,7 @@ def traverse_bom_for_mrp_with_net_rec(
 		)
 
 
-def get_stock_map_for_mrp(item_codes):
+def get_stock_map_for_mrp(item_codes) -> dict:
 	"""Get stock map for all items"""
 	if not item_codes:
 		return {}
@@ -1746,7 +1746,7 @@ def get_stock_map_for_mrp(item_codes):
 	return {d.item_code: flt(d.stock) for d in bin_rows}
 
 
-def get_wip_map_for_mrp():
+def get_wip_map_for_mrp() -> dict:
 	"""Get WIP (Work In Progress) map - sum of (qty - produced_qty) from Work Order (where status is not Completed or Cancelled)
 	for ALL items (all-time data)
 
@@ -1919,7 +1919,7 @@ def get_wip_map_for_mrp():
 	return wip_map
 
 
-def get_open_so_map_for_mrp():
+def get_open_so_map_for_mrp() -> dict:
 	"""Get Open SO map - sum of max(0, qty - delivered_qty) from Sales Order Items
 	IMPORTANT: This calculates OPEN SO (qty - delivered_qty), NOT total SO (qty).
 	Open SO = Sales Orders with delivery_date <= today (only those with delivery date today or in the past).
@@ -1955,7 +1955,7 @@ def get_open_so_map_for_mrp():
 	return {d.item_code: flt(d.so_qty) for d in so_rows}
 
 
-def get_qualified_demand_map_for_mrp():
+def get_qualified_demand_map_for_mrp() -> tuple:
 	"""Get qualified demand map for ALL items (same logic as PO Recommendation report)
 
 	Qualified Demand logic:
@@ -2070,7 +2070,7 @@ def get_qualified_demand_map_for_mrp():
 	return qualified_demand_map
 
 
-def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map):
+def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map) -> dict[str, float]:
 	"""Calculate spike map for buffer items based on Spike Master configuration
 
 	Logic (same as PSP PO Recommendation report):
@@ -2267,7 +2267,7 @@ def get_qualified_demand_for_item(
 	item_tog_map=None,
 	item_type_map=None,
 	spike_master_map=None,
-):
+) -> tuple:
 	"""Get qualified demand for a single item (same logic as PSP PO Recommendation)
 
 	Qualified Demand = till_today + spike
@@ -2311,7 +2311,7 @@ def get_qualified_demand_for_item(
 	return qualified_demand, till_today, spike
 
 
-def get_mrq_map_for_mrp():
+def get_mrq_map_for_mrp() -> dict:
 	"""Get MRQ (Material Request Quantity) map - sum of (qty - ordered_qty) from Material Request Items
 	for all items (only Material Requests with status 'Pending' or 'Partially Ordered'),
 	plus Draft Work Orders (docstatus=0).
@@ -2359,7 +2359,7 @@ def get_mrq_map_for_mrp():
 	return mrq_map
 
 
-def get_open_po_map_for_mrp():
+def get_open_po_map_for_mrp() -> dict:
 	"""Get Open PO (Purchase Order) map - sum of (qty - received_qty) from Purchase Order Items
 	for all items. If (qty - received_qty) is negative for a particular PO, treat it as 0.
 	Only includes submitted Purchase Orders that are not cancelled.
@@ -2400,7 +2400,7 @@ def get_open_po_map_for_mrp():
 	return open_po_map
 
 
-def build_calculation_breakdown(info, parent_demand_map):
+def build_calculation_breakdown(info, parent_demand_map) -> str:
 	"""Build detailed calculation breakdown for an item"""
 	item_code = info["item_code"]
 	buffer_flag = info["buffer_flag"]
@@ -2576,7 +2576,7 @@ def build_calculation_breakdown(info, parent_demand_map):
 	info["calculation_breakdown"] = "\n".join(lines)
 
 
-def generate_detailed_log(detailed_info, net_order_recommendations):
+def generate_detailed_log(detailed_info, net_order_recommendations) -> str:
 	"""Generate detailed log with full breakdown for each item"""
 	lines = []
 	lines.append("\n" + "=" * 100)

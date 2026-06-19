@@ -5,7 +5,7 @@ from frappe.utils import getdate, today
 from prakash_steel.utils.whitelist_permissions import require_any_permission
 
 
-def _normalize_filter_value(value):
+def _normalize_filter_value(value) -> str:
 	if isinstance(value, (list, tuple)):
 		for item in value:
 			if item:
@@ -14,7 +14,7 @@ def _normalize_filter_value(value):
 	return str(value or "")
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = frappe._dict(filters or {})
 	filters.date = getdate(filters.get("date") or today())
 	filters.party_name = _normalize_filter_value(filters.get("party_name"))
@@ -26,7 +26,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{"label": _("Date"), "fieldname": "date", "fieldtype": "Date", "width": 120},
 		{
@@ -49,7 +49,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	query = """
 		SELECT
 			entries.posting_date AS date,
@@ -140,7 +140,7 @@ def get_data(filters):
 
 
 @frappe.whitelist()
-def get_filter_options(fieldname, txt="", date=None):
+def get_filter_options(fieldname, txt="", date=None) -> str:
 	require_any_permission(
 		[
 			("Journal Entry", "read"),
