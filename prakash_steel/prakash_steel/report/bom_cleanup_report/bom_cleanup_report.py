@@ -4,13 +4,13 @@
 import frappe
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{"label": "Parent Item", "fieldname": "parent_item", "fieldtype": "Link", "options": "Item", "width": 180},
 		{"label": "BOM ID", "fieldname": "bom_id", "fieldtype": "Link", "options": "BOM", "width": 200},
@@ -21,7 +21,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	conditions = []
 	values = {}
 

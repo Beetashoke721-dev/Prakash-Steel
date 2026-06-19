@@ -6,7 +6,7 @@ from prakash_steel.utils.lead_time import get_default_bom
 
 
 @frappe.whitelist()
-def check_item_has_bom(item_code):
+def check_item_has_bom(item_code) -> bool:
 	"""
 	API method to check if an item has a BOM.
 	

@@ -17,7 +17,7 @@ SKU_TYPE_MAP = {
 }
 
 
-def execute():
+def execute() -> tuple[list, list]:
 	items = frappe.db.sql(
 		"""
 		SELECT name, custom_item_type, custom_buffer_flag

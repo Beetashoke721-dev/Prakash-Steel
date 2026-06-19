@@ -12,7 +12,7 @@ INVOICE_DOCTYPES = ("Sales Invoice", "Purchase Invoice")
 @frappe.whitelist()
 def get_reference_details(
 	reference_doctype, reference_name, party_account_currency, party_type=None, party=None
-):
+) -> dict:
 	"""Wrapper around ERPNext's `get_reference_details` that also returns the
 	invoice's `posting_date` under the key `custom_invoice_date`.
 
@@ -48,7 +48,7 @@ def get_reference_details(
 	return ref_details
 
 
-def set_submitted_time(doc, method=None):
+def set_submitted_time(doc, method=None) -> None:
 	"""Store submit time in custom_submitted_time on submit."""
 	if doc.get("custom_submitted_time"):
 		return
@@ -60,7 +60,7 @@ def set_submitted_time(doc, method=None):
 	doc.db_set("custom_submitted_time", now_datetime(), update_modified=False)
 
 
-def set_invoice_date_on_references(doc, method=None):
+def set_invoice_date_on_references(doc, method=None) -> None:
 	"""Populate `custom_invoice_date` on each Payment Entry Reference row from
 	the linked Sales/Purchase Invoice's `posting_date`.
 

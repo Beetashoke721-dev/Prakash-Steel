@@ -3,7 +3,7 @@ from frappe import _
 
 
 @frappe.whitelist()
-def get_last_sales_invoice_sold_qty(item_code):
+def get_last_sales_invoice_sold_qty(item_code) -> float:
 	if not frappe.has_permission("Sales Invoice", "read"):
 		frappe.throw(_("Not permitted to access Sales Invoice data."), frappe.PermissionError)
 

@@ -4,7 +4,7 @@
 import frappe
 
 
-def calculate_decoupled_lead_time(item_code):
+def calculate_decoupled_lead_time(item_code) -> float:
 	if not item_code:
 		return 0
 
@@ -34,7 +34,7 @@ def calculate_decoupled_lead_time(item_code):
 		return 0
 
 
-def _calculate_lead_time_recursive(item_code, visited_items, item_groups_cache=None):
+def _calculate_lead_time_recursive(item_code, visited_items, item_groups_cache=None) -> float:
 	if not item_code or item_code in visited_items:
 		return 0
 
@@ -170,7 +170,7 @@ def _calculate_lead_time_recursive(item_code, visited_items, item_groups_cache=N
 
 
 @frappe.whitelist()
-def get_default_bom(item_code):
+def get_default_bom(item_code) -> str | None:
 	"""
 	Get the default BOM for an item.
 
@@ -207,7 +207,7 @@ def get_default_bom(item_code):
 
 
 @frappe.whitelist()
-def get_bom_details(bom_name):
+def get_bom_details(bom_name) -> dict | None:
 	"""
 	Get BOM details needed for job work RM qty calculation.
 
@@ -233,7 +233,7 @@ def get_bom_details(bom_name):
 	}
 
 
-def update_decoupled_lead_time_for_item(item_code):
+def update_decoupled_lead_time_for_item(item_code) -> None:
 	"""
 	Update the decoupled lead time field for a specific item.
 	Args:
@@ -271,7 +271,7 @@ def update_decoupled_lead_time_for_item(item_code):
 		return None
 
 
-def update_decoupled_lead_time_for_finished_goods():
+def update_decoupled_lead_time_for_finished_goods() -> None:
 	"""
 	Update decoupled lead time for all finished goods items that have BOMs.
 	"""
@@ -296,7 +296,7 @@ def update_decoupled_lead_time_for_finished_goods():
 	return updated_count
 
 
-def flt(value, precision=None):
+def flt(value, precision=None) -> float:
 	"""Wrapper for frappe.utils.flt"""
 	from frappe.utils import flt as _flt
 
@@ -304,7 +304,7 @@ def flt(value, precision=None):
 
 
 @frappe.whitelist()
-def debug_lead_time_calculation(item_code):
+def debug_lead_time_calculation(item_code) -> None:
 	"""
 	Debug function to help diagnose lead time calculation issues with detailed breakdown.
 
@@ -381,7 +381,7 @@ def debug_lead_time_calculation(item_code):
 
 def _calculate_lead_time_recursive_with_trace(
 	item_code, visited_items, trace, level=0, item_groups_cache=None
-):
+) -> tuple:
 	"""
 	Recursive helper with detailed trace for debugging.
 

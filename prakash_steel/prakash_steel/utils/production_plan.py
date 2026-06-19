@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import today
 
 
-def on_production_plan_submit(doc, method):
+def on_production_plan_submit(doc, method) -> None:
 	"""
 	Server-side hook called when Production Plan is submitted.
 	This will automatically create Billet Cutting documents for "Rolled Plan" Production Plans.
@@ -32,7 +32,7 @@ def on_production_plan_submit(doc, method):
 
 
 @frappe.whitelist()
-def create_billet_cutting_for_rolled_plan(production_plan_name: str):
+def create_billet_cutting_for_rolled_plan(production_plan_name: str) -> None:
 	"""
 	Create Billet Cutting documents automatically for a submitted Production Plan
 	with naming_series containing 'Rolled Plan'.

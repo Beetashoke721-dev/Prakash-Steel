@@ -13,11 +13,11 @@ _COMPANY = "Prakash Steel Products Pvt Ltd"
 
 
 class JOBWorkOrder(Document):
-	def on_submit(self):
+	def on_submit(self) -> None:
 		self.db_set("status", "Pending")
 
 
-def _jwo_pr_received_fg_qty_by_item(jwo_name):
+def _jwo_pr_received_fg_qty_by_item(jwo_name) -> dict:
 	rows = frappe.db.sql(
 		"""
 		SELECT pri.item_code, COALESCE(SUM(pri.qty), 0)
@@ -31,7 +31,7 @@ def _jwo_pr_received_fg_qty_by_item(jwo_name):
 	return {r[0]: flt(r[1]) for r in rows}
 
 
-def _jwo_transferred_rm_qty_by_item(jwo_name, job_work_type):
+def _jwo_transferred_rm_qty_by_item(jwo_name, job_work_type) -> dict:
 	if job_work_type == "Subcontracting":
 		rows = frappe.db.sql(
 			"""
@@ -59,7 +59,7 @@ def _jwo_transferred_rm_qty_by_item(jwo_name, job_work_type):
 	return {r[0]: flt(r[1]) for r in rows}
 
 
-def _jwo_has_submitted_rm_transfer(jwo_name, job_work_type):
+def _jwo_has_submitted_rm_transfer(jwo_name, job_work_type) -> bool:
 	if job_work_type == "Subcontracting":
 		return bool(frappe.db.exists("Delivery Note", {"custom_job_work_order": jwo_name, "docstatus": 1}))
 	if job_work_type == "Sale-Purchase":
@@ -67,7 +67,7 @@ def _jwo_has_submitted_rm_transfer(jwo_name, job_work_type):
 	return False
 
 
-def _validate_jwo_update_items(doc, items, original_by_name, incoming_names):
+def _validate_jwo_update_items(doc, items, original_by_name, incoming_names) -> None:
 	received_fg = _jwo_pr_received_fg_qty_by_item(doc.name)
 	transferred_rm = _jwo_transferred_rm_qty_by_item(doc.name, doc.job_work_type)
 	lock_raw_material = _jwo_has_submitted_rm_transfer(doc.name, doc.job_work_type)
@@ -153,7 +153,7 @@ def _validate_jwo_update_items(doc, items, original_by_name, incoming_names):
 
 
 @frappe.whitelist()
-def update_work_items(source_name, items):
+def update_work_items(source_name, items) -> None:
 	"""Sync work_item_table from the Update Items dialog: update, append new rows, and delete removed rows.
 
 	Same idea as ERPNext ``validate_and_delete_children`` + update: any existing child name not present
@@ -207,7 +207,7 @@ def update_work_items(source_name, items):
 	frappe.db.commit()
 
 
-def _build_rm_qty_map(work_item_table):
+def _build_rm_qty_map(work_item_table) -> dict:
 	"""Sum rm_qty_required by raw_material across all work item rows."""
 	rm_qty_map = {}
 	for row in work_item_table:
@@ -217,7 +217,7 @@ def _build_rm_qty_map(work_item_table):
 
 
 @frappe.whitelist()
-def make_sales_invoice(source_name):
+def make_sales_invoice(source_name) -> object:
 	require_all_permissions(
 		[("JOB Work Order", "read"), ("Sales Invoice", "create")],
 		_("Not permitted to create Sales Invoice from JOB Work Order."),
@@ -258,7 +258,7 @@ def make_sales_invoice(source_name):
 
 
 @frappe.whitelist()
-def make_delivery_note(source_name):
+def make_delivery_note(source_name) -> object:
 	require_all_permissions(
 		[("JOB Work Order", "read"), ("Delivery Note", "create")],
 		_("Not permitted to create Delivery Note from JOB Work Order."),
@@ -303,7 +303,7 @@ def make_delivery_note(source_name):
 
 
 @frappe.whitelist()
-def make_purchase_receipt(source_name):
+def make_purchase_receipt(source_name) -> object:
 	require_all_permissions(
 		[("JOB Work Order", "read"), ("Purchase Receipt", "create")],
 		_("Not permitted to create Purchase Receipt from JOB Work Order."),

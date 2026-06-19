@@ -23,13 +23,13 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 )
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def _buffer_colour(level, tog, qualified_demand):
+def _buffer_colour(level, tog, qualified_demand) -> str:
 	total = flt(tog) + flt(qualified_demand)
 	if level == 0:
 		return "Black"
@@ -47,7 +47,7 @@ def _buffer_colour(level, tog, qualified_demand):
 _COLOUR_RANK = {"Black": 5, "Red": 4, "Yellow": 3, "Green": 2, "White": 1}
 
 
-def _compute_order_status(delivery_date, transaction_date):
+def _compute_order_status(delivery_date, transaction_date) -> str | None:
 	"""Mirror of Open SO Analysis order_status logic."""
 	if not delivery_date:
 		return None
@@ -70,7 +70,7 @@ def _compute_order_status(delivery_date, transaction_date):
 	return "WHITE"
 
 
-def get_rbmto_so_detail_map(item_codes):
+def get_rbmto_so_detail_map(item_codes) -> dict:
 	"""Returns {item_code: [{pending_qty, colour}, ...]} sorted delivery_date ASC for FIFO."""
 	if not item_codes:
 		return {}
@@ -99,7 +99,7 @@ def get_rbmto_so_detail_map(item_codes):
 	return result
 
 
-def get_parent_bom_map(item_codes):
+def get_parent_bom_map(item_codes) -> dict:
 	"""Returns {child_item_code: [{parent_item, bom_qty, bom_quantity}, ...]} from default BOMs."""
 	if not item_codes:
 		return {}
@@ -141,7 +141,7 @@ def _build_parent_batches(
 	item_code=None,
 	open_so=0.0,
 	so_map_for_priority=None,
-):
+) -> list:
 	"""
 	Generate production batch list for a parent BB item, mirroring bright_plan logic.
 	Returns list of {batch_qty, level_before, colour, op_cp, priority_colour, priority_sequence}.
@@ -198,7 +198,7 @@ def _build_parent_batches(
 _PRIORITY_TO_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
 
 
-def _rbmto_on_hand_colour(level, own_so_list):
+def _rbmto_on_hand_colour(level, own_so_list) -> str:
 	"""
 	RBMTO on-hand colour (mirrors po_recomendation _non_buffer_priority):
 	FIFO-allocate `level` across own SOs sorted by delivery_date ASC.
@@ -229,7 +229,7 @@ def _rbmto_on_hand_colour(level, own_so_list):
 	return ""
 
 
-def _rbmto_colour(level, own_so_list, parent_so_fifo_list):
+def _rbmto_colour(level, own_so_list, parent_so_fifo_list) -> str:
 	"""
 	RBMTO colour:
 	1. FIFO through own open SOs sorted by delivery_date ASC — stop at first shortage.
@@ -261,7 +261,7 @@ def _rbmto_colour(level, own_so_list, parent_so_fifo_list):
 	return ""
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": _("Item Code"),
@@ -627,7 +627,7 @@ def get_columns():
 	]
 
 
-def get_data(filters=None):
+def get_data(filters=None) -> list[dict]:
 	if not filters:
 		filters = {}
 
@@ -1493,7 +1493,7 @@ def get_data(filters=None):
 
 
 @frappe.whitelist()
-def get_final_allocated_qty_breakdown(item_code):
+def get_final_allocated_qty_breakdown(item_code) -> dict | list:
 	"""
 	Returns step-by-step breakdown of how final_allocated_qty is computed for an RB item.
 	Runs the full report and extracts the item's row + subgroup context.
@@ -1590,7 +1590,7 @@ def get_final_allocated_qty_breakdown(item_code):
 
 
 @frappe.whitelist()
-def get_item_colour_breakdown(item_code):
+def get_item_colour_breakdown(item_code) -> dict | list:
 	"""
 	Returns full colour computation detail for an RB item.
 	RBMTA → buffer_colour breakdown.

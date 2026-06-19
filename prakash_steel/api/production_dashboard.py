@@ -19,7 +19,7 @@ def get_rolled_production_data(
     production_plan=None,
     machine_name=None,
     category_name=None,
-):
+) -> dict:
     """
     Fetch Rolled Production data for the Production Dashboard.
 
@@ -377,7 +377,7 @@ def get_bright_production_data(
     production_plan=None,
     machine_name=None,
     category_name=None,
-):
+) -> dict:
     """
     Fetch Bright Production data for the Production Dashboard.
 
@@ -635,7 +635,7 @@ def get_bend_weight_details(
     production_plan=None,
     machine_name=None,
     category_name=None,
-):
+) -> dict | list:
     """
     Fetch Bend Weight Details for the Production Dashboard.
 
@@ -719,7 +719,7 @@ def get_bend_weight_details(
     }
 
 
-def _fmt_date(date_val):
+def _fmt_date(date_val) -> str:
     """Return a Python date object so Excel treats the cell as a real date."""
     if not date_val:
         return ""
@@ -804,7 +804,7 @@ def export_production_dashboard(
     machine_name=None,
     category_name=None,
     selected_columns=None,
-):
+) -> dict:
     """
     Build an Excel file (XLSX) for the Production Dashboard tables.
     selected_columns: comma-separated list of column keys; if empty, all columns are included.

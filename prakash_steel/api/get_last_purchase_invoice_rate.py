@@ -3,7 +3,7 @@ from frappe import _
 
 
 @frappe.whitelist()
-def get_last_purchase_order_rate(item_code, company=None):
+def get_last_purchase_order_rate(item_code, company=None) -> float:
     if not frappe.has_permission("Purchase Order", "read") and not frappe.has_permission("Item", "read"):
         frappe.throw(_("Not permitted to access purchase order rate data."), frappe.PermissionError)
 
@@ -47,7 +47,7 @@ def get_last_purchase_order_rate(item_code, company=None):
 
 
 @frappe.whitelist()
-def get_last_purchase_invoice_rate(item_code, company=None):
+def get_last_purchase_invoice_rate(item_code, company=None) -> float:
     # Backward-compatible alias for any existing clients.
     if not frappe.has_permission("Purchase Order", "read") and not frappe.has_permission("Item", "read"):
         frappe.throw(

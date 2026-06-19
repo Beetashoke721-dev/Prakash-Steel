@@ -6,7 +6,7 @@ from frappe.model.document import Document
 
 
 class HourlyProduction(Document):
-	def validate(self):
+	def validate(self) -> None:
 		# Clear and make non-mandatory fields when miss_roll_pcs is empty or 0
 		if not self.miss_roll_pcs or self.miss_roll_pcs <= 0:
 			self.miss_roll_weight = None

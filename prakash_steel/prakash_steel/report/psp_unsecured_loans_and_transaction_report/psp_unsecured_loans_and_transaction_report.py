@@ -6,7 +6,7 @@ import frappe
 from frappe.utils import flt, getdate, today, add_days
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
     filters = filters or {}
     columns = get_columns()
     data = get_data(filters)
@@ -35,7 +35,7 @@ def execute(filters=None):
     return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
     return [
         {"label": "Month", "fieldname": "month", "fieldtype": "Data", "width": 110},
         {"label": "Date", "fieldname": "detail_date", "fieldtype": "Date", "width": 110},
@@ -74,7 +74,7 @@ def get_columns():
     ]
 
 
-def _get_daily_balances(account, loop_start, loop_end):
+def _get_daily_balances(account, loop_start, loop_end) -> dict:
     """
     Pre-fetch closing balances for every date in [loop_start, loop_end] using
     2 SQL queries instead of one per day.
@@ -144,7 +144,7 @@ MONTH_MAP = {
 }
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
     conditions = []
     values = {}
 

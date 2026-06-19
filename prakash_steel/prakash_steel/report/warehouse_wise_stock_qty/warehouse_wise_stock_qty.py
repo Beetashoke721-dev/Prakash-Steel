@@ -4,7 +4,7 @@
 import frappe
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = filters or {}
 
 	columns = get_columns()
@@ -12,7 +12,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "Warehouse Name",
@@ -30,7 +30,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	where_conditions = []
 	params = {}
 

@@ -6,7 +6,7 @@ import frappe
 from frappe import _, msgprint
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	if not filters:
 		filters = {}
 
@@ -16,7 +16,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns(filters):
+def get_columns(filters) -> list[dict]:
 	if not filters.get("doctype"):
 		msgprint(_("Please select the document type first"), raise_exception=1)
 
@@ -81,7 +81,7 @@ def get_columns(filters):
 	return columns
 
 
-def get_entries(filters):
+def get_entries(filters) -> list[dict]:
 	date_field = "transaction_date" if filters.get("doctype") == "Sales Order" else "posting_date"
 	company_currency = frappe.db.get_value("Company", filters.get("company"), "default_currency")
 	conditions = get_conditions(filters, date_field)
@@ -103,7 +103,7 @@ def get_entries(filters):
 	return entries
 
 
-def get_conditions(filters, date_field):
+def get_conditions(filters, date_field) -> str:
 	conditions = "1=1"
 
 	for field in ["company", "customer", "territory"]:

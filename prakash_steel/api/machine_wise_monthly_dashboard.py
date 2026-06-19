@@ -24,7 +24,7 @@ MONTH_LABELS = {
 
 
 @frappe.whitelist()
-def get_machine_wise_monthly_data(fiscal_year=None, machine_name=None):
+def get_machine_wise_monthly_data(fiscal_year=None, machine_name=None) -> list[dict]:
     if not frappe.has_permission("Bright Bar Production", "read") and not frappe.has_permission(
         "Machine Master", "read"
     ):
@@ -126,7 +126,7 @@ def get_machine_wise_monthly_data(fiscal_year=None, machine_name=None):
     }
 
 
-def _get_fiscal_year_doc(fiscal_year=None):
+def _get_fiscal_year_doc(fiscal_year=None) -> object:
     if fiscal_year:
         return frappe.get_doc("Fiscal Year", fiscal_year)
 
@@ -157,7 +157,7 @@ def _get_fiscal_year_doc(fiscal_year=None):
     frappe.throw("No Fiscal Year found. Please create Fiscal Year first.")
 
 
-def _get_fiscal_month_periods(fiscal_year_doc):
+def _get_fiscal_month_periods(fiscal_year_doc) -> list:
     periods = []
     current = fiscal_year_doc.year_start_date
     for _ in range(12):
@@ -171,7 +171,7 @@ def _get_fiscal_month_periods(fiscal_year_doc):
     return periods
 
 
-def _build_machine_rate_lookup(machine_names):
+def _build_machine_rate_lookup(machine_names) -> dict:
     if not machine_names:
         return {}
 
@@ -202,7 +202,7 @@ def _build_machine_rate_lookup(machine_names):
     return lookup
 
 
-def _get_rate_for_date(rate_rows, production_date):
+def _get_rate_for_date(rate_rows, production_date) -> float:
     """Return latest applicable rate as on production date."""
     applicable_rate = 0
     for rate_row in rate_rows:
@@ -213,11 +213,11 @@ def _get_rate_for_date(rate_rows, production_date):
     return applicable_rate
 
 
-def _safe_export_filename_part(value):
+def _safe_export_filename_part(value) -> str:
     return re.sub(r"[^\w\-.]+", "_", (value or "") or "")[:120] or "export"
 
 
-def _build_flat_sheet_rows(machines, rows):
+def _build_flat_sheet_rows(machines, rows) -> list[dict]:
     header = [_("Month")]
     for machine in machines:
         header.append(f"{machine} — {_('FG Weight')}")
@@ -242,7 +242,7 @@ def _build_flat_sheet_rows(machines, rows):
 
 
 @frappe.whitelist()
-def export_machine_wise_monthly_excel(fiscal_year=None, machine_name=None):
+def export_machine_wise_monthly_excel(fiscal_year=None, machine_name=None) -> dict:
     if not frappe.has_permission("Bright Bar Production", "read") and not frappe.has_permission(
         "Machine Master", "read"
     ):
@@ -269,7 +269,7 @@ def export_machine_wise_monthly_excel(fiscal_year=None, machine_name=None):
 
 
 @frappe.whitelist()
-def export_machine_wise_monthly_pdf(fiscal_year=None, machine_name=None):
+def export_machine_wise_monthly_pdf(fiscal_year=None, machine_name=None) -> dict:
     if not frappe.has_permission("Bright Bar Production", "read") and not frappe.has_permission(
         "Machine Master", "read"
     ):

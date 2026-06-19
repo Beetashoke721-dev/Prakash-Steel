@@ -10,7 +10,7 @@ from prakash_steel.utils.whitelist_permissions import require_all_permissions, r
 
 
 class ProductionPlanning(Document):
-	def on_submit(self):
+	def on_submit(self) -> None:
 		if "Rolled Plan" not in (self.naming_series or ""):
 			return
 
@@ -23,7 +23,7 @@ class ProductionPlanning(Document):
 			)
 
 
-def _billet_cutting_exists(production_planning_name, fg_item, raw_material):
+def _billet_cutting_exists(production_planning_name, fg_item, raw_material) -> bool:
 	"""Check if a Billet Cutting doc already exists for this row combination."""
 	return frappe.db.exists(
 		"Billet Cutting",
@@ -35,7 +35,7 @@ def _billet_cutting_exists(production_planning_name, fg_item, raw_material):
 	)
 
 
-def _create_billet_cutting_for_rows(production_planning_name, rows, shift_type, posting_date=None):
+def _create_billet_cutting_for_rows(production_planning_name, rows, shift_type, posting_date=None) -> None:
 	"""Create Billet Cutting docs for rows that don't already have one."""
 	created = []
 
@@ -64,7 +64,7 @@ def _create_billet_cutting_for_rows(production_planning_name, rows, shift_type, 
 
 
 @frappe.whitelist()
-def get_fg_items_for_production_planning(production_planning):
+def get_fg_items_for_production_planning(production_planning) -> dict | list:
 	"""Return fg_item and raw_material rows from Production Planning FG Table."""
 	require_permission("Production Planning", "read")
 	rows = frappe.get_all(
@@ -76,7 +76,7 @@ def get_fg_items_for_production_planning(production_planning):
 
 
 @frappe.whitelist()
-def update_production_plan(source_name, items):
+def update_production_plan(source_name, items) -> None:
 	"""Sync production_plan child table from the Update Items dialog."""
 	require_all_permissions(
 		[

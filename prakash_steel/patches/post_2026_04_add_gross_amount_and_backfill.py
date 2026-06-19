@@ -14,7 +14,7 @@ def _compute_gross(item: dict) -> float:
     return taxable_value + gst_component
 
 
-def _backfill_existing():
+def _backfill_existing() -> None:
     """Populate custom_gross_amount for all Sales Invoice Items across all invoices.
 
     - Works for submitted, draft and cancelled by writing directly to child rows.
@@ -44,5 +44,5 @@ def _backfill_existing():
     frappe.db.commit()
 
 
-def execute():
+def execute() -> tuple[list, list]:
     _backfill_existing()

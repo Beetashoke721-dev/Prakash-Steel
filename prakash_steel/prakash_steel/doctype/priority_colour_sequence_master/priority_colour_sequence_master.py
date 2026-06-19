@@ -8,7 +8,7 @@ from frappe.utils import cint
 
 
 class PriorityColourSequenceMaster(Document):
-	def validate(self):
+	def validate(self) -> None:
 		self.validate_table_rows()
 
 	def validate_table_rows(self):

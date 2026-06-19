@@ -1,14 +1,14 @@
 import frappe
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = filters or {}
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "Production Date",
@@ -55,7 +55,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	conditions = ["fw.docstatus = 1"]
 
 	if filters.get("from_date"):

@@ -120,5 +120,5 @@ def backfill_submitted_sales_invoices(*, only_if_empty: bool = True) -> None:
 	frappe.db.commit()
 
 
-def run_after_migrate():
+def run_after_migrate() -> None:
 	backfill_submitted_sales_invoices(only_if_empty=True)

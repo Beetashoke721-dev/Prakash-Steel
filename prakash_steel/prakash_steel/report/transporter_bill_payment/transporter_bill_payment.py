@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import flt, getdate
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
     filters = filters or {}
     invoice_type = get_invoice_type(filters)
     columns = get_columns(invoice_type)
@@ -10,12 +10,12 @@ def execute(filters=None):
     return columns, data
 
 
-def get_invoice_type(filters):
+def get_invoice_type(filters) -> str:
     invoice_type = (filters.get("invoice_type") or "Purchase").strip().lower()
     return "sale" if invoice_type == "sale" else "purchase"
 
 
-def get_columns(invoice_type):
+def get_columns(invoice_type) -> list[dict]:
     if invoice_type == "sale":
         return [
             {
@@ -128,7 +128,7 @@ def get_columns(invoice_type):
     ]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
     invoice_type = get_invoice_type(filters)
     if invoice_type == "sale":
         return get_sale_data(filters)
@@ -136,7 +136,7 @@ def get_data(filters):
     return get_purchase_data(filters)
 
 
-def get_purchase_data(filters):
+def get_purchase_data(filters) -> list[dict]:
     conditions = ["pi.docstatus = 1", "ifnull(pi.transporter_name, '') != ''"]
     values = {}
 
@@ -218,7 +218,7 @@ def get_purchase_data(filters):
     return result
 
 
-def get_sale_data(filters):
+def get_sale_data(filters) -> list[dict]:
     has_transporter_name = frappe.db.has_column("Sales Invoice", "transporter_name")
     has_vehicle_no = frappe.db.has_column("Sales Invoice", "vehicle_no")
 

@@ -12,7 +12,7 @@ COMBINATIONS = [
 ]
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = frappe._dict(filters or {})
 	if not filters.snapshot_date:
 		filters.snapshot_date = today()
@@ -22,7 +22,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{"label": _("Combination"), "fieldname": "combination", "fieldtype": "Data", "width": 160},
 		{"label": _("Snapshot Time"), "fieldname": "snapshot_time", "fieldtype": "Data", "width": 100},
@@ -87,7 +87,7 @@ def _get_latest_snapshot(snapshot_date, purchase, sell, buffer_flag):
 	return results[0] if results else None
 
 
-def _parse_multiselect(value):
+def _parse_multiselect(value) -> list[str]:
 	"""MultiSelectList sends a list or newline-joined string; normalise to a Python list."""
 	if not value:
 		return []
@@ -96,7 +96,7 @@ def _parse_multiselect(value):
 	return [v.strip() for v in str(value).split("\n") if v.strip()]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	snapshot_date = filters.snapshot_date
 	sku_types = _parse_multiselect(filters.get("sku_type"))
 	item_code_filter = filters.get("item_code")

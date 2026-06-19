@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 
-def get_data():
+def get_data() -> list[dict]:
 	return {
 		"fieldname": "custom_job_work_order",
 		"transactions": [

@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import flt
 
 
-def validate_purchase_order_quantity_on_close(doc, method=None):
+def validate_purchase_order_quantity_on_close(doc, method=None) -> None:
 	"""
 	Validate Purchase Order items when status is changed to "Closed".
 	Send email notification if received_qty is more than 5% less than qty for any item.
@@ -74,7 +74,7 @@ def validate_purchase_order_quantity_on_close(doc, method=None):
 		send_quantity_shortfall_notification(doc, shortfall_items)
 
 
-def send_quantity_shortfall_notification(doc, shortfall_items):
+def send_quantity_shortfall_notification(doc, shortfall_items) -> None:
 	"""
 	Send email notification when Purchase Order is closed and items have received_qty
 	more than 5% less than qty.
@@ -163,7 +163,7 @@ def send_quantity_shortfall_notification(doc, shortfall_items):
 		)
 
 
-def get_notification_recipients():
+def get_notification_recipients() -> None:
 	"""
 	Get list of email recipients for quantity shortfall notifications.
 
@@ -180,7 +180,7 @@ def get_notification_recipients():
 
 
 @frappe.whitelist()
-def make_purchase_receipt(source_name, target_doc=None, args=None):
+def make_purchase_receipt(source_name, target_doc=None, args=None) -> object:
 	if not frappe.has_permission("Purchase Order", "read"):
 		frappe.throw(_("Not permitted to create Purchase Receipt from Purchase Order."), frappe.PermissionError)
 

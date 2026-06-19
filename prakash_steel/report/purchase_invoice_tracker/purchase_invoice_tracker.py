@@ -4,7 +4,7 @@
 import frappe
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	filters = filters or {}
 
 	columns = get_columns()
@@ -13,7 +13,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": "Purchase Invoice ID",
@@ -56,7 +56,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters) -> list[dict]:
 	# Set default date range if not provided
 	if not filters.get("from_date"):
 		filters["from_date"] = "2020-01-01"

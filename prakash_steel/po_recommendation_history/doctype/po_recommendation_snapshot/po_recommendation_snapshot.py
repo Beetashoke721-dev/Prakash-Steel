@@ -6,7 +6,7 @@ from prakash_steel.utils.whitelist_permissions import require_all_permissions
 
 
 class PORecommendationSnapshot(Document):
-	def before_save(self):
+	def before_save(self) -> None:
 		self.item_count = len(self.items)
 
 
@@ -14,7 +14,7 @@ class PORecommendationSnapshot(Document):
 # Core capture logic
 # ---------------------------------------------------------------------------
 
-def _capture_snapshot(purchase=1, sell=0, buffer_flag=1, sku_type_filter=None, item_code_filter=None, trigger="Scheduled"):
+def _capture_snapshot(purchase=1, sell=0, buffer_flag=1, sku_type_filter=None, item_code_filter=None, trigger="Scheduled") -> None:
 	"""
 	Run the PO Recommendation for PSP report and save results as a snapshot.
 	Returns the new snapshot document name.
@@ -113,7 +113,7 @@ def _capture_snapshot(purchase=1, sell=0, buffer_flag=1, sku_type_filter=None, i
 # Scheduled job — runs at 8 AM daily (wired in hooks.py)
 # ---------------------------------------------------------------------------
 
-def capture_daily_po_snapshot():
+def capture_daily_po_snapshot() -> None:
 	"""Capture all 4 PO recommendation snapshots at 8 AM."""
 	_capture_snapshot(purchase=1, sell=0, buffer_flag=1, trigger="Scheduled")
 	_capture_snapshot(purchase=1, sell=0, buffer_flag=0, trigger="Scheduled")
@@ -126,7 +126,7 @@ def capture_daily_po_snapshot():
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def run_manual_snapshot(purchase=1, sell=0, buffer_flag=1, sku_type_filter=None, item_code_filter=None):
+def run_manual_snapshot(purchase=1, sell=0, buffer_flag=1, sku_type_filter=None, item_code_filter=None) -> None:
 	require_all_permissions(
 		[("PO Recommendation Snapshot", "create"), ("PO Recommendation Snapshot", "write")],
 	)
