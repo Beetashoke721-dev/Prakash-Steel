@@ -105,12 +105,6 @@ def set_purchase_invoice_cancel_reason(name: str, reason: str) -> None:
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
 
-    if not frappe.has_permission("Purchase Invoice", "cancel"):
-        frappe.throw(
-            _("Not permitted to cancel Purchase Invoice."),
-            frappe.PermissionError,
-        )
-
     doc = frappe.get_doc("Purchase Invoice", name)
 
     if doc.docstatus != 1:
@@ -135,12 +129,6 @@ def cancel_purchase_invoice_with_reason(name: str, reason: str) -> None:
     """Cancel a submitted Purchase Invoice after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
-
-    if not frappe.has_permission("Purchase Invoice", "cancel"):
-        frappe.throw(
-            _("Not permitted to cancel Purchase Invoice."),
-            frappe.PermissionError,
-        )
 
     doc = frappe.get_doc("Purchase Invoice", name)
 

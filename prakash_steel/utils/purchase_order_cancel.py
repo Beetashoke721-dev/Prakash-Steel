@@ -21,12 +21,6 @@ def set_purchase_order_cancel_reason(name: str, reason: str) -> None:
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
 
-    if not frappe.has_permission("Purchase Order", "cancel"):
-        frappe.throw(
-            _("Not permitted to cancel Purchase Orders."),
-            frappe.PermissionError,
-        )
-
     doc = frappe.get_doc("Purchase Order", name)
 
     if doc.docstatus != 1:
