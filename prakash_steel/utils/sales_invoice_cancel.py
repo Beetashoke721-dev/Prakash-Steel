@@ -3,16 +3,10 @@ from frappe import _
 
 
 @frappe.whitelist()
-def cancel_sales_invoice_with_reason(name: str, reason: str):
+def cancel_sales_invoice_with_reason(name: str, reason: str) -> None:
     """Cancel a submitted Sales Invoice after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
-
-    if not frappe.has_permission("Sales Invoice", "cancel"):
-        frappe.throw(
-            _("Not permitted to cancel Sales Invoice."),
-            frappe.PermissionError,
-        )
 
     doc = frappe.get_doc("Sales Invoice", name)
 

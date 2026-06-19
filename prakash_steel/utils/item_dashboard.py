@@ -7,7 +7,7 @@ from erpnext.stock.dashboard.item_dashboard import get_data as _original_get_dat
 @frappe.whitelist()
 def get_data(
 	item_code=None, warehouse=None, item_group=None, start=0, sort_by="actual_qty", sort_order="desc"
-):
+) -> list[dict]:
 	"""Return item dashboard data, excluding qty from custom_closed Sales Order items."""
 	if not frappe.has_permission("Item", "read"):
 		frappe.throw("Not permitted to access item dashboard data.", frappe.PermissionError)

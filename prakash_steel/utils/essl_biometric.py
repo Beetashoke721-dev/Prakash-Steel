@@ -22,7 +22,7 @@ import requests
 # ---------------------------------------------------------------------------
 
 
-def _build_soap_body(from_dt, to_dt, serial, username, password):
+def _build_soap_body(from_dt, to_dt, serial, username, password) -> str:
 	return f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -40,7 +40,7 @@ def _build_soap_body(from_dt, to_dt, serial, username, password):
 </soap:Envelope>"""
 
 
-def _fetch_device_logs(api_url, serial, from_dt, to_dt, username, password):
+def _fetch_device_logs(api_url, serial, from_dt, to_dt, username, password) -> list:
 	"""Call ESSL SOAP API and return raw XML response text."""
 	soap_body = _build_soap_body(from_dt, to_dt, serial, username, password)
 	headers = {
@@ -52,7 +52,7 @@ def _fetch_device_logs(api_url, serial, from_dt, to_dt, username, password):
 	return response.text
 
 
-def _parse_logs(xml_text, device_serial, device_label):
+def _parse_logs(xml_text, device_serial, device_label) -> list:
 	"""
 	Parse ESSL XML response and return list of punch dicts:
 	  { user_id, timestamp (datetime), device_serial, device_label }
@@ -99,7 +99,7 @@ def _parse_logs(xml_text, device_serial, device_label):
 # ---------------------------------------------------------------------------
 
 
-def _process_punches(all_punches):
+def _process_punches(all_punches) -> dict:
 	"""
 	Group punches by (user_id, date) across all devices.
 	Returns:
@@ -163,7 +163,7 @@ def _process_punches(all_punches):
 # ---------------------------------------------------------------------------
 
 
-def _get_employee_map():
+def _get_employee_map() -> dict:
 	"""Return dict { essl_id_str: {name, company} } for all employees."""
 	rows = frappe.db.get_all(
 		"Employee",
@@ -182,7 +182,7 @@ def _get_employee_map():
 # ---------------------------------------------------------------------------
 
 
-def _create_checkins(checkins, employee_map):
+def _create_checkins(checkins, employee_map) -> None:
 	success = failed = skipped = 0
 
 	for log in checkins:
@@ -221,7 +221,7 @@ def _create_checkins(checkins, employee_map):
 # ---------------------------------------------------------------------------
 
 
-def _seconds_to_hhmmss(total_seconds):
+def _seconds_to_hhmmss(total_seconds) -> str:
 	"""Convert total seconds to HH:MM:SS string for Time field."""
 	h = total_seconds // 3600
 	m = (total_seconds % 3600) // 60
@@ -234,7 +234,7 @@ def _seconds_to_hhmmss(total_seconds):
 # ---------------------------------------------------------------------------
 
 
-def _create_attendance(attendance_list, employee_map):
+def _create_attendance(attendance_list, employee_map) -> None:
 	success = skipped = failed = 0
 
 	for rec in attendance_list:
@@ -287,7 +287,7 @@ def _create_attendance(attendance_list, employee_map):
 	return {"att_success": success, "att_skipped": skipped, "att_failed": failed}
 
 
-def _insert_and_submit_attendance(employee, company, att_date, rec):
+def _insert_and_submit_attendance(employee, company, att_date, rec) -> None:
 	"""Create a submitted Attendance record with custom punch time fields."""
 	has_out = bool(rec["out_time"])
 	status = "Present" if has_out else "Absent"
@@ -330,7 +330,7 @@ def _insert_and_submit_attendance(employee, company, att_date, rec):
 # ---------------------------------------------------------------------------
 
 
-def sync_essl_checkins(from_dt=None, to_dt=None):
+def sync_essl_checkins(from_dt=None, to_dt=None) -> None:
 	"""
 	Fetch punch logs from all active ESSL devices, create Employee Checkins,
 	and mark Attendance as Present.
@@ -412,7 +412,7 @@ def sync_essl_checkins(from_dt=None, to_dt=None):
 # ---------------------------------------------------------------------------
 
 
-def _mark_absent_employees(punched_user_ids, employee_map, att_date):
+def _mark_absent_employees(punched_user_ids, employee_map, att_date) -> None:
 	"""
 	For every ESSL-mapped employee NOT in punched_user_ids, create a submitted
 	Absent attendance record (if one doesn't already exist for that date).
@@ -457,7 +457,7 @@ def _mark_absent_employees(punched_user_ids, employee_map, att_date):
 	return {"absent_success": success, "absent_skipped": skipped, "absent_failed": failed}
 
 
-def _update_last_synced():
+def _update_last_synced() -> None:
 	frappe.db.set_single_value(
 		"ESSL Biometric Settings", "last_synced_on", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 	)
@@ -469,7 +469,7 @@ def _update_last_synced():
 
 
 @frappe.whitelist()
-def manual_sync(from_dt=None, to_dt=None):
+def manual_sync(from_dt=None, to_dt=None) -> None:
 	"""Trigger ESSL sync manually. Defaults to yesterday if no dates given."""
 	if not frappe.has_permission("Attendance", "write") and not frappe.has_permission(
 		"Attendance", "submit"

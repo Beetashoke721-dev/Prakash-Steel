@@ -7,7 +7,7 @@ from frappe import _
 from frappe.utils import getdate, date_diff, add_days, flt, today
 
 
-def calculate_sku_type(buffer_flag, item_type):
+def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	"""
 	Calculate SKU type based on buffer_flag and item_type
 	buffer_flag: 'Buffer' or 'Non-Buffer'
@@ -32,7 +32,7 @@ def calculate_sku_type(buffer_flag, item_type):
 	return None
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	if not filters:
 		filters = {}
 	
@@ -58,7 +58,7 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_columns(from_date, to_date, sku_type):
+def get_columns(from_date, to_date, sku_type) -> list[dict]:
 	"""Generate columns: {SKU Type} Availability, then one column for each date in range"""
 	label = f"{sku_type} Availability"
 	columns = [
@@ -88,7 +88,7 @@ def get_columns(from_date, to_date, sku_type):
 	return columns
 
 
-def get_data(from_date, to_date, sku_type):
+def get_data(from_date, to_date, sku_type) -> list[dict]:
 	"""Query data and build report data for categories"""
 	
 	# Handle special cases: Pending SO and Open PO
@@ -236,7 +236,7 @@ def get_data(from_date, to_date, sku_type):
 	return data
 
 
-def calculate_order_status(delivery_date, transaction_date, check_date):
+def calculate_order_status(delivery_date, transaction_date, check_date) -> str | None:
 	"""Calculate order status (BLACK, RED, YELLOW, GREEN, WHITE) based on buffer_status logic"""
 	if not delivery_date or not transaction_date:
 		return "BLACK"
@@ -274,7 +274,7 @@ def calculate_order_status(delivery_date, transaction_date, check_date):
 		return "WHITE"
 
 
-def get_pending_so_data(from_date, to_date):
+def get_pending_so_data(from_date, to_date) -> list[dict]:
 	"""Get Pending SO data with color status for each date"""
 	# Get all dates in range
 	date_list = []
@@ -381,7 +381,7 @@ def get_pending_so_data(from_date, to_date):
 	return data
 
 
-def get_open_po_data(from_date, to_date):
+def get_open_po_data(from_date, to_date) -> list[dict]:
 	"""Get Open PO data - placeholder (no logic implemented yet, same as prakash_steel_planni)"""
 	# Get all dates in range
 	date_list = []

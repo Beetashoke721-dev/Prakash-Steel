@@ -10,10 +10,10 @@ MACHINE_LOAD_COLOUR_CHAIN = ["Black", "Red", "Yellow", "Green", "White"]
 
 
 class MachineLoadColourMaster(Document):
-	def before_validate(self):
+	def before_validate(self) -> None:
 		self.normalize_colour_day_chain()
 
-	def validate(self):
+	def validate(self) -> None:
 		self.validate_colour_day_chain()
 
 	def _rows_by_colour(self):

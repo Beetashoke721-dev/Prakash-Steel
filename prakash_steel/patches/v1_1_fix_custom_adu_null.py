@@ -3,7 +3,7 @@
 import frappe
 
 
-def execute():
+def execute() -> tuple[list, list]:
 	"""Update NULL values in custom_adu to 0 if the column exists."""
 	try:
 		db_name = frappe.conf.db_name

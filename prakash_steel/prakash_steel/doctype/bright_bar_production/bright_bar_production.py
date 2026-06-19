@@ -8,7 +8,7 @@ from frappe.utils import flt
 
 
 class BrightBarProduction(Document):
-	def on_submit(self):
+	def on_submit(self) -> None:
 		"""Create Stock Entry on submit"""
 		try:
 			# Validate required fields
@@ -144,7 +144,7 @@ class BrightBarProduction(Document):
 			)
 			frappe.throw(_("Error creating Stock Entry: {0}").format(str(e)))
 
-	def update_production_plan_qty_from_fg_weight(self):
+	def update_production_plan_qty_from_fg_weight(self) -> None:
 		"""
 		Update `custom_production_qty` in the linked Production Plan Item row(s)
 		(child table `po_items`) for the Production Plan referenced on this
@@ -207,7 +207,7 @@ class BrightBarProduction(Document):
 				"Bright Bar Production → Production Plan Qty Sync Error",
 			)
 
-	def update_production_planning_produced_qty(self):
+	def update_production_planning_produced_qty(self) -> None:
 		"""Sum all submitted Bright Bar Production docs for this production_planning + finished
 		and write the total into produced_qty on the matching FG Table row."""
 		if not getattr(self, "production_planning", None):
@@ -231,7 +231,7 @@ class BrightBarProduction(Document):
 		)
 		frappe.db.commit()
 
-	def before_cancel(self):
+	def before_cancel(self) -> None:
 		"""Prevent cancellation if linked Stock Entry is not cancelled.
 
 		Note: When cancelling from the linked Stock Entry using
@@ -263,7 +263,7 @@ class BrightBarProduction(Document):
 				).format(frappe.bold(stock_entry_id))
 			)
 
-	def on_cancel(self):
+	def on_cancel(self) -> None:
 		"""Clear linked Stock Entry ID on cancel so amended docs don't copy old reference."""
 		if getattr(self, "custom_stock_entry_id", None):
 			# Clear in memory and in the database

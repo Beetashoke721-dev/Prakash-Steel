@@ -5,10 +5,10 @@ from frappe.model.document import Document
 
 
 class RollingAlgo(Document):
-	def before_save(self):
+	def before_save(self) -> None:
 		self.update_final_sub_group_fields()
 
-	def update_final_sub_group_fields(self):
+	def update_final_sub_group_fields(self) -> None:
 		custom_shape = (self.shape or "").strip()
 
 		sub_group_name = (

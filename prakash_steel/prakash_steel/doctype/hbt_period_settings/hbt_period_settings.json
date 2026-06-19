@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-06-18 15:39:45.035740",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "fiscal_year",
+  "column_break_kknk",
+  "column_break_jhoq",
+  "column_break_lpwd",
+  "section_break_llxw",
+  "from_month",
+  "column_break_ndsd",
+  "to_month",
+  "column_break_ldqh",
+  "column_break_zpiu"
+ ],
+ "fields": [
+  {
+   "fieldname": "fiscal_year",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Fiscal Year",
+   "options": "Fiscal Year",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_kknk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_jhoq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_lpwd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_llxw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "from_month",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "From Month",
+   "options": "\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nJanuary\nFebruary\nMarch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ndsd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_month",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "To Month",
+   "options": "\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nJanuary\nFebruary\nMarch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ldqh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_zpiu",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-18 15:43:26.884988",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "HBT Period Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

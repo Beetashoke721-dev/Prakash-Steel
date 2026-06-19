@@ -5,7 +5,7 @@ from prakash_steel.utils.whitelist_permissions import require_permission
 
 
 @frappe.whitelist()
-def cancel_e_invoice(docname, values):
+def cancel_e_invoice(docname, values) -> dict | None:
     """
     Override for `india_compliance.gst_india.utils.e_invoice.cancel_e_invoice`.
 

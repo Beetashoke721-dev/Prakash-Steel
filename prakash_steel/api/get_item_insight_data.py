@@ -18,7 +18,7 @@ def get_item_insight_data(
     category_name=None,
     description_code=None,
     limit=None,
-):
+) -> dict:
     """
     Fetch comprehensive item insight data using bulk queries for performance.
     Instead of querying per-item in a loop, all data is fetched in a handful
@@ -157,7 +157,7 @@ def get_item_insight_data(
 
 def _get_items_with_transactions(
     all_codes, rolled_codes, bright_codes, from_date, to_date
-):
+) -> dict:
     """
     Find item codes that have at least one transaction (Sales, Purchase, or
     Production) within the given date range.  Uses a single UNION ALL query
@@ -217,7 +217,7 @@ def _get_items_with_transactions(
     return {r.item_code for r in rows}
 
 
-def _bulk_production_dates(rolled_codes, bright_codes, from_date, to_date):
+def _bulk_production_dates(rolled_codes, bright_codes, from_date, to_date) -> dict:
     """
     Get the latest production date per item.
     - Rolled bars → Finish Weight.posting_date
@@ -267,7 +267,7 @@ def _bulk_production_dates(rolled_codes, bright_codes, from_date, to_date):
     return result
 
 
-def _bulk_production_qty(rolled_codes, bright_codes, from_date, to_date):
+def _bulk_production_qty(rolled_codes, bright_codes, from_date, to_date) -> dict:
     """
     Get the latest production quantity per item.
     - Rolled bars → Finish Weight.finish_weight
@@ -317,7 +317,7 @@ def _bulk_production_qty(rolled_codes, bright_codes, from_date, to_date):
     return result
 
 
-def _bulk_sales_data(item_codes, from_date, to_date):
+def _bulk_sales_data(item_codes, from_date, to_date) -> dict:
     """
     Bulk-fetch latest Sales Order data and pending SO qty.
     Returns (sales_map, pending_so_map).
@@ -385,7 +385,7 @@ def _bulk_sales_data(item_codes, from_date, to_date):
     return sales_map, pending_so_map
 
 
-def _bulk_purchase_data(item_codes, from_date, to_date):
+def _bulk_purchase_data(item_codes, from_date, to_date) -> dict:
     """
     Bulk-fetch latest Purchase Order data and pending PO qty.
     Returns (purchase_map, pending_po_map).
@@ -444,7 +444,7 @@ def _bulk_purchase_data(item_codes, from_date, to_date):
     return purchase_map, pending_po_map
 
 
-def _bulk_inventory_data(item_codes):
+def _bulk_inventory_data(item_codes) -> dict:
     """
     Bulk-fetch warehouse-wise stock for all items.
     Returns {item_code: [{warehouse, stock_qty, committed_stock, projected_qty}]}.
@@ -497,7 +497,7 @@ def _bulk_inventory_data(item_codes):
 
 
 @frappe.whitelist()
-def search_items(query, limit=20):
+def search_items(query, limit=20) -> list:
     if not frappe.has_permission("Item", "read"):
         frappe.throw(_("Not permitted to access item search data."), frappe.PermissionError)
 
@@ -561,7 +561,7 @@ def search_item_categories(
     start: int,
     page_len: int,
     filters: dict[str, Any] | None = None,
-):
+) -> list:
     """
     Link field query: return Item Categories restricted to Items having the given grade.
 

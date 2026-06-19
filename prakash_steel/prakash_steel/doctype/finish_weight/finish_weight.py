@@ -6,7 +6,7 @@ from datetime import datetime
 
 
 class FinishWeight(Document):
-	def validate(self):
+	def validate(self) -> None:
 		"""Finish weight comes from linked Billet Cutting:
 		finish_weight = billet_weight + miss_billet_weight
 		"""
@@ -21,7 +21,7 @@ class FinishWeight(Document):
 		# billet_weight = billet_weight + miss_billet_weight from linked Billet Cutting
 		self.billet_weight = flt(billet_weight) + flt(miss_billet_weight)
 
-	def before_submit(self):
+	def before_submit(self) -> None:
 		"""Linked Billet Cutting must be submitted before Finish Weight can be submitted."""
 		bc = getattr(self, "billet_cutting_id", None)
 		if not bc:
@@ -35,7 +35,7 @@ class FinishWeight(Document):
 				title=_("Validation Error"),
 			)
 
-	def on_submit(self):
+	def on_submit(self) -> None:
 
 		try:
 			if not self.item_code:
@@ -178,7 +178,7 @@ class FinishWeight(Document):
 			)
 			frappe.msgprint(_("Warning:  Error: {0}").format(str(e)), indicator="orange", alert=True)
 
-	def update_production_plan_qty_from_finish_weight(self):
+	def update_production_plan_qty_from_finish_weight(self) -> None:
 		"""
 		Accumulate `finish_weight` into `custom_production_qty` in the linked
 		Production Plan Item row(s) (child table `po_items`) for the Production
@@ -238,7 +238,7 @@ class FinishWeight(Document):
 				"Finish Weight → Production Plan Qty Sync Error",
 			)
 
-	def update_production_planning_produced_qty(self):
+	def update_production_planning_produced_qty(self) -> None:
 		"""Sum all submitted Finish Weight docs for this production_planning + item_code
 		and write the total into produced_qty on the matching FG Table row."""
 		if not getattr(self, "production_planning", None):
@@ -263,7 +263,7 @@ class FinishWeight(Document):
 		)
 		frappe.db.commit()
 
-	def before_cancel(self):
+	def before_cancel(self) -> None:
 		"""Block cancel if linked Stock Entry is still active."""
 		cmd = getattr(frappe.local, "form_dict", {}).get("cmd")
 		if cmd == "frappe.desk.form.linked_with.cancel_all_linked_docs":
@@ -277,7 +277,7 @@ class FinishWeight(Document):
 				_("Please cancel Stock Entry {0} before cancelling this document.").format(frappe.bold(se_id))
 			)
 
-	def on_cancel(self):
+	def on_cancel(self) -> None:
 
 		if getattr(self, "custom_stock_entry_id", None):
 			self.custom_stock_entry_id = ""

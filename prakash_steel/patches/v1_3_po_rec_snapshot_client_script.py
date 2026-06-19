@@ -1,7 +1,7 @@
 import frappe
 
 
-def execute():
+def execute() -> tuple[list, list]:
 	if frappe.db.exists("Client Script", "Purchase Order Recommendation Snapshot-po-rec-snap-buttons"):
 		return
 

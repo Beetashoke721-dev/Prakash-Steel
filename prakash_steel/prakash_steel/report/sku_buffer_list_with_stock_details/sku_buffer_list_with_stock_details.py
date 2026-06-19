@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import flt, today
 
 
-def calculate_sku_type(buffer_flag, item_type):
+def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	"""Calculate SKU type based on buffer flag and item type"""
 	if not item_type:
 		return None
@@ -27,7 +27,7 @@ def calculate_sku_type(buffer_flag, item_type):
 	return None
 
 
-def get_qualified_demand_map(filters):
+def get_qualified_demand_map(filters) -> dict:
 	"""Get qualified demand map for all items"""
 	today_date = today()
 
@@ -54,13 +54,13 @@ def get_qualified_demand_map(filters):
 	return {d.item_code: flt(d.so_qty) for d in so_rows}
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	"""Define report columns"""
 	return [
 		{
@@ -116,7 +116,7 @@ def get_columns():
 	]
 
 
-def get_data(filters=None):
+def get_data(filters=None) -> list[dict]:
 	"""Get data for the report"""
 	if not filters:
 		filters = {}

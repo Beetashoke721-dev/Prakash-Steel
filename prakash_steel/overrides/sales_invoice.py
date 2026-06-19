@@ -417,7 +417,7 @@ class CustomSalesInvoice(SalesInvoice):
 				title=_("Stock Entry Creation Failed"),
 			)
 
-	def get_available_stock(self, item_code, warehouse):
+	def get_available_stock(self, item_code, warehouse) -> float:
 		"""Get available stock quantity for an item in a warehouse.
 
 		Uses Stock Ledger Entry to get accurate stock as of the posting date.

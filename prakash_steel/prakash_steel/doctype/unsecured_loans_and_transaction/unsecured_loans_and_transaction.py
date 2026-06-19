@@ -6,14 +6,14 @@ from frappe.model.document import Document
 from frappe.utils import getdate, flt
 
 class UnsecuredLoansandTransaction(Document): 
-    def validate(self):
+    def validate(self) -> None:
         # Set the dates based on the Fiscal Year selected
         self.set_from_to_dates()
         
         # We no longer call populate_interest_details() or calculate_totals() 
         # as the child table logic has been removed.
 
-    def set_from_to_dates(self):
+    def set_from_to_dates(self) -> None:
         """Sets From and To dates based on the selected Fiscal Year."""
         if self.financial_year:
             fy = frappe.get_doc("Fiscal Year", self.financial_year)
@@ -24,7 +24,7 @@ class UnsecuredLoansandTransaction(Document):
 # Helpers (Modified to remove child table dependencies)
 # ----------------------------------------------------------------------
 
-def get_closing_balance(account, date):
+def get_closing_balance(account, date) -> float:
     """
     Fetches the closing balance for a specific account up to a certain date.
     """

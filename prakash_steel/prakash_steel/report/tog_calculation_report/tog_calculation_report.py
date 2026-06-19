@@ -8,14 +8,14 @@ from frappe.utils import cint, flt, today, add_days
 from prakash_steel.utils.lead_time import get_default_bom
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
 @frappe.whitelist()
-def get_tog_parent_sell_console_payload():
+def get_tog_parent_sell_console_payload() -> dict | list:
 	"""
 	Return parent-sell debug JSON for the browser console.
 
@@ -32,7 +32,7 @@ def get_tog_parent_sell_console_payload():
 
 
 @frappe.whitelist()
-def get_item_tog_debug(item_code):
+def get_item_tog_debug(item_code) -> dict | list:
 	"""
 	Full per-item debug for browser console.
 
@@ -125,7 +125,7 @@ def get_item_tog_debug(item_code):
 	}
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	"""Report column definitions."""
 	return [
 		{
@@ -187,7 +187,7 @@ def get_columns():
 	]
 
 
-def get_data(filters=None):
+def get_data(filters=None) -> list[dict]:
 	"""
 	Get data from Item doctype.
 

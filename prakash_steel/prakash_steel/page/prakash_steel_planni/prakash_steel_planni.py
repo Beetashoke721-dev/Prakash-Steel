@@ -9,7 +9,7 @@ from frappe.utils import flt
 from prakash_steel.utils.whitelist_permissions import require_permission
 
 
-def calculate_sku_type(buffer_flag, item_type):
+def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	"""
 	Same mapping logic as calculate_sku_type in production_order_recomendation.py
 	buffer_flag: 'Buffer' or other
@@ -35,7 +35,7 @@ def calculate_sku_type(buffer_flag, item_type):
 
 
 @frappe.whitelist()
-def get_sku_type_on_hand_status():
+def get_sku_type_on_hand_status() -> dict | list:
 	"""
 	Get on-hand status data grouped by SKU type for buffer items
 	Returns data for pie charts showing distribution by color (BLACK, RED, YELLOW, GREEN, WHITE)
@@ -211,7 +211,7 @@ def get_sku_type_on_hand_status():
 	return chart_data
 
 
-def get_qualified_demand_map():
+def get_qualified_demand_map() -> dict:
 	"""Get qualified demand map - same as po_recomendation_for_psp report
 	Qualified Demand = all open SO quantity (delivery_date <= today)
 	"""
@@ -241,7 +241,7 @@ def get_qualified_demand_map():
 
 
 @frappe.whitelist()
-def get_pending_so_status():
+def get_pending_so_status() -> dict | list:
 	"""
 	Summary for Pending SO pie chart.
 	All sales orders with pending delivery (all time).
@@ -341,7 +341,7 @@ def get_pending_so_status():
 
 
 @frappe.whitelist()
-def get_cs_item_on_hand_status():
+def get_cs_item_on_hand_status() -> dict | list:
 	"""
 	CS Item On Hand Status pie chart.
 	Same colour logic as Critical Spare Buffer report:
@@ -400,7 +400,7 @@ def get_cs_item_on_hand_status():
 
 
 @frappe.whitelist()
-def get_open_po_status():
+def get_open_po_status() -> dict | list:
 	"""
 	Placeholder for Open PO pie chart.
 	For now: single black slice = 100%.

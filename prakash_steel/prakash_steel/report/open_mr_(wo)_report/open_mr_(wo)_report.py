@@ -22,13 +22,13 @@ from prakash_steel.prakash_steel.report.open_mr_for_manufacture.open_mr_for_manu
 )
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = get_columns()
 	data = get_data(filters)
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": _("WO No"),
@@ -109,7 +109,7 @@ def get_columns():
 	]
 
 
-def get_data(filters=None):
+def get_data(filters=None) -> list[dict]:
 	work_orders = frappe.db.sql(
 		"""
 		SELECT
@@ -255,7 +255,7 @@ def get_data(filters=None):
 # ---------------------------------------------------------------------------
 
 
-def get_op_cp_map(work_orders, stock_map, wip_map, qd_map, item_master_map):
+def get_op_cp_map(work_orders, stock_map, wip_map, qd_map, item_master_map) -> dict:
 	"""
 	For Buffer items: assign OP if remaining qualified demand (after stock+wip) is not yet
 	covered by earlier WOs, else CP. Non-buffer items always get "".
@@ -291,7 +291,7 @@ def get_op_cp_map(work_orders, stock_map, wip_map, qd_map, item_master_map):
 # ---------------------------------------------------------------------------
 
 
-def get_previous_wo_qty_map(work_orders):
+def get_previous_wo_qty_map(work_orders) -> dict:
 	"""
 	Returns {(work_order, item_code): previous_pending_qty}.
 	For each WO, sums qty of all draft WOs for the same item
@@ -338,7 +338,7 @@ def get_previous_wo_qty_map(work_orders):
 # ---------------------------------------------------------------------------
 
 
-def get_submitted_wo_map(item_codes):
+def get_submitted_wo_map(item_codes) -> dict:
 	"""
 	Returns {item_code: total_pending_qty} from submitted (docstatus=1) Work Orders
 	that are not Completed/Stopped/Cancelled/Closed.
@@ -370,7 +370,7 @@ def get_submitted_wo_map(item_codes):
 
 
 @frappe.whitelist()
-def get_wo_item_breakdown(wo_name):
+def get_wo_item_breakdown(wo_name) -> list[dict]:
 	"""
 	Returns per-item breakdown for the given draft Work Order:
 	  buffer items  → stock, wip, tog, qualified_demand, previous_wo_qty, level, colour

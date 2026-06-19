@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import date_diff, flt, getdate
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	if not filters:
 		return [], [], None, []
 
@@ -37,7 +37,7 @@ def execute(filters=None):
 	return columns, data, None, None
 
 
-def get_allowed_customers_for_user():
+def get_allowed_customers_for_user() -> list[str]:
 	"""
 	Get list of customers associated with the current user via portal_users child table.
 	Returns None if user has no restrictions (e.g., admin/system user), 
@@ -86,7 +86,7 @@ def get_allowed_customers_for_user():
 		return None
 
 
-def validate_filters(filters):
+def validate_filters(filters) -> str:
 	from_date, to_date = filters.get("from_date"), filters.get("to_date")
 
 	if not from_date and to_date:
@@ -95,7 +95,7 @@ def validate_filters(filters):
 		frappe.throw(_("To Date cannot be before From Date."))
 
 
-def get_conditions(filters):
+def get_conditions(filters) -> str:
 	conditions = ""
 	if filters.get("from_date") and filters.get("to_date"):
 		conditions += " and so.transaction_date between %(from_date)s and %(to_date)s"
@@ -128,7 +128,7 @@ def get_conditions(filters):
 	return conditions
 
 
-def get_data(conditions, filters):
+def get_data(conditions, filters) -> list[dict]:
 	# Fetch data from Sales Order and Sales Order Item
 	data = frappe.db.sql(
 		f"""
@@ -162,7 +162,7 @@ def get_data(conditions, filters):
 	return data
 
 
-def prepare_data(data, filters):
+def prepare_data(data, filters) -> list[dict]:
 	# Filter out rows where pending_qty (qty_to_deliver) is 0 or negative
 	# Only show items that still need to be delivered (Open SO items)
 	# Also filter out rows where sales order status is "Closed" or "Cancelled"
@@ -257,7 +257,7 @@ def prepare_data(data, filters):
 	return data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	columns = [
 		{"label": _("Sales Order Date"), "fieldname": "date", "fieldtype": "Date", "width": 120},
 		{

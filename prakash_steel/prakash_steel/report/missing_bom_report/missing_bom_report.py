@@ -4,7 +4,7 @@
 import frappe
 
 
-def execute(filters=None):
+def execute(filters=None) -> tuple[list, list]:
 	columns = [
 		{
 			"label": "Item Code",

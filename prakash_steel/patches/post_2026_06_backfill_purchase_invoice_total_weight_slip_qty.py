@@ -1,7 +1,7 @@
 import frappe
 
 
-def execute():
+def execute() -> tuple[list, list]:
 	"""Backfill custom_total_weight_slip_qty from item rows on existing Purchase Invoices."""
 	if not frappe.db.has_column("Purchase Invoice", "custom_total_weight_slip_qty"):
 		return

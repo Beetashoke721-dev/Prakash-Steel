@@ -6,7 +6,7 @@ from frappe import _
 from prakash_steel.utils.lead_time import update_decoupled_lead_time_for_item, get_default_bom
 
 
-def update_decoupled_lead_time_on_item_save(doc, method=None):
+def update_decoupled_lead_time_on_item_save(doc, method=None) -> None:
 	# Only update if item_code exists (not a new item being created)
 	if not doc.name:
 		return
@@ -45,7 +45,7 @@ def update_decoupled_lead_time_on_item_save(doc, method=None):
 		)
 
 
-def update_decoupled_lead_time_on_bom_save(doc, method=None):
+def update_decoupled_lead_time_on_bom_save(doc, method=None) -> None:
 	# Only process submitted BOMs
 	if doc.docstatus != 1:
 		return
@@ -64,7 +64,7 @@ def update_decoupled_lead_time_on_bom_save(doc, method=None):
 			)
 
 
-def _update_parent_items_lead_time(item_code):
+def _update_parent_items_lead_time(item_code) -> None:
 	"""
 	Update decoupled lead time for all parent items that use this item in their BOM.
 	This is needed because when a child item's lead time changes, parent items are affected.
@@ -105,7 +105,7 @@ def _update_parent_items_lead_time(item_code):
 		)
 
 
-def calculate_sku_type_on_validate(doc, method=None):
+def calculate_sku_type_on_validate(doc, method=None) -> None:
 	"""
 	Server-side calculation of custom_sku_type based on custom_item_type and custom_buffer_flag.
 	Mirrors the client-side calculate_sku_type function in item.js.
@@ -132,7 +132,7 @@ def calculate_sku_type_on_validate(doc, method=None):
 	doc.custom_sku_type = new_sku_type
 
 
-def validate_min_order_qty_and_batch_size(doc, method=None):
+def validate_min_order_qty_and_batch_size(doc, method=None) -> None:
 	"""
 	Validate that min_order_qty and custom_batch_size are mutually exclusive.
 	Only one field can have a value greater than 0 at a time.

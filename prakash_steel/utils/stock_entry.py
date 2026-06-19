@@ -7,7 +7,7 @@ from frappe.utils import flt
 # from prakash_steel.utils.lead_time import update_decoupled_lead_time_for_item
 
 
-def validate_vehicle_no_for_material_transfer(doc, method=None):
+def validate_vehicle_no_for_material_transfer(doc, method=None) -> None:
 	"""
 	Validate that vehicle_no is mandatory when stock_entry_type/purpose is Material Transfer.
 

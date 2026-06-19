@@ -3,7 +3,7 @@ from frappe import _
 
 
 @frappe.whitelist()
-def get_last_purchase_or_production(item_code: str):
+def get_last_purchase_or_production(item_code: str) -> dict | None:
     """
     Fetch the latest *either* production or purchase transaction for the item.
 

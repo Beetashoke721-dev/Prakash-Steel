@@ -7,7 +7,7 @@ from frappe.model.document import Document
 
 
 class BrightMachineMaster(Document):
-	def validate(self):
+	def validate(self) -> None:
 		self.validate_is_default()
 		self.validate_unique_machine_groups()
 

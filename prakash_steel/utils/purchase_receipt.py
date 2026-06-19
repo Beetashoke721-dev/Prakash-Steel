@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import flt
 
 
-def validate_purchase_receipt_quantity(doc, method=None):
+def validate_purchase_receipt_quantity(doc, method=None) -> None:
 	"""
 	Validate Purchase Receipt quantity against Purchase Order quantity.
 	Send email notification if total received quantity exceeds 5% of PO quantity.
@@ -79,7 +79,7 @@ def validate_purchase_receipt_quantity(doc, method=None):
 		send_quantity_exceeded_notification(doc, exceeded_items)
 
 
-def get_total_received_qty_for_po_item(purchase_order_item, current_pr_name):
+def get_total_received_qty_for_po_item(purchase_order_item, current_pr_name) -> float:
 	"""
 	Get total received quantity for a Purchase Order Item across all submitted Purchase Receipts.
 	This includes the current Purchase Receipt being submitted.
@@ -108,7 +108,7 @@ def get_total_received_qty_for_po_item(purchase_order_item, current_pr_name):
 	return flt(total_received.get("total_qty") or 0)
 
 
-def send_quantity_exceeded_notification(doc, exceeded_items):
+def send_quantity_exceeded_notification(doc, exceeded_items) -> None:
 	"""
 	Send email notification when Purchase Receipt quantity exceeds 5% of PO quantity.
 
@@ -193,7 +193,7 @@ def send_quantity_exceeded_notification(doc, exceeded_items):
 		)
 
 
-def get_notification_recipients():
+def get_notification_recipients() -> None:
 	"""
 	Get list of email recipients for quantity exceeded notifications.
 

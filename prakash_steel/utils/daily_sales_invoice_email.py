@@ -9,7 +9,7 @@ RECIPIENTS = [
 ]
 
 
-def send_daily_sales_invoice_email():
+def send_daily_sales_invoice_email() -> None:
 	posting_date = today()
 	posting_date_display = frappe.utils.formatdate(posting_date, "dd-MM-yyyy")
 
