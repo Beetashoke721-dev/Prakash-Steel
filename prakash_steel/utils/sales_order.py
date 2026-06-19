@@ -3,8 +3,8 @@ from frappe import _
 
 
 @frappe.whitelist()
-def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
-	if ignore_permissions and not frappe.has_role("System Manager"):
+def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False) -> object:
+	if ignore_permissions and "System Manager" not in frappe.get_roles():
 		frappe.throw(_("Not permitted to bypass permissions when creating Sales Invoice."), frappe.PermissionError)
 
 	if not frappe.has_permission("Sales Order", "read") and not frappe.has_permission("Sales Invoice", "read"):
@@ -14,7 +14,7 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 		frappe.throw(_("Not permitted to create Sales Invoice."), frappe.PermissionError)
 
 	# Only System Manager can request ignore_permissions=True (server-side bypass).
-	ignore_permissions = bool(ignore_permissions) and frappe.has_role("System Manager")
+	ignore_permissions = bool(ignore_permissions) and "System Manager" in frappe.get_roles()
 
 	from erpnext.selling.doctype.sales_order.sales_order import (
 		make_sales_invoice as _make_sales_invoice,
