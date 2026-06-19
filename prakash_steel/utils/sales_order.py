@@ -4,8 +4,8 @@ from frappe import _
 
 @frappe.whitelist()
 def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False) -> object:
-	if ignore_permissions and "System Manager" not in frappe.get_roles():
-		frappe.throw(_("Not permitted to bypass permissions when creating Sales Invoice."), frappe.PermissionError)
+	# if ignore_permissions and "System Manager" not in frappe.get_roles():
+	# 	frappe.throw(_("Not permitted to bypass permissions when creating Sales Invoice."), frappe.PermissionError)
 
 	if not frappe.has_permission("Sales Order", "read") and not frappe.has_permission("Sales Invoice", "read"):
 		frappe.throw(_("Not permitted to create Sales Invoice."), frappe.PermissionError)
