@@ -3,11 +3,13 @@
 
 frappe.query_reports["Bright Production Analysis"] = {
 	filters: [
-		// {
-		// 	"fieldname": "my_filter",
-		// 	"label": __("My Filter"),
-		// 	"fieldtype": "Data",
-		// 	"reqd": 1,
-		// },
+		{
+			fieldname: "view_by",
+			label: __("View By"),
+			fieldtype: "Select",
+			options: "Sale Quantity\nSale Value\nThroughput",
+			default: "Sale Quantity",
+			reqd: 1,
+		},
 	],
 };
