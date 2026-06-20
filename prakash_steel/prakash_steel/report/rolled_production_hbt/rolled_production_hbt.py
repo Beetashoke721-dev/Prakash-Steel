@@ -214,6 +214,10 @@ def _get_data(_filters: dict, period_months: list[tuple[int, int]], view_by: str
 	if not period_months:
 		return []
 
+	# TODO: Sale Value and Throughput not implemented yet
+	if view_by != "Sale Quantity":
+		return []
+
 	metric_col = _METRIC_COL.get(view_by)
 	if not metric_col:
 		frappe.throw(_("Unknown view option: {0}").format(view_by))

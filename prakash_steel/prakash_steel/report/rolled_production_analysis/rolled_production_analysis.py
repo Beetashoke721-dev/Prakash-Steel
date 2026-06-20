@@ -162,8 +162,8 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 
 	view_by: str = filters.get("view_by") or "Sale Quantity"
 
-	if view_by == "Throughput":
-		# Throughput logic not implemented yet
+	# TODO: Sale Value and Throughput not implemented yet
+	if view_by != "Sale Quantity":
 		return []
 
 	metric_col = _METRIC_COL.get(view_by)
