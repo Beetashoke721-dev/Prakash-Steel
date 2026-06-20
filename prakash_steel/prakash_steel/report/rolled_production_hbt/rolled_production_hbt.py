@@ -135,6 +135,26 @@ def _get_columns(view_by: str) -> list[dict]:
 			"width": 160,
 			"precision": 2,
 		},
+		*(
+			[
+				{
+					"label": _("Consumption"),
+					"fieldname": "consumption",
+					"fieldtype": "Float",
+					"width": 140,
+					"precision": 2,
+				},
+				{
+					"label": _("Total Value"),
+					"fieldname": "total_value",
+					"fieldtype": "Float",
+					"width": 140,
+					"precision": 2,
+				},
+			]
+			if view_by == "Sale Quantity"
+			else []
+		),
 		{
 			"label": _("Contr%"),
 			"fieldname": "contr_pct",
@@ -269,15 +289,32 @@ def _get_data(_filters: dict, period_months: list[tuple[int, int]], view_by: str
 		bucket = customer_hbt_map.get(r.group_name, "T")
 		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
 
+	# Step 4: consumption map from Bright Bar Production (Sale Quantity only)
+	consumption_map: dict[str, float] = {}
+	if view_by == "Sale Quantity":
+		consumption_map = _get_consumption_map(from_date, to_date)
+
+	# Merge consumption into raw_rows and compute total_value, then sort
+	for row in raw_rows:
+		sale_qty = float(row.total or 0)
+		consumption = consumption_map.get(row.item_code, 0.0)
+		row["consumption"] = consumption
+		row["total_value"] = sale_qty + consumption
+
+	if view_by == "Sale Quantity":
+		raw_rows.sort(key=lambda r: r["total_value"], reverse=True)
+
 	# Build result rows
-	grand_total = sum(float(row.total or 0) for row in raw_rows)
+	ranking_key = "total_value" if view_by == "Sale Quantity" else "total"
+	grand_total = sum(float(row[ranking_key] or 0) for row in raw_rows)
 
 	result = []
 	running = 0.0
 	h_done = False
 	b_done = False
 	for row in raw_rows:
-		contr = (float(row.total or 0) / grand_total * 100) if grand_total else 0.0
+		rank_val = float(row[ranking_key] or 0)
+		contr = (rank_val / grand_total * 100) if grand_total else 0.0
 		running += contr
 
 		if not h_done:
@@ -297,6 +334,8 @@ def _get_data(_filters: dict, period_months: list[tuple[int, int]], view_by: str
 			{
 				"item_code": row.item_code,
 				"total": float(row.total or 0),
+				"consumption": row.get("consumption", 0.0),
+				"total_value": row.get("total_value", float(row.total or 0)),
 				"contr_pct": contr,
 				"cumu_pct": running,
 				"hbt": hbt,
@@ -307,6 +346,54 @@ def _get_data(_filters: dict, period_months: list[tuple[int, int]], view_by: str
 			}
 		)
 	return result
+
+
+# ---------------------------------------------------------------------------
+# Consumption map helper
+# ---------------------------------------------------------------------------
+
+
+def _get_consumption_map(from_date: date, to_date: date) -> dict[str, float]:
+	"""Return {item_code: total_actual_rm_consumption} from submitted Bright Bar Production docs
+	where raw_material OR material matches the item code, within the given date range."""
+	rows: list[dict] = frappe.db.sql(
+		"""
+		SELECT
+			material AS item_code,
+			SUM(actual_rm_consumption) AS consumption
+		FROM
+			`tabBright Bar Production`
+		WHERE
+			docstatus = 1
+			AND NULLIF(material, '') IS NOT NULL
+			AND production_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY
+			material
+
+		UNION ALL
+
+		SELECT
+			raw_material AS item_code,
+			SUM(actual_rm_consumption) AS consumption
+		FROM
+			`tabBright Bar Production`
+		WHERE
+			docstatus = 1
+			AND NULLIF(raw_material, '') IS NOT NULL
+			AND production_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY
+			raw_material
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	consumption_map: dict[str, float] = {}
+	for r in rows:
+		item = r.item_code
+		if item:
+			consumption_map[item] = consumption_map.get(item, 0.0) + float(r.consumption or 0)
+	return consumption_map
 
 
 # ---------------------------------------------------------------------------
