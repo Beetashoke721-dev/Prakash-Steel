@@ -338,7 +338,7 @@ def _get_customer_hbt_map(from_date: date, to_date: date, metric_col: str) -> di
 			`tabCustomer` cust ON cust.name = si.customer
 		WHERE
 			si.docstatus = 1
-			AND i.custom_item_type IN ('BB', 'RB')
+			AND i.custom_item_type IN ('BB', 'RB', 'Traded', 'BO')
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY
 			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer)
