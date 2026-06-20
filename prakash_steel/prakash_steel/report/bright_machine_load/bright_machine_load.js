@@ -139,37 +139,37 @@ frappe.query_reports["Bright Machine Load"] = {
 			},
 		});
 
-		// report.page.add_inner_button(__("Debug Machine Breakdown"), () => {
-		// 	const dlg = new frappe.ui.Dialog({
-		// 		title: __("Debug Machine Breakdown"),
-		// 		fields: [
-		// 			{
-		// 				label: __("Machine"),
-		// 				fieldname: "machine_group_name",
-		// 				fieldtype: "Link",
-		// 				options: "Bright Machine",
-		// 				reqd: 1,
-		// 			},
-		// 		],
-		// 		primary_action_label: __("Show Breakdown"),
-		// 		primary_action({ machine_group_name }) {
-		// 			if (!machine_group_name) return;
-		// 			dlg.disable_primary_action();
-		// 			frappe.call({
-		// 				method: "prakash_steel.prakash_steel.report.bright_machine_load.bright_machine_load.get_machine_breakdown",
-		// 				args: { machine_group_name },
-		// 				callback(r) {
-		// 					dlg.enable_primary_action();
-		// 					show_machine_breakdown(r.message || {});
-		// 				},
-		// 				error() {
-		// 					dlg.enable_primary_action();
-		// 				},
-		// 			});
-		// 		},
-		// 	});
-		// 	dlg.show();
-		// });
+		report.page.add_inner_button(__("Debug Machine Breakdown"), () => {
+			const dlg = new frappe.ui.Dialog({
+				title: __("Debug Machine Breakdown"),
+				fields: [
+					{
+						label: __("Machine"),
+						fieldname: "machine_group_name",
+						fieldtype: "Link",
+						options: "Bright Machine",
+						reqd: 1,
+					},
+				],
+				primary_action_label: __("Show Breakdown"),
+				primary_action({ machine_group_name }) {
+					if (!machine_group_name) return;
+					dlg.disable_primary_action();
+					frappe.call({
+						method: "prakash_steel.prakash_steel.report.bright_machine_load.bright_machine_load.get_machine_breakdown",
+						args: { machine_group_name },
+						callback(r) {
+							dlg.enable_primary_action();
+							show_machine_breakdown(r.message || {});
+						},
+						error() {
+							dlg.enable_primary_action();
+						},
+					});
+				},
+			});
+			dlg.show();
+		});
 	},
 
 	formatter(value, row, column, data, default_formatter) {
