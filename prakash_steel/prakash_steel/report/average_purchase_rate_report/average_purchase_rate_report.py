@@ -7,7 +7,7 @@ from typing import Any
 
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate
+from frappe.utils import getdate
 
 
 def execute(filters: dict[str, Any] | None = None):
@@ -15,8 +15,7 @@ def execute(filters: dict[str, Any] | None = None):
 	validate_filters(filters)
 	columns = get_columns()
 	data = get_data(filters)
-	report_summary = get_report_summary(data)
-	return columns, data, None, None, report_summary
+	return columns, data
 
 
 def validate_filters(filters):
@@ -89,23 +88,3 @@ def get_data(filters):
 		params,
 		as_dict=True,
 	)
-
-
-def get_report_summary(data):
-	if not data:
-		return None
-
-	rates = [flt(row.get("rate")) for row in data if row.get("rate") is not None]
-	if not rates:
-		return None
-
-	average_rate = sum(rates) / len(rates)
-
-	return [
-		{
-			"value": average_rate,
-			"indicator": "Blue",
-			"label": _("Average Rate"),
-			"datatype": "Float",
-		}
-	]
