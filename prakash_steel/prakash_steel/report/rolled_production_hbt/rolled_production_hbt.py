@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import calendar
+from collections import defaultdict
 from datetime import date
 
 import frappe
@@ -58,7 +59,7 @@ def execute(filters: dict | None = None) -> tuple[list[dict], list[dict]]:
 
 
 # ---------------------------------------------------------------------------
-# Period resolution (same logic as Bright Production Analysis)
+# Period resolution
 # ---------------------------------------------------------------------------
 
 
@@ -163,20 +164,23 @@ def _get_columns(view_by: str) -> list[dict]:
 		{
 			"label": _("H"),
 			"fieldname": "h",
-			"fieldtype": "Data",
-			"width": 60,
+			"fieldtype": total_fieldtype,
+			"width": 140,
+			"precision": 2,
 		},
 		{
 			"label": _("B"),
 			"fieldname": "b",
-			"fieldtype": "Data",
-			"width": 60,
+			"fieldtype": total_fieldtype,
+			"width": 140,
+			"precision": 2,
 		},
 		{
 			"label": _("T"),
 			"fieldname": "t",
-			"fieldtype": "Data",
-			"width": 60,
+			"fieldtype": total_fieldtype,
+			"width": 140,
+			"precision": 2,
 		},
 	]
 
@@ -186,7 +190,9 @@ def _get_columns(view_by: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _get_data(filters: dict, period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
+def _get_data(
+	_filters: dict, period_months: list[tuple[int, int]], view_by: str
+) -> list[dict]:
 	if not period_months:
 		return []
 
@@ -202,6 +208,8 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]], view_by: str)
 	to_date = date(last_year, last_month, last_day)
 
 	# metric_col is sourced from _METRIC_COL (internal constant) — safe to interpolate
+
+	# Step 1: item totals + frequency (for contr%, cumu%, hbt, frequency columns)
 	raw_rows: list[dict] = frappe.db.sql(
 		f"""
 		SELECT
@@ -227,6 +235,43 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]], view_by: str)
 		as_dict=True,
 	)
 
+	# Step 2: customer-group HBT map (same period, BB+RB like customer_hbt report)
+	customer_hbt_map = _get_customer_hbt_map(from_date, to_date, metric_col)
+
+	# Step 3: per-item per-customer-group totals (RB items only)
+	item_group_rows: list[dict] = frappe.db.sql(
+		f"""
+		SELECT
+			sii.item_code,
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer) AS group_name,
+			SUM({metric_col}) AS total
+		FROM
+			`tabSales Invoice` si
+		INNER JOIN
+			`tabSales Invoice Item` sii ON sii.parent = si.name
+		INNER JOIN
+			`tabItem` i ON i.name = sii.item_code
+		INNER JOIN
+			`tabCustomer` cust ON cust.name = si.customer
+		WHERE
+			si.docstatus = 1
+			AND i.custom_item_type = 'RB'
+			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY
+			sii.item_code,
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer)
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	# Build {item_code: {H: x, B: x, T: x}} buckets
+	item_hbt_buckets: dict[str, dict[str, float]] = defaultdict(lambda: {"H": 0.0, "B": 0.0, "T": 0.0})
+	for r in item_group_rows:
+		bucket = customer_hbt_map.get(r.group_name, "T")
+		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
+
+	# Build result rows
 	grand_total = sum(float(row.total or 0) for row in raw_rows)
 
 	result = []
@@ -248,6 +293,8 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]], view_by: str)
 		else:
 			hbt = "T"
 
+		buckets = item_hbt_buckets.get(row.item_code, {"H": 0.0, "B": 0.0, "T": 0.0})
+
 		result.append(
 			{
 				"item_code": row.item_code,
@@ -256,9 +303,63 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]], view_by: str)
 				"cumu_pct": running,
 				"hbt": hbt,
 				"frequency": int(row.frequency or 0),
-				"h": "",
-				"b": "",
-				"t": "",
+				"h": buckets["H"],
+				"b": buckets["B"],
+				"t": buckets["T"],
 			}
 		)
 	return result
+
+
+# ---------------------------------------------------------------------------
+# Customer HBT map helper
+# ---------------------------------------------------------------------------
+
+
+def _get_customer_hbt_map(from_date: date, to_date: date, metric_col: str) -> dict[str, str]:
+	"""Return {group_name: 'H'/'B'/'T'} using the same logic as the Customer HBT report."""
+	rows: list[dict] = frappe.db.sql(
+		f"""
+		SELECT
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer) AS group_name,
+			SUM({metric_col}) AS total
+		FROM
+			`tabSales Invoice` si
+		INNER JOIN
+			`tabSales Invoice Item` sii ON sii.parent = si.name
+		INNER JOIN
+			`tabItem` i ON i.name = sii.item_code
+		INNER JOIN
+			`tabCustomer` cust ON cust.name = si.customer
+		WHERE
+			si.docstatus = 1
+			AND i.custom_item_type IN ('BB', 'RB')
+			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer)
+		ORDER BY
+			total DESC
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	grand = sum(float(r.total or 0) for r in rows)
+	hbt_map: dict[str, str] = {}
+	running = 0.0
+	h_done = False
+	b_done = False
+	for r in rows:
+		contr = (float(r.total or 0) / grand * 100) if grand else 0.0
+		running += contr
+		if not h_done:
+			hbt_map[r.group_name] = "H"
+			if running >= 50:
+				h_done = True
+		elif not b_done:
+			hbt_map[r.group_name] = "B"
+			if running >= 90:
+				b_done = True
+		else:
+			hbt_map[r.group_name] = "T"
+	return hbt_map

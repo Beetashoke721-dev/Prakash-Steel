@@ -121,10 +121,9 @@ def _get_columns(view_by: str) -> list[dict]:
 
 	return [
 		{
-			"label": _("Customer"),
-			"fieldname": "customer",
-			"fieldtype": "Link",
-			"options": "Customer",
+			"label": _("Customer / Group"),
+			"fieldname": "group_name",
+			"fieldtype": "Data",
 			"width": 220,
 		},
 		{
@@ -160,24 +159,6 @@ def _get_columns(view_by: str) -> list[dict]:
 			"fieldtype": "Int",
 			"width": 100,
 		},
-		{
-			"label": _("H"),
-			"fieldname": "h",
-			"fieldtype": "Data",
-			"width": 60,
-		},
-		{
-			"label": _("B"),
-			"fieldname": "b",
-			"fieldtype": "Data",
-			"width": 60,
-		},
-		{
-			"label": _("T"),
-			"fieldname": "t",
-			"fieldtype": "Data",
-			"width": 60,
-		},
 	]
 
 
@@ -186,9 +167,7 @@ def _get_columns(view_by: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _get_data(
-	filters: dict, period_months: list[tuple[int, int]], view_by: str
-) -> list[dict]:
+def _get_data(filters: dict, period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	if not period_months:
 		return []
 
@@ -207,7 +186,7 @@ def _get_data(
 	raw_rows: list[dict] = frappe.db.sql(
 		f"""
 		SELECT
-			si.customer,
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer) AS group_name,
 			SUM({metric_col}) AS total,
 			COUNT(DISTINCT YEAR(si.posting_date) * 100 + MONTH(si.posting_date)) AS frequency
 		FROM
@@ -216,12 +195,14 @@ def _get_data(
 			`tabSales Invoice Item` sii ON sii.parent = si.name
 		INNER JOIN
 			`tabItem` i ON i.name = sii.item_code
+		INNER JOIN
+			`tabCustomer` cust ON cust.name = si.customer
 		WHERE
 			si.docstatus = 1
 			AND i.custom_item_type IN ('BB', 'RB')
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY
-			si.customer
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer)
 		ORDER BY
 			total DESC
 		""",
@@ -252,15 +233,12 @@ def _get_data(
 
 		result.append(
 			{
-				"customer": row.customer,
+				"group_name": row.group_name,
 				"total": float(row.total or 0),
 				"contr_pct": contr,
 				"cumu_pct": running,
 				"hbt": hbt,
 				"frequency": int(row.frequency or 0),
-				"h": "",
-				"b": "",
-				"t": "",
 			}
 		)
 	return result

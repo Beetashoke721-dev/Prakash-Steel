@@ -129,10 +129,9 @@ def _get_period_months() -> list[tuple[int, int]]:
 def _get_columns(period_months: list[tuple[int, int]]) -> list[dict]:
 	columns: list[dict] = [
 		{
-			"label": _("Customer"),
-			"fieldname": "customer",
-			"fieldtype": "Link",
-			"options": "Customer",
+			"label": _("Customer / Group"),
+			"fieldname": "group_name",
+			"fieldtype": "Data",
 			"width": 220,
 		}
 	]
@@ -180,7 +179,7 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 	raw_rows: list[dict] = frappe.db.sql(
 		f"""
 		SELECT
-			si.customer,
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer) AS group_name,
 			YEAR(si.posting_date)  AS yr,
 			MONTH(si.posting_date) AS mo,
 			SUM({metric_col})      AS val
@@ -190,16 +189,18 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 			`tabSales Invoice Item` sii ON sii.parent = si.name
 		INNER JOIN
 			`tabItem` i ON i.name = sii.item_code
+		INNER JOIN
+			`tabCustomer` cust ON cust.name = si.customer
 		WHERE
 			si.docstatus = 1
 			AND i.custom_item_type IN ('BB', 'RB')
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY
-			si.customer,
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer),
 			YEAR(si.posting_date),
 			MONTH(si.posting_date)
 		ORDER BY
-			si.customer
+			group_name
 		""",
 		{"from_date": from_date, "to_date": to_date},
 		as_dict=True,
@@ -208,15 +209,15 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 	period_lookup: dict[tuple[int, int], str] = {(y, m): _month_key(y, m) for y, m in period_months}
 	empty_row: dict[str, float] = {fn: 0.0 for fn in period_lookup.values()}
 
-	customer_data: dict[str, dict[str, float]] = defaultdict(lambda: dict(empty_row))
+	group_data: dict[str, dict[str, float]] = defaultdict(lambda: dict(empty_row))
 
 	for row in raw_rows:
 		key = (int(row.yr), int(row.mo))
 		fieldname = period_lookup.get(key)
 		if fieldname:
-			customer_data[row.customer][fieldname] += float(row.val or 0)
+			group_data[row.group_name][fieldname] += float(row.val or 0)
 
-	return [{"customer": customer, **month_vals} for customer, month_vals in sorted(customer_data.items())]
+	return [{"group_name": group_name, **month_vals} for group_name, month_vals in sorted(group_data.items())]
 
 
 # ---------------------------------------------------------------------------
