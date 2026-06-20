@@ -160,14 +160,14 @@ def _get_columns(view_by: str) -> list[dict]:
 			"fieldname": "contr_pct",
 			"fieldtype": "Percent",
 			"width": 100,
-			"precision": 2,
+			"precision": 1,
 		},
 		{
 			"label": _("Cumu%"),
 			"fieldname": "cumu_pct",
 			"fieldtype": "Percent",
 			"width": 100,
-			"precision": 2,
+			"precision": 1,
 		},
 		{
 			"label": _("HBT"),
