@@ -190,9 +190,7 @@ def _get_columns(view_by: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _get_data(
-	_filters: dict, period_months: list[tuple[int, int]], view_by: str
-) -> list[dict]:
+def _get_data(_filters: dict, period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	if not period_months:
 		return []
 
@@ -224,7 +222,7 @@ def _get_data(
 			`tabItem` i ON i.name = sii.item_code
 		WHERE
 			si.docstatus = 1
-			AND i.custom_item_type = 'RB'
+			AND i.custom_item_type IN ('RB', 'Traded', 'BO')
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY
 			sii.item_code
