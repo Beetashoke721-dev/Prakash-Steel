@@ -16,7 +16,7 @@ def validate_cancel_reason(doc, method=None) -> None:
 
 
 @frappe.whitelist()
-def cancel_sales_order_with_reason(name: str, reason: str) -> None:
+def cancel_sales_order_with_reason(name: str, reason: str) -> dict:
     """Cancel a Sales Order (and any linked Sales Invoices) after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))

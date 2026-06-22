@@ -33,16 +33,41 @@ function setup_average_rate_box(report) {
 	`).appendTo(report.page.page_form);
 }
 
-function update_average_rate(report) {
-	const rates = (report.data || [])
-		.map((row) => flt(row.rate))
-		.filter((rate) => !isNaN(rate));
+function get_visible_rates(report) {
+	const datatable = report.datatable;
 
+	if (!datatable?.datamanager) {
+		return (report.data || [])
+			.map((row) => flt(row.rate))
+			.filter((rate) => !isNaN(rate));
+	}
+
+	const row_indices = datatable.datamanager.getFilteredRowIndices();
+	return row_indices
+		.map((index) => flt(report.data[index]?.rate))
+		.filter((rate) => !isNaN(rate));
+}
+
+function update_average_rate(report) {
+	const rates = get_visible_rates(report);
 	const average_rate = rates.length
 		? (rates.reduce((total, rate) => total + rate, 0) / rates.length).toFixed(2)
 		: "-";
 
 	report.$average_rate_box?.find(".average-rate-value").text(average_rate);
+}
+
+function bind_column_filter_listener(report) {
+	if (report._average_rate_filter_bound) {
+		return;
+	}
+
+	report._average_rate_filter_bound = true;
+	report.$report.on(
+		"keyup",
+		".dt-filter",
+		frappe.utils.debounce(() => update_average_rate(report), 350)
+	);
 }
 
 frappe.query_reports["Average Purchase Rate Report"] = {
@@ -73,6 +98,7 @@ frappe.query_reports["Average Purchase Rate Report"] = {
 
 	onload(report) {
 		setup_average_rate_box(report);
+		bind_column_filter_listener(report);
 
 		const original_refresh = report.refresh.bind(report);
 		report.refresh = function (...args) {
