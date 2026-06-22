@@ -9,8 +9,11 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 
+from prakash_steel.utils.whitelist_permissions import require_permission
 
-def execute(filters: dict[str, Any] | None = None):
+
+def execute(filters: dict[str, Any] | None = None) -> tuple[list, list]:
+	require_permission("Purchase Order", "read")
 	filters = filters or {}
 	validate_filters(filters)
 	columns = get_columns()
@@ -68,6 +71,8 @@ def get_data(filters):
 		where.append("i.custom_grade = %(grade)s")
 		params["grade"] = filters["grade"]
 
+	# where_clause is built from hardcoded string literals only — actual values
+	# are always passed via the params dict. Never append user-supplied strings here.
 	where_clause = " AND ".join(where)
 
 	return frappe.db.sql(
