@@ -1,42 +1,22 @@
 # Copyright (c) 2026, Beetashoke Chakraborty and contributors
 # For license information, please see license.txt
 
-import calendar
+from collections import defaultdict
 from datetime import date
 
 import frappe
 from frappe import _
-from frappe.utils import getdate
 
+from prakash_steel.utils.hbt_utils import (
+	METRIC_COL,
+	assign_hbt_labels,
+	get_customer_hbt_map,
+	get_period_months,
+	period_date_range,
+)
 from prakash_steel.utils.whitelist_permissions import require_permission
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-_MONTH_TO_NUM: dict[str, int] = {
-	"January": 1,
-	"February": 2,
-	"March": 3,
-	"April": 4,
-	"May": 5,
-	"June": 6,
-	"July": 7,
-	"August": 8,
-	"September": 9,
-	"October": 10,
-	"November": 11,
-	"December": 12,
-}
-
-_FISCAL_MONTH_ORDER: list[int] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
-
-# Maps view_by → safe SQL expression (never user-supplied)
-_METRIC_COL: dict[str, str] = {
-	"Sale Quantity": "sii.qty",
-	"Sale Value": "sii.amount",
-	"Throughput": "sii.amount",  # placeholder until throughput logic is defined
-}
+_EMPTY_BUCKETS: dict[str, float] = {"H": 0.0, "B": 0.0, "T": 0.0}
 
 
 # ---------------------------------------------------------------------------
@@ -50,57 +30,11 @@ def execute(filters: dict | None = None) -> tuple[list[dict], list[dict]]:
 	filters = filters or {}
 	view_by: str = filters.get("view_by") or "Sale Quantity"
 
-	period_months = _get_period_months()
+	period_months = get_period_months()
 	columns = _get_columns(view_by)
-	data = _get_data(filters, period_months, view_by)
+	data = _get_data(period_months, view_by)
 
 	return columns, data
-
-
-# ---------------------------------------------------------------------------
-# Period resolution (same logic as Bright Production Analysis)
-# ---------------------------------------------------------------------------
-
-
-def _get_period_months() -> list[tuple[int, int]]:
-	"""Return ordered (year, month) tuples from HBT Period Settings."""
-	settings = frappe.get_single("HBT Period Settings")
-
-	fiscal_year: str | None = settings.fiscal_year
-	from_month: str | None = settings.from_month
-	to_month: str | None = settings.to_month
-
-	if not fiscal_year or not from_month or not to_month:
-		frappe.throw(
-			_("Please configure Fiscal Year, From Month, and To Month in HBT Period Settings."),
-			title=_("Incomplete Period Settings"),
-		)
-
-	from_num = _MONTH_TO_NUM.get(from_month)
-	to_num = _MONTH_TO_NUM.get(to_month)
-
-	if from_num is None or to_num is None:
-		frappe.throw(
-			_("Invalid month value in HBT Period Settings."),
-			title=_("Invalid Period Settings"),
-		)
-
-	from_idx = _FISCAL_MONTH_ORDER.index(from_num)
-	to_idx = _FISCAL_MONTH_ORDER.index(to_num)
-
-	if from_idx > to_idx:
-		frappe.throw(
-			_("From Month ({0}) must come before To Month ({1}) in the fiscal year.").format(
-				from_month, to_month
-			),
-			title=_("Invalid Period Range"),
-		)
-
-	fy_doc = frappe.get_doc("Fiscal Year", fiscal_year)
-	start_year: int = getdate(fy_doc.year_start_date).year
-	end_year: int = getdate(fy_doc.year_end_date).year
-
-	return [(start_year if m >= 4 else end_year, m) for m in _FISCAL_MONTH_ORDER[from_idx : to_idx + 1]]
 
 
 # ---------------------------------------------------------------------------
@@ -109,75 +43,39 @@ def _get_period_months() -> list[tuple[int, int]]:
 
 
 def _get_columns(view_by: str) -> list[dict]:
+	# Sale Value temporarily hidden — _get_data returns [] for it; use Sale Quantity columns as placeholder
 	if view_by == "Sale Value":
-		total_label = _("Total Sale Value")
-		total_fieldtype = "Currency"
-	elif view_by == "Sale Quantity":
-		total_label = _("Total Sale Quantity")
-		total_fieldtype = "Float"
-	else:  # Throughput
-		total_label = _("Total Throughput")
-		total_fieldtype = "Currency"
+		view_by = "Sale Quantity"
+
+	if view_by not in METRIC_COL:
+		frappe.throw(_("{0} is not yet implemented for this report.").format(view_by))
+
+	# Uncomment when Sale Value is ready to expose:
+	# if view_by == "Sale Value":
+	#     total_label = _("Total Sale Value")
+	#     total_fieldtype = "Currency"
+	# else:
+	total_label = _("Total Sale Quantity")
+	total_fieldtype = "Float"
 
 	return [
-		{
-			"label": _("Item Name"),
-			"fieldname": "item_code",
-			"fieldtype": "Link",
-			"options": "Item",
-			"width": 220,
-		},
-		{
-			"label": total_label,
-			"fieldname": "total",
-			"fieldtype": total_fieldtype,
-			"width": 160,
-			"precision": 2,
-		},
-		{
-			"label": _("Contr%"),
-			"fieldname": "contr_pct",
-			"fieldtype": "Percent",
-			"width": 100,
-			"precision": 2,
-		},
-		{
-			"label": _("Cumu%"),
-			"fieldname": "cumu_pct",
-			"fieldtype": "Percent",
-			"width": 100,
-			"precision": 2,
-		},
-		{
-			"label": _("HBT"),
-			"fieldname": "hbt",
-			"fieldtype": "Data",
-			"width": 60,
-		},
-		{
-			"label": _("Frequency"),
-			"fieldname": "frequency",
-			"fieldtype": "Int",
-			"width": 100,
-		},
-		{
-			"label": _("H"),
-			"fieldname": "h",
-			"fieldtype": "Data",
-			"width": 60,
-		},
-		{
-			"label": _("B"),
-			"fieldname": "b",
-			"fieldtype": "Data",
-			"width": 60,
-		},
-		{
-			"label": _("T"),
-			"fieldname": "t",
-			"fieldtype": "Data",
-			"width": 60,
-		},
+		{"label": _("Item Name"), "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 220},
+		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160, "precision": 2},
+		*(
+			[
+				{"label": _("Consumption"), "fieldname": "consumption", "fieldtype": "Float", "width": 140, "precision": 2},
+				{"label": _("Total Value"), "fieldname": "total_value", "fieldtype": "Float", "width": 140, "precision": 2},
+			]
+			if view_by == "Sale Quantity"
+			else []
+		),
+		{"label": _("Contr%"), "fieldname": "contr_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
+		{"label": _("Cumu%"), "fieldname": "cumu_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
+		{"label": _("HBT"), "fieldname": "hbt", "fieldtype": "Data", "width": 60},
+		{"label": _("Frequency"), "fieldname": "frequency", "fieldtype": "Int", "width": 100},
+		{"label": _("H"), "fieldname": "h", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
+		{"label": _("B"), "fieldname": "b", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
+		{"label": _("T"), "fieldname": "t", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
 	]
 
 
@@ -186,79 +84,143 @@ def _get_columns(view_by: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _get_data(filters: dict, period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
+def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	if not period_months:
 		return []
 
-	metric_col = _METRIC_COL.get(view_by)
-	if not metric_col:
-		frappe.throw(_("Unknown view option: {0}").format(view_by))
+	# Sale Value is implemented but temporarily hidden from users
+	if view_by == "Sale Value":
+		return []
 
-	first_year, first_month = period_months[0]
-	last_year, last_month = period_months[-1]
+	if view_by not in METRIC_COL:
+		frappe.throw(_("{0} is not yet implemented for this report.").format(view_by))
 
-	from_date = date(first_year, first_month, 1)
-	last_day = calendar.monthrange(last_year, last_month)[1]
-	to_date = date(last_year, last_month, last_day)
+	metric_col = METRIC_COL[view_by]
+	from_date, to_date = period_date_range(period_months)
 
-	# metric_col is sourced from _METRIC_COL (internal constant) — safe to interpolate
+	# Step 1: item totals + frequency — metric_col from internal constant, safe to interpolate
 	raw_rows: list[dict] = frappe.db.sql(
 		f"""
 		SELECT
 			sii.item_code,
 			SUM({metric_col}) AS total,
 			COUNT(DISTINCT YEAR(si.posting_date) * 100 + MONTH(si.posting_date)) AS frequency
-		FROM
-			`tabSales Invoice` si
-		INNER JOIN
-			`tabSales Invoice Item` sii ON sii.parent = si.name
-		INNER JOIN
-			`tabItem` i ON i.name = sii.item_code
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		INNER JOIN `tabItem` i ON i.name = sii.item_code
 		WHERE
 			si.docstatus = 1
-			AND i.custom_item_type = 'RB'
+			AND i.custom_item_type IN ('RB', 'Traded', 'BO')
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY
-			sii.item_code
-		ORDER BY
-			total DESC
+		GROUP BY sii.item_code
+		ORDER BY total DESC
 		""",
 		{"from_date": from_date, "to_date": to_date},
 		as_dict=True,
 	)
 
-	grand_total = sum(float(row.total or 0) for row in raw_rows)
+	if not raw_rows:
+		return []
 
-	result = []
-	running = 0.0
-	h_done = False
-	b_done = False
+	# Step 2: company-wide customer-group HBT map
+	customer_hbt_map = get_customer_hbt_map(from_date, to_date, metric_col)
+
+	# Step 3: per-item per-customer-group totals (RB only)
+	item_group_rows: list[dict] = frappe.db.sql(
+		f"""
+		SELECT
+			sii.item_code,
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer) AS group_name,
+			SUM({metric_col}) AS total
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		INNER JOIN `tabItem` i ON i.name = sii.item_code
+		INNER JOIN `tabCustomer` cust ON cust.name = si.customer
+		WHERE
+			si.docstatus = 1
+			AND i.custom_item_type = 'RB'
+			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY
+			sii.item_code,
+			COALESCE(NULLIF(cust.custom_customer_group_name, ''), si.customer)
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	# Build {item_code: {H: x, B: x, T: x}} buckets
+	item_hbt_buckets: dict[str, dict[str, float]] = defaultdict(lambda: dict(_EMPTY_BUCKETS))
+	for r in item_group_rows:
+		bucket = customer_hbt_map.get(r.group_name, "T")
+		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
+
+	# Step 4: consumption from Bright Bar Production (Sale Quantity only)
+	consumption_map: dict[str, float] = {}
+	if view_by == "Sale Quantity":
+		consumption_map = _get_consumption_map(from_date, to_date)
+
+	# Enrich raw_rows with consumption + total_value, then re-sort
 	for row in raw_rows:
-		contr = (float(row.total or 0) / grand_total * 100) if grand_total else 0.0
-		running += contr
+		consumption = consumption_map.get(row.item_code, 0.0)
+		row["consumption"] = consumption
+		row["total_value"] = float(row.total or 0) + consumption
 
-		if not h_done:
-			hbt = "H"
-			if running >= 50:
-				h_done = True
-		elif not b_done:
-			hbt = "B"
-			if running >= 90:
-				b_done = True
-		else:
-			hbt = "T"
+	if view_by == "Sale Quantity":
+		raw_rows.sort(key=lambda r: r["total_value"], reverse=True)
 
-		result.append(
-			{
-				"item_code": row.item_code,
-				"total": float(row.total or 0),
-				"contr_pct": contr,
-				"cumu_pct": running,
-				"hbt": hbt,
-				"frequency": int(row.frequency or 0),
-				"h": "",
-				"b": "",
-				"t": "",
-			}
-		)
-	return result
+	# Step 5: assign HBT labels using total_value when sorting by quantity
+	ranking_key = "total_value" if view_by == "Sale Quantity" else "total"
+	assign_hbt_labels(raw_rows, total_key=ranking_key)
+
+	return [
+		{
+			"item_code": row.item_code,
+			"total": float(row.total or 0),
+			"consumption": row.get("consumption", 0.0),
+			"total_value": row.get("total_value", float(row.total or 0)),
+			"contr_pct": row["contr_pct"],
+			"cumu_pct": row["cumu_pct"],
+			"hbt": row["hbt"],
+			"frequency": int(row.frequency or 0),
+			"h": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["H"],
+			"b": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["B"],
+			"t": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["T"],
+		}
+		for row in raw_rows
+	]
+
+
+# ---------------------------------------------------------------------------
+# Consumption map
+# ---------------------------------------------------------------------------
+
+
+def _get_consumption_map(from_date: date, to_date: date) -> dict[str, float]:
+	"""Return ``{item_code: total_actual_rm_consumption}`` from submitted Bright Bar Production docs."""
+	rows: list[dict] = frappe.db.sql(
+		"""
+		SELECT material AS item_code, SUM(actual_rm_consumption) AS consumption
+		FROM `tabBright Bar Production`
+		WHERE docstatus = 1
+			AND NULLIF(material, '') IS NOT NULL
+			AND production_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY material
+
+		UNION ALL
+
+		SELECT raw_material AS item_code, SUM(actual_rm_consumption) AS consumption
+		FROM `tabBright Bar Production`
+		WHERE docstatus = 1
+			AND NULLIF(raw_material, '') IS NOT NULL
+			AND production_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY raw_material
+		""",
+		{"from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	consumption_map: dict[str, float] = {}
+	for r in rows:
+		if r.item_code:
+			consumption_map[r.item_code] = consumption_map.get(r.item_code, 0.0) + float(r.consumption or 0)
+	return consumption_map

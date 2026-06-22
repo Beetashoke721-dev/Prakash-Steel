@@ -42,13 +42,13 @@ from .bom_traversal import (
 
 
 
-def execute(filters=None) -> tuple[list, list]:
+def execute(filters: dict | None = None) -> tuple[list[dict], list[dict]]:
 	columns = get_columns(filters)
 	data = get_data(filters)
 	return columns, data
 
 
-def save_daily_on_hand_colour():
+def save_daily_on_hand_colour() -> None:
 	from frappe.utils import nowdate
 
 	posting_date = nowdate()
@@ -65,7 +65,7 @@ def save_daily_on_hand_colour():
 				if item_code and item_code not in seen_item_codes:
 					seen_item_codes[item_code] = row
 	except Exception as e:
-		pass
+		frappe.log_error(title="PO Recommendation daily colour (purchase)", message=frappe.get_traceback())
 
 	try:
 		filters_sell = {"sell": 1, "buffer_flag": 1}
@@ -76,7 +76,7 @@ def save_daily_on_hand_colour():
 				if item_code and item_code not in seen_item_codes:
 					seen_item_codes[item_code] = row
 	except Exception as e:
-		pass
+		frappe.log_error(title="PO Recommendation daily colour (sell)", message=frappe.get_traceback())
 
 	all_data = list(seen_item_codes.values())
 
@@ -109,10 +109,10 @@ def save_daily_on_hand_colour():
 		doc.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception as e:
-		pass
+		frappe.log_error(title="PO Recommendation daily colour (save)", message=frappe.get_traceback())
 
 
-def get_columns(filters=None) -> list[dict]:
+def get_columns(filters: dict | None = None) -> list[dict]:
 	if not filters:
 		filters = {}
 
@@ -448,7 +448,7 @@ def get_columns(filters=None) -> list[dict]:
 	return columns
 
 
-def get_data(filters=None) -> list[dict]:
+def get_data(filters: dict | None = None) -> list[dict]:
 	if not filters:
 		filters = {}
 
@@ -1578,7 +1578,7 @@ def get_data(filters=None) -> list[dict]:
 
 
 @frappe.whitelist()
-def create_material_request(item_code, qty) -> None:
+def create_material_request(item_code: str, qty: float | str) -> dict:
 	"""
 	Create and submit a Material Request for the given item_code and quantity
 	"""
@@ -1683,7 +1683,7 @@ def create_material_request(item_code, qty) -> None:
 
 
 @frappe.whitelist()
-def create_material_requests_automatically(filters=None) -> None:
+def create_material_requests_automatically(filters: dict | str | None = None) -> dict:
 	"""
 	Create Material Requests automatically for all items with net_po_recommendation > 0
 	"""
@@ -1774,7 +1774,7 @@ def create_material_requests_automatically(filters=None) -> None:
 
 
 @frappe.whitelist()
-def get_priority_breakdown(item_code):
+def get_priority_breakdown(item_code: str) -> dict:
 	"""
 	Returns full priority calculation breakdown for a non-buffer item:
 	- Own FIFO priority (level vs open SOs)
@@ -2017,7 +2017,7 @@ def get_priority_breakdown(item_code):
 
 
 @frappe.whitelist()
-def get_on_hand_status_breakdown(item_code):
+def get_on_hand_status_breakdown(item_code: str) -> dict:
 	from frappe.utils import add_days, today
 	if not frappe.has_permission("Item", "read"):
 		frappe.throw("Not permitted to access on-hand breakdowns.", frappe.PermissionError)
@@ -2297,7 +2297,7 @@ def get_on_hand_status_breakdown(item_code):
 
 
 @frappe.whitelist()
-def get_child_requirement_breakdown(item_code):
+def get_child_requirement_breakdown(item_code: str) -> dict:
 	"""
 	Return a step-by-step breakdown of how child requirements are computed
 	for a given parent item in the PO Recommendation report.

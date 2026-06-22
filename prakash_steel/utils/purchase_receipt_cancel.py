@@ -16,7 +16,7 @@ def validate_cancel_reason(doc, method=None) -> None:
 
 
 @frappe.whitelist()
-def cancel_purchase_receipt_with_reason(name: str, reason: str) -> None:
+def cancel_purchase_receipt_with_reason(name: str, reason: str) -> dict:
     """Cancel a submitted Purchase Receipt after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))

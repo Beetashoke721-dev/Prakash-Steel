@@ -97,6 +97,59 @@ function show_machine_breakdown(d) {
 			<td style="padding:5px 8px;font-size:12px;text-align:right;color:#e65;">${fmt(d.total_order_hours)}</td>
 		</tr>`;
 
+	// Build colour reason explanation for a value
+	function colour_reason(value, colour_rules) {
+		const v = parseFloat(value);
+		if (isNaN(v) || value === null || value === undefined) return "";
+		const colour = get_load_colour(value, colour_rules);
+		if (!colour) return "";
+		const s = LOAD_COLOUR_STYLES[colour] || {};
+		const badge = `<span style="display:inline-block;background:${s.bg};color:${s.fg};${s.border ? `border:${s.border};` : ""}padding:1px 8px;border-radius:3px;font-weight:bold;font-size:12px;">${colour}</span>`;
+		let reason = "";
+		if (v === 0) {
+			reason = "Value = 0 → Black";
+		} else {
+			const matched = colour_rules.find(r => v >= r.from_days && v <= r.to_days);
+			if (matched) {
+				reason = `${v} days falls in range ${matched.from_days}–${matched.to_days} days`;
+			} else {
+				const max_rule = colour_rules.length ? colour_rules[colour_rules.length - 1] : null;
+				reason = max_rule
+					? `${v} days exceeds all ranges (max defined: ${max_rule.to_days} days) → White`
+					: "No colour rules defined → White";
+			}
+		}
+		return `<div style="margin-top:6px;font-size:11px;color:#555;">Colour: ${badge} &nbsp; <span style="color:#888;">${reason}</span></div>`;
+	}
+
+	// Colour rules table
+	const rules = _load_colour_rules;
+	const rules_rows = rules.map(r => {
+		const s = LOAD_COLOUR_STYLES[r.colour] || {};
+		return `<tr>
+			<td style="padding:3px 10px;font-size:11px;text-align:center;">
+				<span style="display:inline-block;background:${s.bg};color:${s.fg};${s.border ? `border:${s.border};` : ""}padding:1px 8px;border-radius:3px;font-weight:bold;">${r.colour}</span>
+			</td>
+			<td style="padding:3px 10px;font-size:11px;text-align:center;">${r.from_days}</td>
+			<td style="padding:3px 10px;font-size:11px;text-align:center;">${r.to_days}</td>
+		</tr>`;
+	}).join("");
+	const colour_table = rules.length ? `
+		<div style="margin-top:14px;font-size:12px;">
+			<b>Colour Rules (from Machine Load Colour Master):</b>
+			<table style="margin-top:6px;border-collapse:collapse;border:1px solid #ddd;">
+				<thead>
+					<tr style="background:#f0f0f0;">
+						<th style="padding:4px 10px;font-size:11px;">Colour</th>
+						<th style="padding:4px 10px;font-size:11px;">From (days)</th>
+						<th style="padding:4px 10px;font-size:11px;">To (days)</th>
+					</tr>
+				</thead>
+				<tbody>${rules_rows}</tbody>
+			</table>
+			<div style="font-size:11px;color:#888;margin-top:4px;">Value = 0 → Black &nbsp;|&nbsp; Value > max range → White</div>
+		</div>` : `<div style="margin-top:10px;font-size:11px;color:#999;">No colour rules loaded.</div>`;
+
 	// Final calculation
 	const calc = `
 		<div style="display:flex;gap:24px;margin-top:16px;font-size:13px;flex-wrap:wrap;">
@@ -104,13 +157,16 @@ function show_machine_breakdown(d) {
 				<div style="font-size:11px;color:#555;margin-bottom:4px;">NET PROD LOAD (Days)</div>
 				<div style="font-size:22px;font-weight:bold;color:#2e7d32;">${fmt(d.net_prod_load)}</div>
 				<div style="font-size:11px;color:#777;margin-top:4px;">(${fmt(d.total_prod_hours)} hrs &divide; ${fmt(d.effective_runtime)}) &divide; ${fmt(d.no_of_machines)}</div>
+				${colour_reason(d.net_prod_load, rules)}
 			</div>
 			<div style="background:#fff3e0;padding:12px 20px;border-radius:6px;border:1px solid #ffcc80;min-width:240px;">
 				<div style="font-size:11px;color:#555;margin-bottom:4px;">NET ORDER LOAD (Days)</div>
 				<div style="font-size:22px;font-weight:bold;color:#e65100;">${fmt(d.net_order_load)}</div>
 				<div style="font-size:11px;color:#777;margin-top:4px;">(${fmt(d.total_order_hours)} hrs &divide; ${fmt(d.effective_runtime)}) &divide; ${fmt(d.no_of_machines)}</div>
+				${colour_reason(d.net_order_load, rules)}
 			</div>
-		</div>`;
+		</div>
+		${colour_table}`;
 
 	const html = summary + formula + `
 		<div style="overflow-x:auto;">
