@@ -11,7 +11,11 @@ INVOICE_DOCTYPES = ("Sales Invoice", "Purchase Invoice")
 
 @frappe.whitelist()
 def get_reference_details(
-	reference_doctype, reference_name, party_account_currency, party_type=None, party=None
+	reference_doctype: str,
+	reference_name: str,
+	party_account_currency: str,
+	party_type: str | None = None,
+	party: str | None = None,
 ) -> dict:
 	"""Wrapper around ERPNext's `get_reference_details` that also returns the
 	invoice's `posting_date` under the key `custom_invoice_date`.

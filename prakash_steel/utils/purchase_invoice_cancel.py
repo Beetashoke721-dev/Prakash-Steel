@@ -100,7 +100,7 @@ def validate_cancel_reason(doc, method=None) -> None:
 
 
 @frappe.whitelist()
-def set_purchase_invoice_cancel_reason(name: str, reason: str) -> None:
+def set_purchase_invoice_cancel_reason(name: str, reason: str) -> dict:
     """Set cancel reason on Purchase Invoice before running standard cancel flow."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
@@ -125,7 +125,7 @@ def set_purchase_invoice_cancel_reason(name: str, reason: str) -> None:
 
 
 @frappe.whitelist()
-def cancel_purchase_invoice_with_reason(name: str, reason: str) -> None:
+def cancel_purchase_invoice_with_reason(name: str, reason: str) -> dict:
     """Cancel a submitted Purchase Invoice after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))

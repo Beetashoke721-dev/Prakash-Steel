@@ -301,6 +301,77 @@ class TestGetOpenSoMapForPriority(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# get_wip_map
+# ---------------------------------------------------------------------------
+
+
+class TestGetWipMap(unittest.TestCase):
+	def setUp(self):
+		from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import get_wip_map
+		self._fn = get_wip_map
+
+	def _settings(self, from_work_order=1, from_production_plan=0):
+		settings = MagicMock()
+		settings.get.side_effect = lambda key, default=None: {
+			"from_work_order": from_work_order,
+			"from_production_plan": from_production_plan,
+		}.get(key, default)
+		return settings
+
+	def test_work_order_path_maps_items(self):
+		rows = [_row(item_code="ITEM-A", wip_qty=40.0), _row(item_code="ITEM-B", wip_qty=10.0)]
+		with patch(MODULE + ".frappe") as mf:
+			mf.get_single.return_value = self._settings()
+			mf.db.sql.return_value = rows
+			result = self._fn()
+		self.assertEqual(result["ITEM-A"], 40.0)
+		self.assertEqual(result["ITEM-B"], 10.0)
+		mf.db.sql.assert_called_once()
+
+	def test_settings_failure_defaults_to_work_order_path(self):
+		with patch(MODULE + ".frappe") as mf:
+			mf.get_single.side_effect = Exception("missing settings")
+			mf._dict = dict
+			mf.db.sql.return_value = []
+			result = self._fn()
+		self.assertEqual(result, {})
+		mf.db.sql.assert_called_once()
+
+	def test_production_plan_path_planned_minus_finished(self):
+		pp_item = MagicMock(item_code="FG-1", planned_qty=100)
+		pp_doc = MagicMock(po_items=[pp_item])
+		fw_row = _row(finish_weight=30.0)
+		bbp_row = _row(fg_weight=20.0)
+		with patch(MODULE + ".frappe") as mf:
+			mf.get_single.return_value = self._settings(from_work_order=0, from_production_plan=1)
+			mf.get_all.return_value = [{"name": "PP-001"}]
+			mf.get_doc.return_value = pp_doc
+			mf.db.sql.side_effect = [[fw_row], [bbp_row]]
+			result = self._fn()
+		self.assertEqual(result["FG-1"], 50.0)
+
+	def test_production_plan_aggregates_same_item_across_plans(self):
+		pp_item = MagicMock(item_code="FG-1", planned_qty=50)
+		pp_doc = MagicMock(po_items=[pp_item])
+		with patch(MODULE + ".frappe") as mf:
+			mf.get_single.return_value = self._settings(from_work_order=0, from_production_plan=1)
+			mf.get_all.return_value = [{"name": "PP-001"}, {"name": "PP-002"}]
+			mf.get_doc.return_value = pp_doc
+			mf.db.sql.side_effect = [[], [], [], []]
+			result = self._fn()
+		self.assertEqual(result["FG-1"], 100.0)
+
+	def test_production_plan_skips_rows_without_item_code(self):
+		pp_doc = MagicMock(po_items=[MagicMock(item_code=None, planned_qty=100)])
+		with patch(MODULE + ".frappe") as mf:
+			mf.get_single.return_value = self._settings(from_work_order=0, from_production_plan=1)
+			mf.get_all.return_value = [{"name": "PP-001"}]
+			mf.get_doc.return_value = pp_doc
+			result = self._fn()
+		self.assertEqual(result, {})
+
+
+# ---------------------------------------------------------------------------
 # calculate_spike_map
 # ---------------------------------------------------------------------------
 

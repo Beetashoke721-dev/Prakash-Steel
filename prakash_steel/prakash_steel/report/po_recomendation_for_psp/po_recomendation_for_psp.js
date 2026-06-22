@@ -184,149 +184,149 @@ frappe.query_reports["PO Recomendation for PSP"] = {
 
 		// ── On Hand Status Calculator button ─────────────────────────────
 
-		report.page.add_inner_button(__("On Hand Status Calculator"), function () {
-			const d = new frappe.ui.Dialog({
-				title: __("On Hand Status Calculator"),
-				fields: [
-					{
-						label: __("Item Code"),
-						fieldname: "item_code",
-						fieldtype: "Link",
-						options: "Item",
-						reqd: 1,
-					},
-				],
-				primary_action_label: __("Calculate"),
-				primary_action({ item_code }) {
-					if (!item_code) return;
-					d.disable_primary_action();
-					frappe.call({
-						method: "prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.get_on_hand_status_breakdown",
-						args: { item_code },
-						callback(r) {
-							d.enable_primary_action();
-							if (!r.message) {
-								frappe.msgprint(__("No data returned."));
-								return;
-							}
-							show_on_hand_status_dialog(r.message);
-						},
-						error() { d.enable_primary_action(); },
-					});
-				},
-			});
-			d.show();
-		});
-		// ── Child Requirement Debugger button ─────────────────────────────
-		report.page.add_inner_button(__("Child Requirement Debugger"), function () {
-			const d = new frappe.ui.Dialog({
-				title: __("Child Requirement Debugger"),
-				fields: [
-					{
-						label: __("Parent Item Code"),
-						fieldname: "item_code",
-						fieldtype: "Link",
-						options: "Item",
-						reqd: 1,
-					},
-				],
-				primary_action_label: __("Show Breakdown"),
-				primary_action({ item_code }) {
-					if (!item_code) return;
-					d.disable_primary_action();
-					frappe.call({
-						method: "prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.get_child_requirement_breakdown",
-						args: { item_code },
-						callback(r) {
-							d.enable_primary_action();
-							if (!r.message) {
-								frappe.msgprint(__("No data returned."));
-								return;
-							}
-							show_child_requirement_dialog(r.message);
-						},
-						error() { d.enable_primary_action(); },
-					});
-				},
-			});
-			d.show();
-		});
+		// report.page.add_inner_button(__("On Hand Status Calculator"), function () {
+		// 	const d = new frappe.ui.Dialog({
+		// 		title: __("On Hand Status Calculator"),
+		// 		fields: [
+		// 			{
+		// 				label: __("Item Code"),
+		// 				fieldname: "item_code",
+		// 				fieldtype: "Link",
+		// 				options: "Item",
+		// 				reqd: 1,
+		// 			},
+		// 		],
+		// 		primary_action_label: __("Calculate"),
+		// 		primary_action({ item_code }) {
+		// 			if (!item_code) return;
+		// 			d.disable_primary_action();
+		// 			frappe.call({
+		// 				method: "prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.get_on_hand_status_breakdown",
+		// 				args: { item_code },
+		// 				callback(r) {
+		// 					d.enable_primary_action();
+		// 					if (!r.message) {
+		// 						frappe.msgprint(__("No data returned."));
+		// 						return;
+		// 					}
+		// 					show_on_hand_status_dialog(r.message);
+		// 				},
+		// 				error() { d.enable_primary_action(); },
+		// 			});
+		// 		},
+		// 	});
+		// 	d.show();
+		// });
+		// // ── Child Requirement Debugger button ─────────────────────────────
+		// report.page.add_inner_button(__("Child Requirement Debugger"), function () {
+		// 	const d = new frappe.ui.Dialog({
+		// 		title: __("Child Requirement Debugger"),
+		// 		fields: [
+		// 			{
+		// 				label: __("Parent Item Code"),
+		// 				fieldname: "item_code",
+		// 				fieldtype: "Link",
+		// 				options: "Item",
+		// 				reqd: 1,
+		// 			},
+		// 		],
+		// 		primary_action_label: __("Show Breakdown"),
+		// 		primary_action({ item_code }) {
+		// 			if (!item_code) return;
+		// 			d.disable_primary_action();
+		// 			frappe.call({
+		// 				method: "prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.get_child_requirement_breakdown",
+		// 				args: { item_code },
+		// 				callback(r) {
+		// 					d.enable_primary_action();
+		// 					if (!r.message) {
+		// 						frappe.msgprint(__("No data returned."));
+		// 						return;
+		// 					}
+		// 					show_child_requirement_dialog(r.message);
+		// 				},
+		// 				error() { d.enable_primary_action(); },
+		// 			});
+		// 		},
+		// 	});
+		// 	d.show();
+		// });
 
-		// ── Production Qty Debugger button ────────────────────────────────
-		report.page.add_inner_button(__("Production Qty Debugger"), function () {
-			const dlg = new frappe.ui.Dialog({
-				title: __("Production Qty Debugger"),
-				fields: [
-					{
-						label: __("Item Code"),
-						fieldname: "item_code",
-						fieldtype: "Link",
-						options: "Item",
-						reqd: 1,
-					},
-				],
-				primary_action_label: __("Show Breakdown"),
-				primary_action({ item_code }) {
-					if (!item_code) return;
-					dlg.disable_primary_action();
-					frappe.call({
-						method: "prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.get_child_requirement_breakdown",
-						args: { item_code },
-						callback(r) {
-							dlg.enable_primary_action();
-							if (!r.message) { frappe.msgprint(__("No data returned.")); return; }
-							const data = r.message;
-							if (data.no_bom || !data.child_items || !data.child_items.length) {
-								frappe.msgprint(__("No BOM or child items found for {0}", [item_code]));
-								return;
-							}
-							// Build a row object for each child (same shape show_prod_qty_inline_dialog expects)
-							// Using total stock (FIFO not applied here — for exact FIFO see the report row)
-							data.child_items.forEach(c => {
-								const or_val      = data.or_with_moq_batch_size || 0;
-								const bom_qty_c   = c.bom_qty || 0;
-								const bom_qty_of  = c.bom_quantity || 1;
-								const pfcf        = bom_qty_c > 0 ? (bom_qty_of / bom_qty_c) : 0;
-								const child_req   = c.child_requirement || 0;
-								const c_stock     = c.child_stock || 0;
-								const c_wip_po    = c.child_wip_open_po || 0;
-								const alloc_stock = Math.min(child_req, c_stock);
-								const stock_short = Math.max(0, child_req - alloc_stock);
-								const alloc_wip   = Math.min(stock_short, c_wip_po);
-								const wip_short   = Math.max(0, stock_short - alloc_wip);
-								const prod_stock  = or_val > 0 ? Math.min(Math.ceil(alloc_stock * pfcf), Math.ceil(or_val)) : 0;
-								const prod_wip    = or_val > 0 ? Math.min(Math.ceil((alloc_stock + alloc_wip) * pfcf), Math.ceil(or_val)) : 0;
-								const kit_stock   = or_val === 0 ? null : stock_short === 0 ? "Full-kit" : alloc_stock === 0 ? "Pending" : "Partial";
-								const kit_wip     = or_val === 0 ? null : wip_short  === 0 ? "Full-kit" : alloc_wip   === 0 ? "Pending" : "Partial";
+		// // ── Production Qty Debugger button ────────────────────────────────
+		// report.page.add_inner_button(__("Production Qty Debugger"), function () {
+		// 	const dlg = new frappe.ui.Dialog({
+		// 		title: __("Production Qty Debugger"),
+		// 		fields: [
+		// 			{
+		// 				label: __("Item Code"),
+		// 				fieldname: "item_code",
+		// 				fieldtype: "Link",
+		// 				options: "Item",
+		// 				reqd: 1,
+		// 			},
+		// 		],
+		// 		primary_action_label: __("Show Breakdown"),
+		// 		primary_action({ item_code }) {
+		// 			if (!item_code) return;
+		// 			dlg.disable_primary_action();
+		// 			frappe.call({
+		// 				method: "prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.get_child_requirement_breakdown",
+		// 				args: { item_code },
+		// 				callback(r) {
+		// 					dlg.enable_primary_action();
+		// 					if (!r.message) { frappe.msgprint(__("No data returned.")); return; }
+		// 					const data = r.message;
+		// 					if (data.no_bom || !data.child_items || !data.child_items.length) {
+		// 						frappe.msgprint(__("No BOM or child items found for {0}", [item_code]));
+		// 						return;
+		// 					}
+		// 					// Build a row object for each child (same shape show_prod_qty_inline_dialog expects)
+		// 					// Using total stock (FIFO not applied here — for exact FIFO see the report row)
+		// 					data.child_items.forEach(c => {
+		// 						const or_val      = data.or_with_moq_batch_size || 0;
+		// 						const bom_qty_c   = c.bom_qty || 0;
+		// 						const bom_qty_of  = c.bom_quantity || 1;
+		// 						const pfcf        = bom_qty_c > 0 ? (bom_qty_of / bom_qty_c) : 0;
+		// 						const child_req   = c.child_requirement || 0;
+		// 						const c_stock     = c.child_stock || 0;
+		// 						const c_wip_po    = c.child_wip_open_po || 0;
+		// 						const alloc_stock = Math.min(child_req, c_stock);
+		// 						const stock_short = Math.max(0, child_req - alloc_stock);
+		// 						const alloc_wip   = Math.min(stock_short, c_wip_po);
+		// 						const wip_short   = Math.max(0, stock_short - alloc_wip);
+		// 						const prod_stock  = or_val > 0 ? Math.min(Math.ceil(alloc_stock * pfcf), Math.ceil(or_val)) : 0;
+		// 						const prod_wip    = or_val > 0 ? Math.min(Math.ceil((alloc_stock + alloc_wip) * pfcf), Math.ceil(or_val)) : 0;
+		// 						const kit_stock   = or_val === 0 ? null : stock_short === 0 ? "Full-kit" : alloc_stock === 0 ? "Pending" : "Partial";
+		// 						const kit_wip     = or_val === 0 ? null : wip_short  === 0 ? "Full-kit" : alloc_wip   === 0 ? "Pending" : "Partial";
 
-								show_prod_qty_inline_dialog({
-									item_code:    data.item_code,
-									item_name:    data.item_name,
-									child_item_code:  c.child_item_code,
-									on_hand_status:   "",
-									or_with_moq_batch_size: or_val,
-									child_requirement:  child_req,
-									child_stock:        c_stock,
-									child_stock_soft_allocation_qty:    alloc_stock,
-									child_stock_shortage:               stock_short,
-									child_wip_open_po:                  c_wip_po,
-									child_wip_open_po_soft_allocation_qty: alloc_wip,
-									child_wip_open_po_shortage:         wip_short,
-									child_bom_qty:      bom_qty_c,
-									child_bom_quantity: bom_qty_of,
-									production_qty_based_on_child_stock:             prod_stock,
-									production_qty_based_on_child_stock_wip_open_po: prod_wip,
-									child_full_kit_status:              kit_stock,
-									child_wip_open_po_full_kit_status:  kit_wip,
-								});
-							});
-						},
-						error() { dlg.enable_primary_action(); },
-					});
-				},
-			});
-			dlg.show();
-		});
+		// 						show_prod_qty_inline_dialog({
+		// 							item_code:    data.item_code,
+		// 							item_name:    data.item_name,
+		// 							child_item_code:  c.child_item_code,
+		// 							on_hand_status:   "",
+		// 							or_with_moq_batch_size: or_val,
+		// 							child_requirement:  child_req,
+		// 							child_stock:        c_stock,
+		// 							child_stock_soft_allocation_qty:    alloc_stock,
+		// 							child_stock_shortage:               stock_short,
+		// 							child_wip_open_po:                  c_wip_po,
+		// 							child_wip_open_po_soft_allocation_qty: alloc_wip,
+		// 							child_wip_open_po_shortage:         wip_short,
+		// 							child_bom_qty:      bom_qty_c,
+		// 							child_bom_quantity: bom_qty_of,
+		// 							production_qty_based_on_child_stock:             prod_stock,
+		// 							production_qty_based_on_child_stock_wip_open_po: prod_wip,
+		// 							child_full_kit_status:              kit_stock,
+		// 							child_wip_open_po_full_kit_status:  kit_wip,
+		// 						});
+		// 					});
+		// 				},
+		// 				error() { dlg.enable_primary_action(); },
+		// 			});
+		// 		},
+		// 	});
+		// 	dlg.show();
+		// });
 
 		// ── Priority Breakdown button ──────────────────────────────────────
 		// report.page.add_inner_button(__("Priority Breakdown"), function () {
@@ -522,29 +522,29 @@ frappe.query_reports["PO Recomendation for PSP"] = {
 };
 
 function show_prod_qty_inline_dialog(r) {
-	const e  = v => frappe.utils.escape_html(String(v ?? "—"));
-	const n  = v => (v === null || v === undefined || v === "") ? "—" : Number(v).toLocaleString();
-	const nf = v => (v === null || v === undefined || v === "") ? 0  : Number(v);
+	const e = v => frappe.utils.escape_html(String(v ?? "—"));
+	const n = v => (v === null || v === undefined || v === "") ? "—" : Number(v).toLocaleString();
+	const nf = v => (v === null || v === undefined || v === "") ? 0 : Number(v);
 
-	const or          = nf(r.or_with_moq_batch_size);
-	const bom_qty     = nf(r.child_bom_qty);          // child qty needed per BOM run
-	const bom_qty_of  = nf(r.child_bom_quantity) || 1; // how many parent units BOM produces
-	const ratio       = bom_qty_of > 0 ? (bom_qty / bom_qty_of) : 0; // child units per 1 parent
-	const pfcf        = ratio > 0 ? (1 / ratio) : 0;  // parent units per 1 child unit
-	const child_req   = nf(r.child_requirement);
+	const or = nf(r.or_with_moq_batch_size);
+	const bom_qty = nf(r.child_bom_qty);          // child qty needed per BOM run
+	const bom_qty_of = nf(r.child_bom_quantity) || 1; // how many parent units BOM produces
+	const ratio = bom_qty_of > 0 ? (bom_qty / bom_qty_of) : 0; // child units per 1 parent
+	const pfcf = ratio > 0 ? (1 / ratio) : 0;  // parent units per 1 child unit
+	const child_req = nf(r.child_requirement);
 	const total_stock = nf(r.child_stock);
 	const alloc_stock = nf(r.child_stock_soft_allocation_qty);
 	const short_stock = nf(r.child_stock_shortage);
-	const wip_po      = nf(r.child_wip_open_po);
-	const alloc_wip   = nf(r.child_wip_open_po_soft_allocation_qty);
-	const short_wip   = nf(r.child_wip_open_po_shortage);
-	const prod_stock  = nf(r.production_qty_based_on_child_stock);
-	const prod_wip    = nf(r.production_qty_based_on_child_stock_wip_open_po);
+	const wip_po = nf(r.child_wip_open_po);
+	const alloc_wip = nf(r.child_wip_open_po_soft_allocation_qty);
+	const short_wip = nf(r.child_wip_open_po_shortage);
+	const prod_stock = nf(r.production_qty_based_on_child_stock);
+	const prod_wip = nf(r.production_qty_based_on_child_stock_wip_open_po);
 
 	const kit_badge = (status) => {
 		if (!status) return "—";
-		const cfg = { "Full-kit": ["#dcfce7","#166534"], "Partial": ["#fef9c3","#854d0e"], "Pending": ["#fef2f2","#9b1c1c"] };
-		const [bg, fg] = cfg[status] || ["#f3f4f6","#374151"];
+		const cfg = { "Full-kit": ["#dcfce7", "#166534"], "Partial": ["#fef9c3", "#854d0e"], "Pending": ["#fef2f2", "#9b1c1c"] };
+		const [bg, fg] = cfg[status] || ["#f3f4f6", "#374151"];
 		return `<span style="background:${bg};color:${fg};padding:2px 10px;border-radius:10px;font-weight:600;font-size:12px;">${e(status)}</span>`;
 	};
 
@@ -561,25 +561,25 @@ function show_prod_qty_inline_dialog(r) {
 
 	const html = `
 		${step("①", `Parent Item: <b>${e(r.item_code)}</b>`,
-			`<table style="border-collapse:collapse;width:100%;">
+		`<table style="border-collapse:collapse;width:100%;">
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;width:200px;">Child Item</td><td style="font-size:12px;font-weight:600;">${e(r.child_item_code)}</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">On Hand Status</td><td style="font-size:12px;">${e(r.on_hand_status)}</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">OR with MOQ/Batch</td><td style="font-size:14px;font-weight:bold;color:#1d4ed8;">${n(or)}</td></tr>
 			</table>`
-		)}
+	)}
 
 		${step("②", "BOM Ratio → Child Requirement",
-			`<table style="border-collapse:collapse;width:100%;margin-bottom:4px;">
+		`<table style="border-collapse:collapse;width:100%;margin-bottom:4px;">
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;width:200px;">BOM: produces</td><td style="font-size:12px;">${n(bom_qty_of)} parent unit(s)</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">BOM: needs</td><td style="font-size:12px;">${n(bom_qty)} unit(s) of child</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">Ratio (child per parent)</td><td style="font-size:12px;">${bom_qty} / ${bom_qty_of} = <b>${ratio.toFixed(4)}</b></td></tr>
 			</table>
 			${code_line(`ceil(OR ${n(or)}  ×  ratio ${ratio.toFixed(4)})`, child_req, "#7c3aed")}
 			<div style="font-size:11px;color:#888;margin-top:2px;padding-left:8px;">= <b>${n(child_req)}</b> units of child needed</div>`
-		)}
+	)}
 
 		${step("③", "Child Stock — FIFO Allocation",
-			`<table style="border-collapse:collapse;width:100%;margin-bottom:4px;">
+		`<table style="border-collapse:collapse;width:100%;margin-bottom:4px;">
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;width:200px;">Total child stock</td><td style="font-size:12px;font-weight:600;">${n(total_stock)}</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">FIFO allocated to this item</td><td style="font-size:13px;font-weight:bold;color:#0369a1;">${n(alloc_stock)}</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">Stock shortage</td><td style="font-size:12px;color:${short_stock > 0 ? '#9b1c1c' : '#166534'};">${n(short_stock)}</td></tr>
@@ -588,20 +588,20 @@ function show_prod_qty_inline_dialog(r) {
 				ℹ FIFO: parents with <b>lower on-hand %</b> (worse buffer status) get child stock first.
 				This item got <b>${n(alloc_stock)}</b> of the <b>${n(total_stock)}</b> available.
 			</div>`
-		)}
+	)}
 
 		${step("④", `Production Qty (from child stock only) = <b style="color:#166534;">${n(prod_stock)}</b>`,
-			`${code_line(`ceil(alloc ${n(alloc_stock)}  ×  factor ${pfcf.toFixed(4)})`, Math.ceil(alloc_stock * pfcf), "#166534")}
+		`${code_line(`ceil(alloc ${n(alloc_stock)}  ×  factor ${pfcf.toFixed(4)})`, Math.ceil(alloc_stock * pfcf), "#166534")}
 			${code_line(`capped at OR:  min(${Math.ceil(alloc_stock * pfcf)},  ${n(or)})`, prod_stock, "#166534")}
 			<div style="font-size:11px;color:#888;margin-top:2px;padding-left:8px;">
 				factor = bom_quantity / child_bom_qty = ${bom_qty_of} / ${bom_qty} = ${pfcf.toFixed(4)}
 				&nbsp;(how many parent units 1 child unit can produce)
 			</div>
 			<div style="margin-top:6px;">${kit_badge(r.child_full_kit_status)}</div>`
-		)}
+	)}
 
 		${step("⑤", `Production Qty (stock + WIP + Open PO) = <b style="color:#1d4ed8;">${n(prod_wip)}</b>`,
-			`<table style="border-collapse:collapse;width:100%;margin-bottom:4px;">
+		`<table style="border-collapse:collapse;width:100%;margin-bottom:4px;">
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;width:200px;">Child WIP + Open PO</td><td style="font-size:12px;">${n(wip_po)}</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">FIFO allocated (WIP/PO)</td><td style="font-size:12px;font-weight:600;color:#0369a1;">${n(alloc_wip)}</td></tr>
 				<tr><td style="padding:2px 8px;color:#888;font-size:12px;">WIP/PO shortage</td><td style="font-size:12px;color:${short_wip > 0 ? '#9b1c1c' : '#166534'};">${n(short_wip)}</td></tr>
@@ -609,7 +609,7 @@ function show_prod_qty_inline_dialog(r) {
 			${code_line(`ceil((stock_alloc ${n(alloc_stock)} + wip_alloc ${n(alloc_wip)})  ×  factor ${pfcf.toFixed(4)})`, Math.ceil((alloc_stock + alloc_wip) * pfcf), "#1d4ed8")}
 			${code_line(`capped at OR:  min(${Math.ceil((alloc_stock + alloc_wip) * pfcf)},  ${n(or)})`, prod_wip, "#1d4ed8")}
 			<div style="margin-top:6px;">${kit_badge(r.child_wip_open_po_full_kit_status)}</div>`
-		)}`;
+	)}`;
 
 	frappe.msgprint({
 		title: __("Production Qty Breakdown — {0} → {1}", [r.item_code, r.child_item_code || "?"]),
@@ -880,10 +880,10 @@ function show_child_requirement_dialog(d) {
 	let child_html = "";
 	if (!d.no_bom && d.child_items && d.child_items.length) {
 		const child_rows = d.child_items.map(c => {
-			const kit_stock_color  = c.full_kit_stock  === "Full Kit" ? "#166534" : "#9b1c1c";
-			const kit_wip_color    = c.full_kit_wip_po === "Full Kit" ? "#166534" : "#9b1c1c";
-			const kit_stock_bg     = c.full_kit_stock  === "Full Kit" ? "#dcfce7" : "#fef2f2";
-			const kit_wip_bg       = c.full_kit_wip_po === "Full Kit" ? "#dcfce7" : "#fef2f2";
+			const kit_stock_color = c.full_kit_stock === "Full Kit" ? "#166534" : "#9b1c1c";
+			const kit_wip_color = c.full_kit_wip_po === "Full Kit" ? "#166534" : "#9b1c1c";
+			const kit_stock_bg = c.full_kit_stock === "Full Kit" ? "#dcfce7" : "#fef2f2";
+			const kit_wip_bg = c.full_kit_wip_po === "Full Kit" ? "#dcfce7" : "#fef2f2";
 
 			return `<tr style="border-bottom:1px solid #f1f5f9;">
 				<td style="padding:6px 8px;font-size:12px;font-weight:600;">${e(c.child_item_code)}</td>

@@ -3,7 +3,7 @@ from frappe import _
 
 
 @frappe.whitelist()
-def cancel_sales_invoice_with_reason(name: str, reason: str) -> None:
+def cancel_sales_invoice_with_reason(name: str, reason: str) -> dict:
     """Cancel a submitted Sales Invoice after capturing a Cancel Reason."""
     if not reason or not str(reason).strip():
         frappe.throw(_("Cancel Reason is required."), title=_("Missing Cancel Reason"))
