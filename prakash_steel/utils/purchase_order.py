@@ -3,7 +3,24 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, now_datetime
+
+
+def set_custom_closed_on(doc, method=None) -> None:
+	"""Store datetime when Purchase Order status changes to Closed."""
+	if not frappe.db.has_column(doc.doctype, "custom_closed_on"):
+		return
+
+	before = doc.get_doc_before_save()
+	prev_status = before.get("status") if before else None
+
+	if doc.status == "Closed" and prev_status != "Closed":
+		closed_on = now_datetime()
+		frappe.db.set_value(doc.doctype, doc.name, "custom_closed_on", closed_on, update_modified=False)
+		doc.custom_closed_on = closed_on
+	elif prev_status == "Closed" and doc.status != "Closed":
+		frappe.db.set_value(doc.doctype, doc.name, "custom_closed_on", None, update_modified=False)
+		doc.custom_closed_on = None
 
 
 def validate_purchase_order_quantity_on_close(doc, method=None) -> None:

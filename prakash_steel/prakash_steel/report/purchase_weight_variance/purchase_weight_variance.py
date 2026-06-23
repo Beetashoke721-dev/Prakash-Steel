@@ -31,6 +31,12 @@ def get_columns() -> list[dict]:
 		},
 		{"label": "Item Name", "fieldname": "item_name", "fieldtype": "Data", "width": 220},
 		{"label": "PO Status", "fieldname": "po_status", "fieldtype": "Data", "width": 150},
+		{
+			"label": "Closed Date and Time",
+			"fieldname": "closed_date_time",
+			"fieldtype": "Datetime",
+			"width": 170,
+		},
 		{"label": "PO Qty", "fieldname": "po_qty", "fieldtype": "Float", "width": 100},
 		{"label": "Received Qty", "fieldname": "received_qty", "fieldtype": "Float", "width": 120},
 		{"label": "Weight Variation", "fieldname": "weight_variation", "fieldtype": "Float", "width": 140},
@@ -86,6 +92,7 @@ def get_data(filters) -> list[dict]:
             poi.item_code,
             poi.item_name,
             po.status AS po_status,
+            CASE WHEN po.status = 'Closed' THEN po.custom_closed_on ELSE NULL END AS closed_date_time,
             poi.qty AS po_qty,
             IFNULL(poi.received_qty, 0) AS received_qty
         FROM `tabPurchase Order` po
