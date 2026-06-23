@@ -18,9 +18,8 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				align-items: center; margin-bottom: 16px;
 			}
 			.so-filter-bar .so-filter-label {
-				font-size: 12px; font-weight: 700;
-				color: #555; margin-right: 4px; text-transform: uppercase;
-				letter-spacing: .5px;
+				font-size: 12px; font-weight: 700; color: #555;
+				margin-right: 4px; text-transform: uppercase; letter-spacing: .5px;
 			}
 			.so-btn {
 				display: inline-flex; align-items: center; gap: 6px;
@@ -32,26 +31,48 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			.so-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,.18); }
 			.so-btn.active { border-color: #333 !important; box-shadow: 0 0 0 3px rgba(0,0,0,.15); }
 			.so-btn .so-btn-count {
-				background: rgba(0,0,0,.18); border-radius: 10px;
-				padding: 1px 7px; font-size: 11px;
+				background: rgba(0,0,0,.18); border-radius: 10px; padding: 1px 7px; font-size: 11px;
 			}
 
-			/* table wrapper */
-			.so-table-wrap {
-				width: 100%; overflow-x: auto;
-				border-radius: 10px;
-				box-shadow: 0 3px 12px rgba(0,0,0,.1);
-				background: #fff;
+			/* table */
+			.so-table-wrap { width: 100%; overflow-x: auto; border-radius: 10px;
+				box-shadow: 0 3px 12px rgba(0,0,0,.1); background:#fff; }
+			.so-tbl { border-collapse: collapse; min-width: max-content; width: 100%; font-size: 12px; }
+			.so-tbl thead th {
+				background: linear-gradient(135deg,#dce8f5,#c5d9ee);
+				color: #000; font-weight: 700; font-size: 12px;
+				padding: 9px 10px; white-space: nowrap;
+				border-bottom: 2px solid #b0c8df;
+				border-right: 1px solid rgba(0,0,0,.08);
+				position: sticky; top: 0; z-index: 2;
 			}
-			.so-table-wrap .dt-scrollable { border-radius: 10px; }
-			.so-table-wrap .dt-cell--header {
-				background: linear-gradient(135deg,#dce8f5,#c5d9ee) !important;
-				color: #000 !important;
-				font-size: 12px !important;
-				font-weight: 700 !important;
-				border-right: 1px solid rgba(0,0,0,.1) !important;
+			.so-tbl tbody tr:hover td { background: #eef4ff !important; }
+			.so-tbl tbody td {
+				padding: 6px 10px; border-bottom: 1px solid #f0f0f0;
+				border-right: 1px solid #f5f5f5; white-space: nowrap; vertical-align: middle;
 			}
-			.so-table-wrap .dt-row:hover .dt-cell { background: #eef4ff !important; }
+			.so-tbl tbody tr:nth-child(even) td { background: #fafbff; }
+
+			/* editable cells */
+			.so-tbl .delay-select {
+				width: 140px; padding: 4px 6px; border: 1px solid #d0d7e8;
+				border-radius: 4px; font-size: 12px; background: #fff;
+			}
+			.so-tbl .delay-select:focus { border-color: #1e88e5; outline: none; box-shadow: 0 0 0 2px rgba(30,136,229,.2); }
+			.so-tbl .delay-remarks {
+				width: 180px; padding: 4px 6px; border: 1px solid #d0d7e8;
+				border-radius: 4px; font-size: 12px; resize: none; height: 32px;
+				font-family: inherit;
+			}
+			.so-tbl .delay-remarks:focus { border-color: #1e88e5; outline: none; box-shadow: 0 0 0 2px rgba(30,136,229,.2); }
+			.so-tbl .changed .delay-select,
+			.so-tbl .changed .delay-remarks { border-color: #f57f17; background: #fffde7; }
+
+			/* status badges */
+			.badge-status {
+				display: inline-block; border-radius: 4px; padding: 2px 8px;
+				font-weight: 700; font-size: 11px; text-align: center; min-width: 56px;
+			}
 		`;
 		document.head.appendChild(style);
 	}
@@ -64,14 +85,13 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		change() { refresh(); },
 	});
 	let from_date_field = page.add_field({
-		fieldname: "from_date", label: __("From Date"),
-		fieldtype: "Date",
+		fieldname: "from_date", label: __("From Date"), fieldtype: "Date",
 		default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
 		change() { refresh(); },
 	});
 	let to_date_field = page.add_field({
-		fieldname: "to_date", label: __("To Date"),
-		fieldtype: "Date", default: frappe.datetime.get_today(),
+		fieldname: "to_date", label: __("To Date"), fieldtype: "Date",
+		default: frappe.datetime.get_today(),
 		change() { refresh(); },
 	});
 	let sales_order_field = page.add_field({
@@ -85,8 +105,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		change() { refresh(); },
 	});
 	let status_field = page.add_field({
-		fieldname: "status", label: __("Status"),
-		fieldtype: "MultiSelectList",
+		fieldname: "status", label: __("Status"), fieldtype: "MultiSelectList",
 		get_data(txt) {
 			return ["To Pay","To Bill","To Deliver","To Deliver and Bill","Completed","Closed"]
 				.filter(s => !txt || s.toLowerCase().includes(txt.toLowerCase()))
@@ -111,37 +130,43 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	});
 
 	page.set_primary_action(__("Refresh"), () => refresh(), "octicon octicon-sync");
+	page.set_secondary_action(__("Execute"), () => execute_save(), "octicon octicon-check");
 
 	// ── layout ────────────────────────────────────────────────────────────────
 	let $wrap       = $(`<div class="so-page-wrap"></div>`).appendTo(page.main);
 	let $filter_bar = $(`<div class="so-filter-bar"></div>`).appendTo($wrap);
 	let $table_wrap = $(`<div class="so-table-wrap"></div>`).appendTo($wrap);
 
-	// ── colour filter buttons config ──────────────────────────────────────────
+	// ── state ─────────────────────────────────────────────────────────────────
+	let all_data      = [];
+	let delay_reasons = [];   // [{name, delay_reason}]
+	let active_filter = "ALL";
+	let changes       = {};   // { soi_name: { delay_reason, delay_remarks } }
+
+	// ── fetch delay reasons once ──────────────────────────────────────────────
+	frappe.call({
+		method: "prakash_steel.prakash_steel.page.open_so_page.open_so_page.get_delay_reasons",
+		callback(r) { delay_reasons = r.message || []; },
+	});
+
+	// ── colour filter buttons ─────────────────────────────────────────────────
 	const COLOR_FILTERS = [
-		{ key: "ALL",    label: "All",     bg: "#607d8b", fg: "#fff"    },
-		{ key: "GREEN",  label: "Green",   bg: "#00c853", fg: "#003300" },
-		{ key: "YELLOW", label: "Yellow",  bg: "#ffd600", fg: "#3d2f00" },
-		{ key: "RED",    label: "Red",     bg: "#e53935", fg: "#fff"    },
-		{ key: "BLACK",  label: "Black",   bg: "#212121", fg: "#fff"    },
-		{ key: "WHITE",  label: "White",   bg: "#e0e0e0", fg: "#333"    },
+		{ key: "ALL",    label: "All",    bg: "#607d8b", fg: "#fff"    },
+		{ key: "GREEN",  label: "Green",  bg: "#00c853", fg: "#003300" },
+		{ key: "YELLOW", label: "Yellow", bg: "#ffd600", fg: "#3d2f00" },
+		{ key: "RED",    label: "Red",    bg: "#e53935", fg: "#fff"    },
+		{ key: "BLACK",  label: "Black",  bg: "#212121", fg: "#fff"    },
+		{ key: "WHITE",  label: "White",  bg: "#e0e0e0", fg: "#333"    },
 	];
 
-	let active_filter = "ALL";
-	let all_data      = [];
-	let datatable;
-
 	function build_filter_bar(data) {
-		// count per status
 		let counts = { ALL: data.length, GREEN:0, YELLOW:0, RED:0, BLACK:0, WHITE:0 };
 		data.forEach(r => {
 			let k = (r.order_status || "").toUpperCase();
 			if (counts[k] !== undefined) counts[k]++;
 		});
-
 		$filter_bar.empty();
 		$filter_bar.append(`<span class="so-filter-label">Order Status:</span>`);
-
 		COLOR_FILTERS.forEach(f => {
 			let $btn = $(`
 				<div class="so-btn ${active_filter === f.key ? "active" : ""}"
@@ -152,7 +177,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			`);
 			$btn.on("click", () => {
 				active_filter = f.key;
-				build_filter_bar(all_data);   // re-render buttons with updated active state
+				build_filter_bar(all_data);
 				render_table(filtered_data());
 			});
 			$filter_bar.append($btn);
@@ -164,125 +189,195 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		return all_data.filter(r => (r.order_status || "").toUpperCase() === active_filter);
 	}
 
-	// ── column formatter ──────────────────────────────────────────────────────
-	function formatter(value, column) {
+	// ── column definitions ────────────────────────────────────────────────────
+	const COLUMNS = [
+		{ fieldname: "date",                   label: "SO Date",            width: "100px" },
+		{ fieldname: "customer",               label: "Customer Name",      width: "150px" },
+		{ fieldname: "item_code",              label: "Item Code",          width: "120px" },
+		{ fieldname: "qty",                    label: "Order Qty",          width: "80px"  },
+		{ fieldname: "rate",                   label: "Rate",               width: "90px"  },
+		{ fieldname: "payment_terms_template", label: "Payment Terms",      width: "130px" },
+		{ fieldname: "lead_time",              label: "Lead Time",          width: "80px"  },
+		{ fieldname: "special_condition",      label: "Special Cond.",      width: "110px" },
+		{ fieldname: "status",                 label: "Status",             width: "120px" },
+		{ fieldname: "sales_order",            label: "Sales Order",        width: "150px" },
+		{ fieldname: "delivered_qty",          label: "Delivered Qty",      width: "100px" },
+		{ fieldname: "delivery_date",          label: "Delivery Date",      width: "100px" },
+		{ fieldname: "pending_qty",            label: "Qty to Deliver",     width: "100px" },
+		{ fieldname: "item_type",              label: "Item Type",          width: "80px"  },
+		{ fieldname: "sku_type",               label: "SKU Type",           width: "100px" },
+		{ fieldname: "remaining_days",         label: "Remaining Days",     width: "100px" },
+		{ fieldname: "buffer_status",          label: "Buffer Status",      width: "100px" },
+		{ fieldname: "order_status",           label: "Order Status",       width: "100px" },
+		{ fieldname: "stock",                  label: "Stock",              width: "80px"  },
+		{ fieldname: "stock_allocation",       label: "Stock Alloc.",       width: "100px" },
+		{ fieldname: "shortage",               label: "Shortage",           width: "80px"  },
+		{ fieldname: "line_fullkit",           label: "Line Fullkit",       width: "100px" },
+		{ fieldname: "order_fullkit",          label: "Order Fullkit",      width: "100px" },
+		{ fieldname: "amount",                 label: "Amount",             width: "100px" },
+		{ fieldname: "pending_amount",         label: "Pending Amount",     width: "110px" },
+		{ fieldname: "__delay_reason",         label: "Delay Reason",       width: "160px", editable: true },
+		{ fieldname: "__delay_remarks",        label: "Delay Remarks",      width: "200px", editable: true },
+	];
+
+	// ── cell value formatter ──────────────────────────────────────────────────
+	function format_cell(fieldname, value) {
 		if (value === null || value === undefined || value === "") return "";
 
-		if ((column.fieldname === "delivered_qty" || column.fieldname === "billed_amount") && value > 0)
+		if (fieldname === "order_status") {
+			let s = String(value).toLowerCase();
+			let cfg = {
+				black:  ["#212121","#fff"],
+				white:  ["#e0e0e0","#333"],
+				green:  ["#00c853","#003300"],
+				yellow: ["#ffd600","#3d2f00"],
+				red:    ["#e53935","#fff"],
+			}[s];
+			if (cfg)
+				return `<span class="badge-status" style="background:${cfg[0]};color:${cfg[1]};">${String(value).toUpperCase()}</span>`;
+		}
+
+		if (fieldname === "line_fullkit" || fieldname === "order_fullkit") {
+			let lf = String(value).toLowerCase();
+			let cfg = {
+				"full-kit": ["#00c853","#003300"],
+				"partial":  ["#ffd600","#3d2f00"],
+				"pending":  ["#e53935","#fff"],
+			}[lf];
+			if (cfg)
+				return `<span class="badge-status" style="background:${cfg[0]};color:${cfg[1]};">${value}</span>`;
+		}
+
+		if (fieldname === "delivered_qty" && value > 0)
 			return `<span style="color:#2e7d32;font-weight:600;">${value}</span>`;
 
-		if (column.fieldname === "delay" && value > 0)
-			return `<span style="color:#c62828;font-weight:600;">${value}</span>`;
-
-		if (column.fieldname === "order_status") {
-			let s = String(value).toLowerCase();
-			let bg = "", fg = "#000";
-			if      (s === "black")  { bg = "#212121"; fg = "#fff"; }
-			else if (s === "white")  { bg = "#e0e0e0"; fg = "#333"; }
-			else if (s === "green")  { bg = "#00c853"; fg = "#003300"; }
-			else if (s === "yellow") { bg = "#ffd600"; fg = "#3d2f00"; }
-			else if (s === "red")    { bg = "#e53935"; fg = "#fff"; }
-			if (bg)
-				return `<div style="background:${bg};color:${fg};border-radius:4px;padding:3px 6px;text-align:center;font-weight:700;font-size:11px;">${String(value).toUpperCase()}</div>`;
-		}
-
-		if (column.fieldname === "line_fullkit" || column.fieldname === "order_fullkit") {
-			let lf = String(value).toLowerCase();
-			let bg = "", fg = "#000";
-			if      (lf === "full-kit") { bg = "#00c853"; fg = "#003300"; }
-			else if (lf === "partial")  { bg = "#ffd600"; fg = "#3d2f00"; }
-			else if (lf === "pending")  { bg = "#e53935"; fg = "#fff"; }
-			if (bg)
-				return `<div style="background:${bg};color:${fg};border-radius:4px;padding:3px 6px;text-align:center;font-weight:700;font-size:11px;">${value}</div>`;
-		}
-
-		if (column.fieldname === "shortage" && value > 0)
+		if (fieldname === "shortage" && value > 0)
 			return `<span style="color:#c62828;font-weight:700;">${value}</span>`;
 
-		if (column.fieldname === "remaining_days") {
+		if (fieldname === "remaining_days") {
 			let n = parseFloat(value);
 			if (!isNaN(n)) {
-				let color = n < 0 ? "#c62828" : n <= 5 ? "#e65100" : "#2e7d32";
-				return `<span style="color:${color};font-weight:600;">${value}</span>`;
+				let c = n < 0 ? "#c62828" : n <= 5 ? "#e65100" : "#2e7d32";
+				return `<span style="color:${c};font-weight:600;">${value}</span>`;
 			}
 		}
 
-		if (column.fieldname === "buffer_status") {
+		if (fieldname === "buffer_status") {
 			let num = parseInt(value);
-			let color = isNaN(num) ? "#333" : num <= 34 ? "#c62828" : num <= 67 ? "#f57f17" : "#2e7d32";
-			return `<span style="color:${color};font-weight:700;">${value}</span>`;
+			let c = isNaN(num) ? "#333" : num <= 34 ? "#c62828" : num <= 67 ? "#f57f17" : "#2e7d32";
+			return `<span style="color:${c};font-weight:700;">${value}</span>`;
 		}
 
-		return value;
+		if (fieldname === "sales_order")
+			return `<a href="/app/sales-order/${value}" target="_blank">${value}</a>`;
+
+		return frappe.utils.escape_html(String(value));
 	}
 
-	// ── visible columns ───────────────────────────────────────────────────────
-	const VISIBLE_COLUMNS = [
-		{ fieldname: "date",                   label: "Sales Order Date",   width: 110 },
-		{ fieldname: "customer",               label: "Customer Name",      width: 150 },
-		{ fieldname: "item_code",              label: "Item Code",          width: 120 },
-		{ fieldname: "qty",                    label: "Order Qty",          width: 90  },
-		{ fieldname: "rate",                   label: "Rate",               width: 100 },
-		{ fieldname: "payment_terms_template", label: "Payment Terms",      width: 140 },
-		{ fieldname: "lead_time",              label: "Lead Time",          width: 90  },
-		{ fieldname: "special_condition",      label: "Special Conditions", width: 130 },
-		{ fieldname: "status",                 label: "Status",             width: 130 },
-		{ fieldname: "sales_order",            label: "Sales Order",        width: 160 },
-		{ fieldname: "delivered_qty",          label: "Delivered Qty",      width: 110 },
-		{ fieldname: "delivery_date",          label: "Delivery Date",      width: 110 },
-		{ fieldname: "pending_qty",            label: "Qty to Deliver",     width: 110 },
-		{ fieldname: "item_type",              label: "Item Type",          width: 90  },
-		{ fieldname: "sku_type",               label: "SKU Type",           width: 110 },
-		{ fieldname: "remaining_days",         label: "Remaining Days",     width: 110 },
-		{ fieldname: "buffer_status",          label: "Buffer Status",      width: 110 },
-		{ fieldname: "order_status",           label: "Order Status",       width: 110 },
-		{ fieldname: "stock",                  label: "Stock",              width: 90  },
-		{ fieldname: "stock_allocation",       label: "Stock Allocation",   width: 120 },
-		{ fieldname: "shortage",               label: "Shortage",           width: 90  },
-		{ fieldname: "line_fullkit",           label: "Line Fullkit",       width: 110 },
-		{ fieldname: "order_fullkit",          label: "Order Fullkit",      width: 110 },
-		{ fieldname: "amount",                 label: "Amount",             width: 110 },
-		{ fieldname: "pending_amount",         label: "Pending Amount",     width: 120 },
-	];
-
+	// ── render HTML table ─────────────────────────────────────────────────────
 	function render_table(data) {
-		let dt_columns = VISIBLE_COLUMNS.map(col => ({
-			name: __(col.label),
-			id: col.fieldname,
-			editable: false,
-			width: col.width,
-			format: (value) => formatter(value, col),
-		}));
-
-		let dt_rows = data.map(row =>
-			VISIBLE_COLUMNS.map(col => {
-				let val = row[col.fieldname];
-				return (val === null || val === undefined) ? "" : val;
-			})
-		);
-
-		$table_wrap.empty();
-		let $table_div = $(`<div></div>`).appendTo($table_wrap);
-
-		if (datatable) { datatable.destroy && datatable.destroy(); datatable = null; }
-
-		if (!dt_rows.length) {
+		if (!data || !data.length) {
 			$table_wrap.html(`<div style="text-align:center;padding:60px;color:#888;">No rows match this filter.</div>`);
 			return;
 		}
 
-		datatable = new frappe.DataTable($table_div[0], {
-			columns: dt_columns,
-			data: dt_rows,
-			layout: "fixed",
-			enableClusterize: true,
-			noDataMessage: __("No data"),
-			serialNoColumn: false,
-			checkboxColumn: false,
+		// build options HTML once
+		let reason_options = `<option value=""></option>` +
+			delay_reasons.map(r => `<option value="${frappe.utils.escape_html(r.name)}">${frappe.utils.escape_html(r.name)}</option>`).join("");
+
+		let thead = `<thead><tr>` +
+			COLUMNS.map(c => `<th style="min-width:${c.width};width:${c.width};">${__(c.label)}</th>`).join("") +
+			`</tr></thead>`;
+
+		let tbody = `<tbody>` + data.map((row, idx) => {
+			let soi = row.name || "";
+			// existing saved values (from DB) or pending change
+			let saved_reason  = row.delay_reasons  || "";
+			let saved_remarks = row.delay_remarks  || "";
+			let ch = changes[soi] || {};
+			let cur_reason  = ch.delay_reason  !== undefined ? ch.delay_reason  : saved_reason;
+			let cur_remarks = ch.delay_remarks !== undefined ? ch.delay_remarks : saved_remarks;
+			let is_changed  = ch.delay_reason !== undefined || ch.delay_remarks !== undefined;
+
+			let cells = COLUMNS.map(col => {
+				if (col.fieldname === "__delay_reason") {
+					let opts = reason_options.replace(
+						`value="${frappe.utils.escape_html(cur_reason)}"`,
+						`value="${frappe.utils.escape_html(cur_reason)}" selected`
+					);
+					return `<td><select class="delay-select" data-soi="${soi}" data-field="delay_reason">${opts}</select></td>`;
+				}
+				if (col.fieldname === "__delay_remarks") {
+					return `<td><textarea class="delay-remarks" data-soi="${soi}" data-field="delay_remarks" rows="1">${frappe.utils.escape_html(cur_remarks)}</textarea></td>`;
+				}
+				return `<td>${format_cell(col.fieldname, row[col.fieldname])}</td>`;
+			}).join("");
+
+			return `<tr class="${is_changed ? "changed" : ""}" data-soi="${soi}">${cells}</tr>`;
+		}).join("") + `</tbody>`;
+
+		$table_wrap.html(`<table class="so-tbl">${thead}${tbody}</table>`);
+
+		// ── event delegation ──────────────────────────────────────────────────
+		$table_wrap.off("change.so input.so");
+
+		$table_wrap.on("change.so", ".delay-select", function () {
+			let soi   = $(this).data("soi");
+			let field = $(this).data("field");
+			if (!changes[soi]) changes[soi] = {};
+			changes[soi][field] = $(this).val();
+			$(this).closest("tr").addClass("changed");
+		});
+
+		$table_wrap.on("input.so", ".delay-remarks", function () {
+			let soi   = $(this).data("soi");
+			let field = $(this).data("field");
+			if (!changes[soi]) changes[soi] = {};
+			changes[soi][field] = $(this).val();
+			$(this).closest("tr").addClass("changed");
 		});
 	}
 
-	// ── fetch ─────────────────────────────────────────────────────────────────
+	// ── execute (save) ────────────────────────────────────────────────────────
+	function execute_save() {
+		if (!Object.keys(changes).length) {
+			frappe.show_alert({ message: __("No changes to save."), indicator: "orange" });
+			return;
+		}
+
+		let rows = Object.entries(changes).map(([soi_name, vals]) => ({
+			soi_name,
+			delay_reason:  vals.delay_reason  !== undefined ? vals.delay_reason  : (all_data.find(r => r.name === soi_name) || {}).delay_reasons  || "",
+			delay_remarks: vals.delay_remarks !== undefined ? vals.delay_remarks : (all_data.find(r => r.name === soi_name) || {}).delay_remarks || "",
+		}));
+
+		frappe.call({
+			method: "prakash_steel.prakash_steel.page.open_so_page.open_so_page.save_delay_info",
+			args: { rows: JSON.stringify(rows) },
+			callback(r) {
+				if (r.message && r.message.status === "ok") {
+					frappe.show_alert({ message: __(`Saved ${r.message.updated} row(s).`), indicator: "green" });
+
+					// update all_data in memory so re-renders show saved values
+					rows.forEach(saved => {
+						let row = all_data.find(r => r.name === saved.soi_name);
+						if (row) {
+							row.delay_reasons  = saved.delay_reason;
+							row.delay_remarks  = saved.delay_remarks;
+						}
+					});
+					changes = {};
+
+					// remove yellow highlight from changed rows
+					$table_wrap.find("tr.changed").removeClass("changed");
+					$table_wrap.find(".delay-select, .delay-remarks")
+						.css({ "border-color": "", "background": "" });
+				}
+			},
+		});
+	}
+
+	// ── fetch report data ─────────────────────────────────────────────────────
 	function refresh() {
 		let filters = {
 			company:             company_field.get_value(),
@@ -302,6 +397,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 
 		$filter_bar.empty();
 		$table_wrap.html(`<div style="text-align:center;padding:60px;color:#888;">Loading…</div>`);
+		changes       = {};
 		active_filter = "ALL";
 
 		frappe.call({
