@@ -15,6 +15,7 @@ fixtures = [
 
 after_migrate = [
 	"prakash_steel.utils.backfill_sales_invoice_sales_order_date.run_after_migrate",
+	"prakash_steel.utils.backfill_purchase_order_closed_on.run_after_migrate",
 ]
 
 # ------------------------------------------------------------------------------
@@ -101,6 +102,7 @@ doc_events = {
 		"before_cancel": "prakash_steel.utils.purchase_order_cancel.validate_cancel_reason",
 		"validate": "prakash_steel.utils.order_validation.validate_no_zero_rate_items",
 		"before_update_after_submit": "prakash_steel.utils.order_validation.validate_no_zero_rate_items",
+		"on_change": "prakash_steel.utils.purchase_order.set_custom_closed_on",
 	},
 	"Purchase Invoice": {
 		"before_cancel": "prakash_steel.utils.purchase_invoice_cancel.validate_cancel_reason",

@@ -63,6 +63,22 @@ class CustomStockEntry(StockEntry):
         print("[CONSOLE] validate_stock_availability() completed")
         print("=" * 80)
 
+    def get_basic_rate_for_manufactured_item(self, finished_item_qty, outgoing_items_cost=0) -> float:
+        """Prevent negative FG rate when RM cost is zero but scrap has existing valuation.
+
+        ERPNext formula: (outgoing_items_cost - scrap_items_cost) / finished_item_qty
+        When RM cost = 0 and scrap has value, the result goes negative.
+        We zero the scrap cost so FG rate = RM cost / FG qty, floored at 0.
+        """
+        scrap_items_cost = sum(
+            flt(d.basic_amount) for d in self.get("items") if d.is_legacy_scrap_item
+        )
+        rate = super().get_basic_rate_for_manufactured_item(finished_item_qty, outgoing_items_cost)
+        if rate < 0:
+            # Recalculate ignoring scrap so FG rate is never negative
+            rate = flt((outgoing_items_cost) / finished_item_qty) if finished_item_qty else 0
+        return max(flt(rate), 0.0)
+
     def validate_stock_availability(self):
         """Validate stock availability for all items and collect all errors."""
         print("[CONSOLE] validate_stock_availability() started")
