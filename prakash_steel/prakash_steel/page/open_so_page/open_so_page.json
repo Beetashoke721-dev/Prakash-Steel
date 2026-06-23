@@ -1,0 +1,41 @@
+{
+ "content": null,
+ "creation": "2026-06-22 17:19:54.240700",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-06-23 11:40:29.832009",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "open-so-page",
+ "owner": "Administrator",
+ "page_name": "open-so-page",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Accounts User"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Open SO"
+}
