@@ -1,0 +1,10 @@
+# Copyright (c) 2026, Beetashoke Chakraborty and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe.model.document import Document
+
+
+class DeliveryDelayReasonMaster(Document):
+	def autoname(self):
+		self.name = self.delay_reason

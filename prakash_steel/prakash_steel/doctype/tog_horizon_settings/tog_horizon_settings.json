@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "Format: {fiscal_year}",
+ "creation": "2026-06-23 11:17:17.438921",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "fiscal_year",
+  "column_break_sqir",
+  "column_break_lusx",
+  "column_break_kyjx",
+  "section_break_fswn",
+  "from_month",
+  "column_break_ntkd",
+  "to_month",
+  "column_break_qhxo",
+  "column_break_zrvr"
+ ],
+ "fields": [
+  {
+   "fieldname": "fiscal_year",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Fiscal Year",
+   "options": "Fiscal Year",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_sqir",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_lusx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_kyjx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_fswn",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "from_month",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "From Month",
+   "options": "\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nJanuary\nFebruary\nMarch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ntkd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_month",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "To Month",
+   "options": "\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nJanuary\nFebruary\nMarch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_qhxo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_zrvr",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-23 11:19:49.976141",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "TOG Horizon Settings",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

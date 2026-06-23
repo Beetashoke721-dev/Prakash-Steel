@@ -37,12 +37,14 @@ def get_data(filters) -> list[dict]:
 		conditions.append("bom.is_active = %(is_active)s")
 		values["is_active"] = 1 if filters["is_active"] == "Yes" else 0
 
-	# Always include the duplicate-detection subquery condition
+	# Only flag duplicates where the same child appears in more than one *active* BOM
+	conditions.append("bom.is_active = 1")
 	conditions.append("""
 		(bom.item, bi.item_code) IN (
 			SELECT bom2.item, bi2.item_code
 			FROM `tabBOM` bom2
 			JOIN `tabBOM Item` bi2 ON bi2.parent = bom2.name
+			WHERE bom2.is_active = 1
 			GROUP BY bom2.item, bi2.item_code
 			HAVING COUNT(DISTINCT bom2.name) > 1
 		)

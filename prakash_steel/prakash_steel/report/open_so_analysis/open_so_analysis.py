@@ -86,7 +86,9 @@ def get_data(conditions, filters) -> list[dict]:
             so.company,
             so.currency,
             soi.name,
-            soi.description as description
+            soi.description as description,
+            soi.custom_delay_reasons as delay_reasons,
+            soi.custom_delay_remarks as delay_remarks
         FROM
             `tabSales Order` so,
             `tabSales Order Item` soi
