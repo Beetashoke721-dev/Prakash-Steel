@@ -15,6 +15,7 @@ fixtures = [
 
 after_migrate = [
 	"prakash_steel.utils.backfill_sales_invoice_sales_order_date.run_after_migrate",
+	"prakash_steel.utils.backfill_purchase_order_closed_on.run_after_migrate",
 ]
 
 # ------------------------------------------------------------------------------
