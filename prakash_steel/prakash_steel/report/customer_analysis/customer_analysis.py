@@ -9,6 +9,7 @@ from frappe import _
 from prakash_steel.utils.hbt_utils import (
 	METRIC_COL,
 	MONTH_SHORT,
+	get_customer_hbt_map,
 	get_period_months,
 	month_key,
 	period_date_range,
@@ -44,7 +45,13 @@ def _get_columns(period_months: list[tuple[int, int]]) -> list[dict]:
 			"fieldname": "group_name",
 			"fieldtype": "Data",
 			"width": 220,
-		}
+		},
+		{
+			"label": _("HBT"),
+			"fieldname": "hbt",
+			"fieldtype": "Data",
+			"width": 60,
+		},
 	]
 
 	for year, month in period_months:
@@ -118,4 +125,9 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 		if fieldname:
 			group_data[row.group_name][fieldname] += float(row.val or 0)
 
-	return [{"group_name": gn, **month_vals} for gn, month_vals in sorted(group_data.items())]
+	hbt_map = get_customer_hbt_map(from_date, to_date, metric_col)
+
+	return [
+		{"group_name": gn, "hbt": hbt_map.get(gn, ""), **month_vals}
+		for gn, month_vals in sorted(group_data.items())
+	]
