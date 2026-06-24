@@ -18,6 +18,15 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		change() { load_data(); },
 	});
 
+	const sku_type_field = page.add_field({
+		fieldname: "sku_type",
+		label: __("SKU Type"),
+		fieldtype: "Select",
+		options: ["", "BBMTA", "BBMTO"],
+		default: "",
+		change() { apply_filter(); },
+	});
+
 	page.add_inner_button(__("Refresh"), () => load_data());
 
 	$(`<div id="bbt-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
@@ -91,6 +100,26 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 	// ── DataTable ─────────────────────────────────────────────────────────────
 	let _dt = null;
+	let _all_data = [];
+	let _raw_data = [];   // full unfiltered dataset
+
+	function apply_filter() {
+		const sku = sku_type_field.get_value();
+		const filtered = sku ? _raw_data.filter(r => r.sku_type === sku) : _raw_data;
+		_all_data = filtered.map((row, idx) => ({ ...row, _idx: idx }));
+		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
+		_dt = new DataTable(document.getElementById("bbt-dt"), {
+			columns: COLS,
+			data: _all_data,
+			serialNoColumn: false,
+			checkboxColumn: false,
+			inlineFilters: true,
+			clusterize: false,
+			noDataMessage: __("No BB items found."),
+			layout: "fixed",
+		});
+		bind_events();
+	}
 
 	const COLS = [
 		{
@@ -99,6 +128,10 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 				? `<a href="/app/item/${encodeURIComponent(val)}" target="_blank"
 					style="font-weight:500;">${esc(val)}</a>`
 				: dash(),
+		},
+		{
+			name: "SKU Type", id: "sku_type", width: 110, align: "center",
+			format: val => val ? esc(val) : dash(),
 		},
 		{
 			name: "Total Qty", id: "total", width: 130, align: "right",
@@ -147,20 +180,56 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
 		},
 		{
-			name: "FOS", id: "fos", width: 100, align: "right",
-			format: val => val !== null && val !== undefined ? fmt_num(val, 2) : dash(),
+			name: "FOS", id: "fos", width: 110, align: "right",
+			format: (val, _r, _c, d) =>
+				`<input type="number" class="bbt-fos-input" data-idx="${d._idx}" min="0" step="1"
+					value="${val !== null && val !== undefined ? val : ""}"
+					style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
+					font-size:12px;width:80px;text-align:right;background:#fffbe6;">`,
 		},
 		{
-			name: "TOG", id: "tog", width: 100, align: "right",
-			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
+			name: "TOG", id: "tog", width: 110, align: "right",
+			format: (val, _r, _c, d) =>
+				`<input type="number" class="bbt-tog-input" data-idx="${d._idx}" min="0" step="1"
+					value="${val !== null && val !== undefined ? val : ""}"
+					style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
+					font-size:12px;width:80px;text-align:right;background:#fffbe6;">`,
 		},
 		{
 			name: "Current TOG", id: "current_tog", width: 120, align: "right",
-			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
+			format: val => val !== null && val !== undefined ? `<span style="font-weight:600;">${fmt_num(val, 0)}</span>` : dash(),
 		},
 	];
 
+	function recalc_tog(idx) {
+		const row = _all_data[idx];
+		const fos = row.fos !== null && row.fos !== undefined ? row.fos : 25;
+		const adu = row.adu || 0;
+		const lt = row.lt || 0;
+		const tog = Math.ceil(adu * lt * (1 + fos / 100));
+		row.tog = tog;
+		$(`.bbt-tog-input[data-idx="${idx}"]`).val(tog);
+	}
+
+	function bind_events() {
+		$(document).off("input", ".bbt-fos-input").on("input", ".bbt-fos-input", function () {
+			const idx = parseInt($(this).data("idx"));
+			const val = $(this).val();
+			_all_data[idx].fos = val === "" ? 0 : parseInt(val);
+			recalc_tog(idx);
+		});
+
+		$(document).off("input", ".bbt-tog-input").on("input", ".bbt-tog-input", function () {
+			const idx = parseInt($(this).data("idx"));
+			const val = $(this).val();
+			_all_data[idx].tog = val === "" ? null : parseInt(val);
+		});
+	}
+
 	function build_datatable(data, period_label) {
+		_raw_data = data;
+		_all_data = data.map((row, idx) => ({ ...row, _idx: idx }));
+
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
 		$("#bbt-root").html(`
@@ -174,7 +243,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 		_dt = new DataTable(document.getElementById("bbt-dt"), {
 			columns: COLS,
-			data,
+			data: _all_data,
 			serialNoColumn: false,
 			checkboxColumn: false,
 			inlineFilters: true,
@@ -182,6 +251,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			noDataMessage: __("No BB items found for the configured HBT period."),
 			layout: "fixed",
 			getRowHTML(cols, data_row) {
+				data_row = _all_data[data_row._idx] || data_row;
 				const hbt = data_row.hbt;
 				const bg = (HBT[hbt] && hbt !== "H") ? HBT[hbt].light : "";
 				const cells = cols.map(col => {
@@ -194,6 +264,8 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 				return `<tr>${cells.join("")}</tr>`;
 			},
 		});
+
+		bind_events();
 	}
 
 	// ── Load ──────────────────────────────────────────────────────────────────

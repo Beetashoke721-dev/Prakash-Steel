@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Beetashoke Chakraborty and contributors
 # For license information, please see license.txt
 
+import math
 from collections import defaultdict
 
 import frappe
@@ -120,6 +121,24 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 
 	assign_hbt_labels(raw_rows)
 
+	# Fetch ADU, Lead Time, TOG (safety_stock) from Item master for all items in one query
+	item_codes = [row["item_code"] for row in raw_rows]
+	item_master_rows = frappe.db.sql(
+		"""
+		SELECT
+			name AS item_code,
+			custom_adu AS adu,
+			lead_time_days AS lt,
+			safety_stock AS tog,
+			custom_sku_type AS sku_type
+		FROM `tabItem`
+		WHERE name IN %(item_codes)s
+		""",
+		{"item_codes": item_codes},
+		as_dict=True,
+	)
+	item_master_map = {r.item_code: r for r in item_master_rows}
+
 	_empty = {"H": 0.0, "B": 0.0, "T": 0.0}
 	data = [
 		{
@@ -132,12 +151,16 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"h": item_hbt_buckets.get(row["item_code"], _empty)["H"],
 			"b": item_hbt_buckets.get(row["item_code"], _empty)["B"],
 			"t": item_hbt_buckets.get(row["item_code"], _empty)["T"],
-			# --- new columns: logic TBD ---
-			"adu": None,          # Average Daily Usage
-			"lt": None,           # Lead Time
-			"fos": None,          # Fill Order Size
-			"tog": None,          # TOG
-			"current_tog": None,  # Current TOG
+			"sku_type": item_master_map.get(row["item_code"], {}).get("sku_type") or "",
+			"adu": float(item_master_map.get(row["item_code"], {}).get("adu") or 0),
+			"lt": float(item_master_map.get(row["item_code"], {}).get("lt") or 0),
+			"fos": 25,
+			"tog": math.ceil(
+				float(item_master_map.get(row["item_code"], {}).get("adu") or 0)
+				* float(item_master_map.get(row["item_code"], {}).get("lt") or 0)
+				* 1.25
+			),
+			"current_tog": float(item_master_map.get(row["item_code"], {}).get("tog") or 0),
 		}
 		for row in raw_rows
 	]
