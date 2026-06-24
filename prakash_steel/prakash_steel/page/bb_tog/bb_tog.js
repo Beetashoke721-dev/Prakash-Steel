@@ -102,7 +102,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 				box-shadow:0 1px 4px rgba(0,0,0,0.12);">
 				<div style="background:${c.bg};color:${c.fg};padding:10px 16px;">
 					<span style="font-size:22px;font-weight:800;letter-spacing:2px;">${k}</span>
-					<span style="font-size:12px;margin-left:8px;opacity:0.85;">${k === "H" ? "High" : k === "B" ? "Body" : "Tail"}</span>
+					<span style="font-size:12px;margin-left:8px;opacity:0.85;">${k === "H" ? "Head" : k === "B" ? "Body" : "Tail"}</span>
 				</div>
 				<div style="background:${c.light};padding:10px 16px;">
 					<div style="font-size:24px;font-weight:700;color:${c.bg};">${counts[k]}</div>
