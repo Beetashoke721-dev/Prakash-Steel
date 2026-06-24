@@ -27,6 +27,22 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		change() { apply_filter(); },
 	});
 
+	const item_code_field = page.add_field({
+		fieldname: "item_code",
+		label: __("Item Code"),
+		fieldtype: "Link",
+		options: "Item",
+		get_query() {
+			return {
+				filters: {
+					custom_sku_type: ["in", ["BBMTA", "BBMTO"]],
+					disabled: 0,
+				},
+			};
+		},
+		change() { apply_filter(); },
+	});
+
 	page.add_inner_button(__("Refresh"), () => load_data());
 
 	$(`<div id="bbt-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
@@ -100,13 +116,20 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 	// ── DataTable ─────────────────────────────────────────────────────────────
 	let _dt = null;
+	let _dt_observer = null;
 	let _all_data = [];
 	let _raw_data = [];   // full unfiltered dataset
 
 	function apply_filter() {
 		const sku = sku_type_field.get_value();
-		const filtered = sku ? _raw_data.filter(r => r.sku_type === sku) : _raw_data;
+		const item = item_code_field.get_value();
+		const filtered = _raw_data.filter(r => {
+			if (sku && r.sku_type !== sku) return false;
+			if (item && r.item_code !== item) return false;
+			return true;
+		});
 		_all_data = filtered.map((row, idx) => ({ ...row, _idx: idx }));
+		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 		_dt = new DataTable(document.getElementById("bbt-dt"), {
 			columns: COLS,
@@ -123,26 +146,26 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 	const COLS = [
 		{
-			name: "Item Code", id: "item_code", width: 200, align: "left",
+			name: "Item Code", id: "item_code", width: 200, align: "left", editable: false,
 			format: val => val
-				? `<a href="/app/item/${encodeURIComponent(val)}" target="_blank"
-					style="font-weight:500;">${esc(val)}</a>`
+				? `<span class="bbt-item-link" data-item="${esc(val)}"
+					style="color:#1a73e8;font-weight:500;cursor:pointer;">${esc(val)}</span>`
 				: dash(),
 		},
 		{
-			name: "SKU Type", id: "sku_type", width: 110, align: "center",
+			name: "SKU Type", id: "sku_type", width: 110, align: "center", editable: false,
 			format: val => val ? esc(val) : dash(),
 		},
 		{
-			name: "Total Qty", id: "total", width: 130, align: "right",
+			name: "Total Qty", id: "total", width: 130, align: "right", editable: false,
 			format: val => `<span style="font-weight:600;">${fmt_num(val, 1)}</span>`,
 		},
 		{
-			name: "Contr%", id: "contr_pct", width: 90, align: "right",
+			name: "Contr%", id: "contr_pct", width: 90, align: "right", editable: false,
 			format: val => fmt_pct(val),
 		},
 		{
-			name: "Cumu%", id: "cumu_pct", width: 90, align: "right",
+			name: "Cumu%", id: "cumu_pct", width: 90, align: "right", editable: false,
 			format: (val, _r, _c, d) => {
 				const n = parseFloat(val);
 				let color = "#c0152a";
@@ -152,35 +175,35 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			},
 		},
 		{
-			name: "HBT", id: "hbt", width: 80, align: "center",
+			name: "HBT", id: "hbt", width: 80, align: "center", editable: false,
 			format: val => hbt_badge(val),
 		},
 		{
-			name: "Frequency", id: "frequency", width: 100, align: "right",
+			name: "Frequency", id: "frequency", width: 100, align: "right", editable: false,
 			format: val => (val !== null && val !== undefined) ? String(val) : dash(),
 		},
 		{
-			name: "H Qty", id: "h", width: 130, align: "right",
+			name: "H Qty", id: "h", width: 130, align: "right", editable: false,
 			format: val => num_badge(val, "H"),
 		},
 		{
-			name: "B Qty", id: "b", width: 130, align: "right",
+			name: "B Qty", id: "b", width: 130, align: "right", editable: false,
 			format: val => num_badge(val, "B"),
 		},
 		{
-			name: "T Qty", id: "t", width: 130, align: "right",
+			name: "T Qty", id: "t", width: 130, align: "right", editable: false,
 			format: val => num_badge(val, "T"),
 		},
 		{
-			name: "ADU", id: "adu", width: 110, align: "right",
+			name: "ADU", id: "adu", width: 110, align: "right", editable: false,
 			format: val => val !== null && val !== undefined ? fmt_num(val, 2) : dash(),
 		},
 		{
-			name: "LT", id: "lt", width: 90, align: "right",
+			name: "LT", id: "lt", width: 90, align: "right", editable: false,
 			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
 		},
 		{
-			name: "FOS", id: "fos", width: 110, align: "right",
+			name: "FOS", id: "fos", width: 110, align: "right", editable: false,
 			format: (val, _r, _c, d) =>
 				`<input type="number" class="bbt-fos-input" data-idx="${d._idx}" min="0" step="1"
 					value="${val !== null && val !== undefined ? val : ""}"
@@ -188,7 +211,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 					font-size:12px;width:80px;text-align:right;background:#fffbe6;">`,
 		},
 		{
-			name: "TOG", id: "tog", width: 110, align: "right",
+			name: "TOG", id: "tog", width: 110, align: "right", editable: false,
 			format: (val, _r, _c, d) =>
 				`<input type="number" class="bbt-tog-input" data-idx="${d._idx}" min="0" step="1"
 					value="${val !== null && val !== undefined ? val : ""}"
@@ -196,7 +219,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 					font-size:12px;width:80px;text-align:right;background:#fffbe6;">`,
 		},
 		{
-			name: "Current TOG", id: "current_tog", width: 120, align: "right",
+			name: "Current TOG", id: "current_tog", width: 120, align: "right", editable: false,
 			format: val => val !== null && val !== undefined ? `<span style="font-weight:600;">${fmt_num(val, 0)}</span>` : dash(),
 		},
 	];
@@ -212,6 +235,11 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 	}
 
 	function bind_events() {
+		$(document).off("click", ".bbt-item-link").on("click", ".bbt-item-link", function () {
+			const item = $(this).data("item");
+			if (item) window.open(`/app/item/${encodeURIComponent(item)}`, "_blank");
+		});
+
 		$(document).off("input", ".bbt-fos-input").on("input", ".bbt-fos-input", function () {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
@@ -241,6 +269,8 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			<div id="bbt-dt" style="overflow-x:auto;"></div>
 		`);
 
+		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
+
 		_dt = new DataTable(document.getElementById("bbt-dt"), {
 			columns: COLS,
 			data: _all_data,
@@ -250,21 +280,33 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			clusterize: false,
 			noDataMessage: __("No BB items found for the configured HBT period."),
 			layout: "fixed",
-			getRowHTML(cols, data_row) {
-				data_row = _all_data[data_row._idx] || data_row;
-				const hbt = data_row.hbt;
-				const bg = (HBT[hbt] && hbt !== "H") ? HBT[hbt].light : "";
-				const cells = cols.map(col => {
-					const val = data_row[col.id];
-					const cell_val = col.format ? col.format(val, null, col, data_row) : (val ?? "");
-					const align = col.align || "left";
-					return `<td style="padding:6px 10px;text-align:${align};
-						${bg ? `background:${bg};` : ""}">${cell_val}</td>`;
-				});
-				return `<tr>${cells.join("")}</tr>`;
-			},
 		});
 
+		// Apply row background colors based on HBT after every render
+		function apply_row_colors() {
+			const tbody = document.querySelector("#bbt-dt .dt-body");
+			if (!tbody) return;
+			tbody.querySelectorAll(".dt-row").forEach(tr => {
+				const idx = parseInt(tr.getAttribute("data-row-index"));
+				if (isNaN(idx)) return;
+				const row = _all_data[idx];
+				if (!row) return;
+				const bg = HBT[row.hbt] ? HBT[row.hbt].light : "";
+				tr.querySelectorAll(".dt-cell").forEach(td => {
+					td.style.backgroundColor = bg;
+				});
+			});
+		}
+
+		let _obs_timer = null;
+		const dt_el = document.getElementById("bbt-dt");
+		_dt_observer = new MutationObserver(() => {
+			clearTimeout(_obs_timer);
+			_obs_timer = setTimeout(apply_row_colors, 30);
+		});
+		_dt_observer.observe(dt_el, { childList: true, subtree: true });
+
+		apply_row_colors();
 		bind_events();
 	}
 
