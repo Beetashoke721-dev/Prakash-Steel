@@ -139,7 +139,9 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				.filter(s => !txt || s.toLowerCase().includes(txt.toLowerCase()))
 				.map(s => ({ value: s, label: __(s), description: "" }));
 		},
-		change() { refresh(); },
+		change() {
+			if (all_data.length) filter_dispatch(all_data, active_filter_dispatch);
+		},
 	});
 	let group_by_field = page.add_field({
 		fieldname: "group_by_so", label: __("Group by Sales Order"),
@@ -166,7 +168,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	let $panel_dispatch  = $(`<div class="so-tab-panel" data-panel="dispatch"></div>`).appendTo($wrap);
 
 	// each panel has its own filter bar + table wrap
-	let $filter_bar_analysis = $(`<div class="so-filter-bar"></div>`).appendTo($panel_analysis);
 	let $table_wrap_analysis  = $(`<div class="so-table-wrap"></div>`).appendTo($panel_analysis);
 
 	let $filter_bar_dispatch = $(`<div class="so-filter-bar"></div>`).appendTo($panel_dispatch);
@@ -183,13 +184,13 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		$(this).addClass("active");
 		$wrap.find(".so-tab-panel").removeClass("active");
 		$wrap.find(`.so-tab-panel[data-panel="${tab}"]`).addClass("active");
+		$(line_fullkit_field.wrapper).toggle(tab === "dispatch");
 	});
 
 	// ── shared state ──────────────────────────────────────────────────────────
 	let all_data      = [];
 	let delay_reasons = [];
 	let changes       = {};
-	let active_filter_analysis = "ALL";
 	let active_filter_dispatch  = "ALL";
 
 	frappe.call({
@@ -422,22 +423,19 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	}
 
 	// ── render both tabs ──────────────────────────────────────────────────────
-	function filter_analysis(data, key) {
-		active_filter_analysis = key;
-		let fd = key === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === key);
-		build_filter_bar($filter_bar_analysis, data, key, k => filter_analysis(data, k));
-		render_table($table_wrap_analysis, COLS_ANALYSIS, fd, true);
-	}
-
 	function filter_dispatch(data, key) {
 		active_filter_dispatch = key;
-		let fd = key === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === key);
-		build_filter_bar($filter_bar_dispatch, data, key, k => filter_dispatch(data, k));
+		let lf_values = line_fullkit_field.get_value() || ["Partial", "Full-kit"];
+		let lf_data = (lf_values && lf_values.length)
+			? data.filter(r => lf_values.includes(r.line_fullkit))
+			: data;
+		let fd = key === "ALL" ? lf_data : lf_data.filter(r => (r.order_status || "").toUpperCase() === key);
+		build_filter_bar($filter_bar_dispatch, lf_data, key, k => filter_dispatch(data, k));
 		render_table($table_wrap_dispatch, COLS_DISPATCH, fd, false);
 	}
 
 	function render_all(data) {
-		filter_analysis(data, active_filter_analysis);
+		render_table($table_wrap_analysis, COLS_ANALYSIS, data, true);
 		filter_dispatch(data, active_filter_dispatch);
 	}
 
@@ -507,7 +505,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			sales_order:         sales_order_field.get_value(),
 			warehouse:           warehouse_field.get_value(),
 			status:              status_field.get_value(),
-			line_fullkit_status: line_fullkit_field.get_value() || ["Partial", "Full-kit"],
+			line_fullkit_status: ["Partial", "Full-kit", "Pending"],
 			group_by_so:         group_by_field.get_value(),
 		};
 
@@ -517,9 +515,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		}
 
 		changes = {};
-		active_filter_analysis = "ALL";
 		active_filter_dispatch  = "ALL";
-		$filter_bar_analysis.empty();
 		$filter_bar_dispatch.empty();
 		let loading = `<div style="text-align:center;padding:60px;color:#888;">Loading…</div>`;
 		$table_wrap_analysis.html(loading);
@@ -534,7 +530,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 
 				if (!result || !result.length) {
 					let empty = `<div style="text-align:center;padding:60px;color:#888;">No data found.</div>`;
-					$filter_bar_analysis.empty();
 					$filter_bar_dispatch.empty();
 					$table_wrap_analysis.html(empty);
 					$table_wrap_dispatch.html(empty);
@@ -548,5 +543,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	}
 
 	line_fullkit_field.set_value(["Partial", "Full-kit"]);
+	$(line_fullkit_field.wrapper).hide();
 	refresh();
 };
