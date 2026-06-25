@@ -7,7 +7,6 @@ if (!frappe.pages['procurement-tracker-dashboard']) {
 }
 
 frappe.pages['procurement-tracker-dashboard'].on_page_load = function (wrapper) {
-    console.log('Procurement Tracker Dashboard page loading...');
 
     // Build page shell
     const page = frappe.ui.make_app_page({
@@ -35,7 +34,6 @@ frappe.pages['procurement-tracker-dashboard'].on_page_load = function (wrapper) 
 };
 
 frappe.pages['procurement-tracker-dashboard'].on_page_show = function () {
-    console.log('Procurement Tracker Dashboard shown');
 };
 
 function initializeDashboard(state) {
@@ -327,7 +325,6 @@ function createSectionFilterControls(state, tabId) {
             let $targetElement = $button.length ? $button : $formControl.length ? $formControl : $input;
 
             if ($targetElement.length) {
-                console.log('Found button element:', $targetElement[0]);
                 $targetElement.removeClass('form-control').addClass('btn btn-primary');
                 $targetElement.attr('style', `
                     background-color: #007bff !important;
@@ -341,7 +338,6 @@ function createSectionFilterControls(state, tabId) {
                 `);
                 $targetElement.html(__('Refresh'));
             } else {
-                console.log('No button element found in:', $(`#${tabId}-refresh-btn`).html());
             }
         }, 300);
 
@@ -392,7 +388,6 @@ function createSectionFilterControls(state, tabId) {
             let $targetElement = $button.length ? $button : $formControl.length ? $formControl : $input;
 
             if ($targetElement.length) {
-                console.log('Found button element:', $targetElement[0]);
                 $targetElement.removeClass('form-control').addClass('btn btn-primary');
                 $targetElement.attr('style', `
                     background-color: #007bff !important;
@@ -406,7 +401,6 @@ function createSectionFilterControls(state, tabId) {
                 `);
                 $targetElement.html(__('Refresh'));
             } else {
-                console.log('No button element found in:', $(`#${tabId}-refresh-btn`).html());
             }
         }, 300);
 
@@ -766,7 +760,6 @@ function updateTabStyles(state) {
 }
 
 function refreshDashboard(state) {
-    console.log('Refreshing procurement dashboard...');
 
     const filters = getFilters(state);
 
@@ -1424,7 +1417,6 @@ function fetchPurchaseInvoiceData(filters, state) {
             callback: (r) => {
                 if (r.message && r.message.result) {
                     let piData = r.message.result;
-                    console.log('Raw Purchase Invoice data from report:', piData.slice(0, 2)); // Show first 2 records
 
                     // Transform data to match expected format
                     const purchaseInvoices = [];
@@ -1686,9 +1678,7 @@ function getStatusOptions(tabId) {
 function updateStatusOptions(tabId, data, state) {
     const statusSet = new Set();
 
-    console.log(`updateStatusOptions called for ${tabId} with ${data ? data.length : 0} records`);
     if (data && data.length > 0) {
-        console.log(`Sample data for ${tabId}:`, data[0]);
     }
 
     if (tabId === 'material_request') {
@@ -1709,14 +1699,11 @@ function updateStatusOptions(tabId, data, state) {
         });
     } else if (tabId === 'purchase_invoice') {
         data.forEach(row => {
-            console.log(`Purchase Invoice row:`, row);
             if (row.status) {
-                console.log(`Adding status: ${row.status}`);
                 statusSet.add(row.status);
             }
             // Also check workflow_state as fallback
             if (row.workflow_state) {
-                console.log(`Adding workflow_state: ${row.workflow_state}`);
                 statusSet.add(row.workflow_state);
             }
         });
@@ -1724,11 +1711,9 @@ function updateStatusOptions(tabId, data, state) {
 
     const statusOptions = ['', ...Array.from(statusSet).sort()];
 
-    console.log(`Generated status options for ${tabId}:`, statusOptions);
 
     // Update the dropdown options
     const statusControl = state.controls[`${tabId}_status`];
-    console.log(`Status control for ${tabId}:`, statusControl);
     if (statusControl) {
         statusControl.df.options = statusOptions;
         statusControl.refresh();

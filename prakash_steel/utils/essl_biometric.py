@@ -182,7 +182,7 @@ def _get_employee_map() -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _create_checkins(checkins, employee_map) -> None:
+def _create_checkins(checkins, employee_map) -> dict:
 	success = failed = skipped = 0
 
 	for log in checkins:
@@ -234,7 +234,7 @@ def _seconds_to_hhmmss(total_seconds) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _create_attendance(attendance_list, employee_map) -> None:
+def _create_attendance(attendance_list, employee_map) -> dict:
 	success = skipped = failed = 0
 
 	for rec in attendance_list:
@@ -412,7 +412,7 @@ def sync_essl_checkins(from_dt=None, to_dt=None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _mark_absent_employees(punched_user_ids, employee_map, att_date) -> None:
+def _mark_absent_employees(punched_user_ids, employee_map, att_date) -> dict:
 	"""
 	For every ESSL-mapped employee NOT in punched_user_ids, create a submitted
 	Absent attendance record (if one doesn't already exist for that date).

@@ -53,7 +53,7 @@ def _get_columns(period_months: list[tuple[int, int]]) -> list[dict]:
 			{
 				"label": f"{MONTH_SHORT[month]} {str(year)[-2:]}",
 				"fieldname": month_key(year, month),
-				"fieldtype": "Int",
+				"fieldtype": "Float",
 				"width": 110,
 			}
 		)
@@ -71,10 +71,6 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 		return []
 
 	view_by: str = filters.get("view_by") or "Sale Quantity"
-
-	# Sale Value is implemented but temporarily hidden from users
-	if view_by == "Sale Value":
-		return []
 
 	if view_by not in METRIC_COL:
 		frappe.throw(_("{0} is not yet implemented for this report.").format(view_by))

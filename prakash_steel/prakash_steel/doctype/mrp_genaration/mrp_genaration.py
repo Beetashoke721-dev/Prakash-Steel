@@ -66,8 +66,6 @@ def generate_mrp_order_recommendations() -> None:
 	# Store job_id in cache for later retrieval
 	frappe.cache().set_value(f"mrp_job_id_{frappe.session.user}", job_id, expires_in_sec=3600)
 
-	# Log job creation
-	print(f"[MRP] Job queued with ID: {job_id}, Name: MRP Generation - {frappe.session.user}")
 	frappe.log_error(f"MRP Generation job queued: {job_id}", "MRP Generation Job")
 
 	return {
@@ -105,7 +103,6 @@ def _generate_mrp_order_recommendations_worker() -> None:
 		job_id = frappe.cache().get_value(f"mrp_job_id_{frappe.session.user}")
 
 	start_msg = f"[MRP Job {job_id or 'Unknown'}] Starting MRP calculation..."
-	print(start_msg)
 	frappe.log_error(start_msg, "MRP Generation Job")
 
 	# Get all items (buffer and non-buffer)
@@ -467,9 +464,6 @@ def _generate_mrp_order_recommendations_worker() -> None:
 	# Log to console (will be visible in server logs)
 	frappe.log_error(detailed_log, "MRP Generation")
 
-	# Also print to console for immediate visibility
-	print(detailed_log)
-
 	# Get job_id for logging and caching
 	job_id = None
 	try:
@@ -501,7 +495,6 @@ def _generate_mrp_order_recommendations_worker() -> None:
 	completion_msg = (
 		f"[MRP Job {job_id or 'Unknown'}] Completed! Items with net order rec > 0: {items_with_rec}"
 	)
-	print(completion_msg)
 	frappe.log_error(completion_msg, "MRP Generation Job")
 
 	return result
@@ -900,10 +893,6 @@ def create_material_requests_automatically(net_order_recommendations=None) -> No
 		job_id = job.id if hasattr(job, "id") else str(job)
 		frappe.cache().set_value(f"mr_creation_job_id_{frappe.session.user}", job_id, expires_in_sec=1800)
 
-		# Log job creation
-		print(
-			f"[MR Creation] Job queued with ID: {job_id}, Name: MRP Material Request Creation - {frappe.session.user}"
-		)
 		frappe.log_error(f"MR Creation job queued: {job_id}", "MR Creation Job")
 
 		return {
@@ -931,10 +920,6 @@ def create_material_requests_automatically(net_order_recommendations=None) -> No
 		job_id = job.id if hasattr(job, "id") else str(job)
 		frappe.cache().set_value(f"mr_creation_job_id_{frappe.session.user}", job_id, expires_in_sec=1800)
 
-		# Log job creation
-		print(
-			f"[MR Creation] Job queued with ID: {job_id}, Name: MRP Material Request Creation - {frappe.session.user}"
-		)
 		frappe.log_error(f"MR Creation job queued: {job_id}", "MR Creation Job")
 
 		return {
@@ -962,7 +947,6 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 		job_id = frappe.cache().get_value(f"mr_creation_job_id_{frappe.session.user}")
 
 	start_msg = f"[MR Creation Job {job_id or 'Unknown'}] Starting Material Request creation..."
-	print(start_msg)
 	frappe.log_error(start_msg, "MR Creation Job")
 
 	# If not provided as parameter, try to get from cache
@@ -1051,10 +1035,6 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 			"error_count": error_count,
 		}
 		frappe.cache().set_value(progress_cache_key, progress, expires_in_sec=1800)
-		# Also print for debugging
-		print(
-			f"[MR Creation Progress] {current}/{total} ({progress['percent']}%) - Item: {current_item}, Success: {success_count}, Failed: {error_count}"
-		)
 
 	# Initialize progress at start
 	update_progress(0, total_items, None)
@@ -1161,7 +1141,6 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 
 	# Log job completion
 	completion_msg = f"[MR Creation Job {job_id or 'Unknown'}] Completed! Created {success_count} MR(s), {error_count} failed"
-	print(completion_msg)
 	frappe.log_error(completion_msg, "MR Creation Job")
 
 	return result
@@ -1897,7 +1876,6 @@ def get_wip_map_for_mrp() -> dict:
 
 						# Log the breakdown
 						breakdown_str = "\n".join(breakdown_lines)
-						print(breakdown_str)
 						frappe.log_error(
 							breakdown_str,
 							"WIP Calculation Breakdown (MRP Generation)",

@@ -37,20 +37,15 @@ def execute(filters: dict | None = None) -> tuple[list[dict], list[dict]]:
 
 
 def _get_columns(view_by: str) -> list[dict]:
-	# Sale Value temporarily hidden — _get_data returns [] for it; use Sale Quantity columns as placeholder
-	if view_by == "Sale Value":
-		view_by = "Sale Quantity"
-
 	if view_by not in METRIC_COL:
 		frappe.throw(_("{0} is not yet implemented for this report.").format(view_by))
 
-	# Uncomment when Sale Value is ready to expose:
-	# if view_by == "Sale Value":
-	#     total_label = _("Total Sale Value")
-	#     total_fieldtype = "Currency"
-	# else:
-	total_label = _("Total Sale Quantity")
-	total_fieldtype = "Int"
+	if view_by == "Sale Value":
+		total_label = _("Total Sale Value")
+		total_fieldtype = "Currency"
+	else:
+		total_label = _("Total Sale Quantity")
+		total_fieldtype = "Float"
 
 	return [
 		{"label": _("Customer / Group"), "fieldname": "group_name", "fieldtype": "Data", "width": 220},

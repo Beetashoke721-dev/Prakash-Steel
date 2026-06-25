@@ -57,7 +57,7 @@ FISCAL_MONTH_ORDER: list[int] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
 # Throughput is not yet defined — reports should guard against unsupported values.
 METRIC_COL: dict[str, str] = {
 	"Sale Quantity": "sii.qty",
-	# "Sale Value": "sii.amount",  # implemented but temporarily hidden — uncomment when ready to expose
+	"Sale Value": "sii.amount",
 }
 
 # ---------------------------------------------------------------------------
