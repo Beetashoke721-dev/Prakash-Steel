@@ -68,7 +68,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		if (!n) return `<span style="color:#bbb;">0</span>`;
 		const c = HBT[hbt_key];
 		return `<span style="display:inline-block;padding:1px 8px;border-radius:3px;
-			background:${c.light};color:${c.bg};font-weight:600;font-size:12px;">${fmt_num(n)}</span>`;
+			background:${c.light};color:${c.bg};font-weight:600;font-size:12px;">${fmt_num(n, 0)}</span>`;
 	}
 
 	function fmt_num(v, dec = 1) {
@@ -84,34 +84,13 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 	function esc(v) { return frappe.utils.escape_html(String(v ?? "")); }
 	function dash() { return '<span style="color:#ccc;">—</span>'; }
 
-	// ── Summary cards ─────────────────────────────────────────────────────────
-	function render_summary(data) {
-		const counts = { H: 0, B: 0, T: 0 };
-		const totals = { H: 0, B: 0, T: 0 };
-		data.forEach(r => {
-			if (HBT[r.hbt]) {
-				counts[r.hbt]++;
-				totals[r.hbt] += r.total || 0;
-			}
-		});
-
-		const cards = ["H", "B", "T"].map(k => {
-			const c = HBT[k];
-			return `
-			<div style="flex:1;min-width:160px;border-radius:8px;overflow:hidden;
-				box-shadow:0 1px 4px rgba(0,0,0,0.12);">
-				<div style="background:${c.bg};color:${c.fg};padding:10px 16px;">
-					<span style="font-size:22px;font-weight:800;letter-spacing:2px;">${k}</span>
-					<span style="font-size:12px;margin-left:8px;opacity:0.85;">${k === "H" ? "Head" : k === "B" ? "Body" : "Tail"}</span>
-				</div>
-				<div style="background:${c.light};padding:10px 16px;">
-					<div style="font-size:24px;font-weight:700;color:${c.bg};">${counts[k]}</div>
-					<div style="font-size:11px;color:#666;margin-top:2px;">items &nbsp;|&nbsp; ${fmt_num(totals[k], 0)} qty</div>
-				</div>
-			</div>`;
-		}).join("");
-
-		return `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">${cards}</div>`;
+	function fmt_change_pct(val, idx) {
+		if (val === null || val === undefined) return dash();
+		const n = parseFloat(val);
+		const color = n > 0 ? "#1a7a3f" : n < 0 ? "#c0152a" : "#888";
+		const arrow = n > 0 ? "▲" : n < 0 ? "▼" : "";
+		return `<span class="bbt-change-pct" data-idx="${idx}"
+			style="font-weight:600;color:${color};">${Math.abs(n).toFixed(1)}% ${arrow}</span>`;
 	}
 
 	// ── DataTable ─────────────────────────────────────────────────────────────
@@ -158,7 +137,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		},
 		{
 			name: "Total Qty", id: "total", width: 130, align: "right", editable: false,
-			format: val => `<span style="font-weight:600;">${fmt_num(val, 1)}</span>`,
+			format: val => `<span style="font-weight:600;">${fmt_num(val, 0)}</span>`,
 		},
 		{
 			name: "Contr%", id: "contr_pct", width: 90, align: "right", editable: false,
@@ -183,20 +162,20 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			format: val => (val !== null && val !== undefined) ? String(val) : dash(),
 		},
 		{
-			name: "H Qty", id: "h", width: 130, align: "right", editable: false,
+			name: "Head Customer", id: "h", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "H"),
 		},
 		{
-			name: "B Qty", id: "b", width: 130, align: "right", editable: false,
+			name: "Body Customer", id: "b", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "B"),
 		},
 		{
-			name: "T Qty", id: "t", width: 130, align: "right", editable: false,
+			name: "Tail Customer", id: "t", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "T"),
 		},
 		{
 			name: "ADU", id: "adu", width: 110, align: "right", editable: false,
-			format: val => val !== null && val !== undefined ? fmt_num(val, 2) : dash(),
+			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
 		},
 		{
 			name: "LT", id: "lt", width: 90, align: "right", editable: false,
@@ -222,6 +201,10 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			name: "Current TOG", id: "current_tog", width: 120, align: "right", editable: false,
 			format: val => val !== null && val !== undefined ? `<span style="font-weight:600;">${fmt_num(val, 0)}</span>` : dash(),
 		},
+		{
+			name: "Change%", id: "change_pct", width: 110, align: "right", editable: false,
+			format: (val, _r, _c, d) => fmt_change_pct(val, d._idx),
+		},
 	];
 
 	function recalc_tog(idx) {
@@ -232,6 +215,11 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		const tog = Math.ceil(adu * lt * (1 + fos / 100));
 		row.tog = tog;
 		$(`.bbt-tog-input[data-idx="${idx}"]`).val(tog);
+
+		const current_tog = row.current_tog || 0;
+		const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
+		row.change_pct = change_pct;
+		$(`.bbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
 	}
 
 	function bind_events() {
@@ -261,7 +249,6 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
 		$("#bbt-root").html(`
-			${render_summary(data)}
 			<div style="font-size:12px;color:#888;margin-bottom:10px;padding-left:2px;">
 				Period: <strong>${esc(period_label)}</strong>
 				&nbsp;·&nbsp; ${data.length} items

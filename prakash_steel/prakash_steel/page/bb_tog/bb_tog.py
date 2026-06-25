@@ -121,15 +121,17 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 
 	assign_hbt_labels(raw_rows)
 
-	# Fetch ADU, Lead Time, TOG (safety_stock) from Item master for all items in one query
+	# ADU horizon = full period from TOG Horizon Settings (not ADU Horizon doctype)
+	horizon_days = (to_date - from_date).days + 1
+
+	# Fetch Lead Time, safety_stock (current_tog), sku_type from Item master
 	item_codes = [row["item_code"] for row in raw_rows]
 	item_master_rows = frappe.db.sql(
 		"""
 		SELECT
 			name AS item_code,
-			custom_adu AS adu,
 			lead_time_days AS lt,
-			safety_stock AS tog,
+			safety_stock AS current_tog,
 			custom_sku_type AS sku_type
 		FROM `tabItem`
 		WHERE name IN %(item_codes)s
@@ -139,9 +141,17 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 	)
 	item_master_map = {r.item_code: r for r in item_master_rows}
 
+	# BB items have no consumption — ADU = ceil(sales_qty / horizon_days)
+	# sales_qty per item is already in raw_rows as `total`
+	sales_map = {row["item_code"]: float(row["total"] or 0) for row in raw_rows}
+
 	_empty = {"H": 0.0, "B": 0.0, "T": 0.0}
-	data = [
-		{
+	data = []
+	for row in raw_rows:
+		sales_qty = sales_map.get(row["item_code"], 0.0)
+		adu = math.ceil(sales_qty / horizon_days) if horizon_days > 0 and sales_qty > 0 else 0
+		lt = float(item_master_map.get(row["item_code"], {}).get("lt") or 0)
+		data.append({
 			"item_code": row["item_code"],
 			"total": float(row["total"] or 0),
 			"contr_pct": round(float(row.get("contr_pct") or 0), 1),
@@ -152,17 +162,15 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"b": item_hbt_buckets.get(row["item_code"], _empty)["B"],
 			"t": item_hbt_buckets.get(row["item_code"], _empty)["T"],
 			"sku_type": item_master_map.get(row["item_code"], {}).get("sku_type") or "",
-			"adu": float(item_master_map.get(row["item_code"], {}).get("adu") or 0),
-			"lt": float(item_master_map.get(row["item_code"], {}).get("lt") or 0),
+			"adu": adu,
+			"lt": lt,
 			"fos": 25,
-			"tog": math.ceil(
-				float(item_master_map.get(row["item_code"], {}).get("adu") or 0)
-				* float(item_master_map.get(row["item_code"], {}).get("lt") or 0)
-				* 1.25
-			),
-			"current_tog": float(item_master_map.get(row["item_code"], {}).get("tog") or 0),
-		}
-		for row in raw_rows
-	]
+			"tog": math.ceil(adu * lt * 1.25),
+			"current_tog": float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0),
+			"change_pct": round(
+				(math.ceil(adu * lt * 1.25) - float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0))
+				/ float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) * 100, 1
+			) if float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) else None,
+		})
 
 	return {"data": data, "period_label": period_label}
