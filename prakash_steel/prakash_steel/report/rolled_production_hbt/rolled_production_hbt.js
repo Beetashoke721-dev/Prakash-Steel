@@ -30,4 +30,5 @@ frappe.query_reports["Rolled Production HBT"] = {
 
 		return value;
 	},
+
 };

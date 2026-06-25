@@ -63,9 +63,9 @@ def _get_columns(view_by: str) -> list[dict]:
 		{"label": _("Cumu%"), "fieldname": "cumu_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("HBT"), "fieldname": "hbt", "fieldtype": "Data", "width": 60},
 		{"label": _("Frequency"), "fieldname": "frequency", "fieldtype": "Int", "width": 100},
-		{"label": _("Head Customer"), "fieldname": "h", "fieldtype": total_fieldtype, "width": 160},
-		{"label": _("Body Customer"), "fieldname": "b", "fieldtype": total_fieldtype, "width": 160},
-		{"label": _("Tail Customer"), "fieldname": "t", "fieldtype": total_fieldtype, "width": 160},
+		{"label": "<span style='color:#1a7a3f;font-weight:700;'>Head Customer</span>", "fieldname": "h", "fieldtype": total_fieldtype, "width": 160},
+		{"label": "<span style='color:#d4a000;font-weight:700;'>Body Customer</span>", "fieldname": "b", "fieldtype": total_fieldtype, "width": 160},
+		{"label": "<span style='color:#c0152a;font-weight:700;'>Tail Customer</span>", "fieldname": "t", "fieldtype": total_fieldtype, "width": 160},
 	]
 
 

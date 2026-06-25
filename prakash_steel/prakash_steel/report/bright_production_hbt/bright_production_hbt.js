@@ -28,4 +28,5 @@ frappe.query_reports["Bright Production HBT"] = {
 
 		return value;
 	},
+
 };
