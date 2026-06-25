@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Beetashoke Chakraborty and contributors
 // For license information, please see license.txt
 
-frappe.query_reports["Critical Spare Buffer report"] = {
+frappe.query_reports["Bright CS Buffer Report"] = {
 	"filters": [],
 
 	formatter: function (value, row, column, data, default_formatter) {

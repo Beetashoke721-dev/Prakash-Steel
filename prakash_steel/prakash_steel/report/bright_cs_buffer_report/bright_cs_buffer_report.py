@@ -41,29 +41,25 @@ def get_columns() -> list[dict]:
 		{
 			"label": _("On Hand Stock"),
 			"fieldname": "on_hand_stock",
-			"fieldtype": "Float",
-			"precision": 2,
+			"fieldtype": "Int",
 			"width": 120,
 		},
 		{
 			"label": _("On Order"),
 			"fieldname": "on_order",
-			"fieldtype": "Float",
-			"precision": 2,
+			"fieldtype": "Int",
 			"width": 100,
 		},
 		{
 			"label": _("MRQ"),
 			"fieldname": "mrq",
-			"fieldtype": "Float",
-			"precision": 2,
+			"fieldtype": "Int",
 			"width": 100,
 		},
 		{
 			"label": _("Order Recommendation"),
 			"fieldname": "order_recommendation",
-			"fieldtype": "Float",
-			"precision": 2,
+			"fieldtype": "Int",
 			"width": 160,
 		},
 		{
@@ -87,8 +83,7 @@ def get_columns() -> list[dict]:
 		{
 			"label": _("Net Order Recommendation"),
 			"fieldname": "net_order_recommendation",
-			"fieldtype": "Float",
-			"precision": 2,
+			"fieldtype": "Int",
 			"width": 180,
 		},
 	]
@@ -149,14 +144,14 @@ def get_data() -> list[dict]:
 	data = []
 	for item in items:
 		item_code = item.item_code
-		tog = flt(cs_tog_map.get(item_code, 0))
-		on_hand_stock = flt(stock_map.get(item_code, 0))
-		on_order = flt(open_po_map.get(item_code, 0))
-		mrq = flt(mrq_map.get(item_code, 0))
+		tog = int(flt(cs_tog_map.get(item_code, 0)))
+		on_hand_stock = int(flt(stock_map.get(item_code, 0)))
+		on_order = int(flt(open_po_map.get(item_code, 0)))
+		mrq = int(flt(mrq_map.get(item_code, 0)))
 		order_recommendation = max(0, tog - on_hand_stock - on_order - mrq)
 		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
 		on_hand_status = f"{on_hand_status_value:.2f}%"
-		moq = flt(item.moq)
+		moq = int(flt(item.moq))
 		net_order_recommendation = max(order_recommendation, moq)
 
 		if on_hand_status_value == 0:
