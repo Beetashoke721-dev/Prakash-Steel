@@ -169,7 +169,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	});
 
 	page.set_primary_action(__("Refresh"), () => refresh(), "octicon octicon-sync");
-	page.set_secondary_action(__("Execute"), () => execute_save(), "octicon octicon-check");
+	page.set_secondary_action(__("Save"), () => execute_save(), "octicon octicon-check");
 
 	// ── layout ────────────────────────────────────────────────────────────────
 	let $wrap = $(`<div class="so-page-wrap"></div>`).appendTo(page.main);
