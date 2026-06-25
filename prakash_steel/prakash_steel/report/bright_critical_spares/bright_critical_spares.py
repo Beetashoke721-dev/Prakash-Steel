@@ -128,7 +128,7 @@ def get_stock_map_by_warehouse(item_codes: set[str], warehouse: str) -> dict[str
 def get_data() -> list[dict]:
 	items = frappe.db.get_all(
 		"Item",
-		filters={"custom_item_type": "CS", "disabled": 0},
+		filters={"custom_item_type": "CS", "custom_buffer_flag": "Buffer", "disabled": 0},
 		fields=["name as item_code", "item_name", "safety_stock as tog", "min_order_qty as moq"],
 	)
 
