@@ -12,7 +12,7 @@ import unittest
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-MOD = "prakash_steel.prakash_steel.report.rolled_production_hbt.rolled_production_hbt"
+MOD = "prakash_steel.prakash_steel.report.rolled_product_hbt.rolled_product_hbt"
 _PERIOD = [(2025, 4), (2025, 5), (2025, 6)]
 
 
@@ -20,7 +20,7 @@ class TestGetData(unittest.TestCase):
 	@patch(MOD + ".frappe")
 	@patch(MOD + ".get_customer_hbt_map", return_value={})
 	def test_empty_rows_returns_empty(self, _mock_hbt_map, mock_frappe):
-		from prakash_steel.prakash_steel.report.rolled_production_hbt.rolled_production_hbt import (
+		from prakash_steel.prakash_steel.report.rolled_product_hbt.rolled_product_hbt import (
 			_get_data,
 		)
 		mock_frappe.db.sql.return_value = []
@@ -29,7 +29,7 @@ class TestGetData(unittest.TestCase):
 
 	@patch(MOD + ".frappe")
 	def test_unsupported_view_throws(self, mock_frappe):
-		from prakash_steel.prakash_steel.report.rolled_production_hbt.rolled_production_hbt import (
+		from prakash_steel.prakash_steel.report.rolled_product_hbt.rolled_product_hbt import (
 			_get_data,
 		)
 		mock_frappe.throw.side_effect = Exception("not implemented")
@@ -37,7 +37,7 @@ class TestGetData(unittest.TestCase):
 			_get_data(_PERIOD, "Throughput")
 
 	def test_get_consumption_map_aggregates(self):
-		from prakash_steel.prakash_steel.report.rolled_production_hbt.rolled_production_hbt import (
+		from prakash_steel.prakash_steel.report.rolled_product_hbt.rolled_product_hbt import (
 			_get_consumption_map,
 		)
 		with patch(MOD + ".frappe") as mock_frappe:
@@ -53,7 +53,7 @@ class TestGetData(unittest.TestCase):
 	@patch(MOD + ".frappe")
 	@patch(MOD + ".get_customer_hbt_map", return_value={})
 	def test_result_has_expected_keys(self, _mock_hbt_map, mock_frappe):
-		from prakash_steel.prakash_steel.report.rolled_production_hbt.rolled_production_hbt import (
+		from prakash_steel.prakash_steel.report.rolled_product_hbt.rolled_product_hbt import (
 			_get_data,
 		)
 		item_row = MagicMock()
@@ -63,7 +63,8 @@ class TestGetData(unittest.TestCase):
 		mock_frappe.db.sql.side_effect = [
 			[item_row],  # item totals
 			[],          # item_group_rows
-			[],          # consumption
+			[],          # consumption (inside _get_consumption_map)
+			[],          # item_master_rows
 		]
 		result = _get_data(_PERIOD, "Sale Quantity")
 		self.assertEqual(len(result), 1)
