@@ -84,6 +84,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 	function esc(v) { return frappe.utils.escape_html(String(v ?? "")); }
 	function dash() { return '<span style="color:#ccc;">—</span>'; }
 
+
 	function fmt_change_pct(val, idx) {
 		if (val === null || val === undefined) return dash();
 		const n = parseFloat(val);
@@ -162,15 +163,18 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			format: val => (val !== null && val !== undefined) ? String(val) : dash(),
 		},
 		{
-			name: "Head Customer", id: "h", width: 150, align: "right", editable: false,
+			name: `<span style="color:#1a7a3f;font-weight:700;">Head Customer</span>`,
+			id: "h", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "H"),
 		},
 		{
-			name: "Body Customer", id: "b", width: 150, align: "right", editable: false,
+			name: `<span style="color:#d4a000;font-weight:700;">Body Customer</span>`,
+			id: "b", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "B"),
 		},
 		{
-			name: "Tail Customer", id: "t", width: 150, align: "right", editable: false,
+			name: `<span style="color:#c0152a;font-weight:700;">Tail Customer</span>`,
+			id: "t", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "T"),
 		},
 		{
