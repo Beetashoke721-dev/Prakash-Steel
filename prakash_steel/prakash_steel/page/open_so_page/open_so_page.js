@@ -372,7 +372,17 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			return `<tr class="${is_changed ? "changed" : ""}" data-soi="${soi}">${cells}</tr>`;
 		}).join("") + `</tbody>`;
 
-		$wrap_el.html(`<table class="so-tbl">${thead}${tbody}</table>`);
+		let total_pending = data.reduce((sum, row) => sum + (parseFloat(row.pending_qty) || 0), 0);
+		let pending_idx = cols.findIndex(c => c.fieldname === "pending_qty");
+		let tfoot = `<tfoot><tr style="background:linear-gradient(135deg,#dce8f5,#c5d9ee);font-weight:700;font-size:12px;">` +
+			cols.map((c, i) => {
+				if (i === 0) return `<td style="padding:7px 10px;border-top:2px solid #b0c8df;">Total</td>`;
+				if (i === pending_idx) return `<td style="padding:7px 10px;border-top:2px solid #b0c8df;">${frappe.utils.escape_html(String(total_pending % 1 === 0 ? total_pending : total_pending.toFixed(2)))}</td>`;
+				return `<td style="border-top:2px solid #b0c8df;"></td>`;
+			}).join("") +
+			`</tr></tfoot>`;
+
+		$wrap_el.html(`<table class="so-tbl">${thead}${tbody}${tfoot}</table>`);
 
 		if (!editable) return;  // no event listeners needed for read-only tab
 
