@@ -15,8 +15,8 @@ class TestCustomerAnalysisColumns(unittest.TestCase):
 	def test_columns_count(self):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_columns
 		cols = _get_columns(_PERIOD)
-		# 1 group_name + 3 month columns
-		self.assertEqual(len(cols), 4)
+		# 1 group_name + 1 hbt + 3 month columns
+		self.assertEqual(len(cols), 5)
 
 	def test_first_column_is_group_name(self):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_columns
@@ -26,18 +26,19 @@ class TestCustomerAnalysisColumns(unittest.TestCase):
 	def test_month_column_labels(self):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_columns
 		cols = _get_columns([(2025, 4)])
-		self.assertIn("Apr", cols[1]["label"])
-		self.assertIn("25", cols[1]["label"])
+		self.assertIn("Apr", cols[2]["label"])
+		self.assertIn("25", cols[2]["label"])
 
 	def test_empty_period(self):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_columns
 		cols = _get_columns([])
-		self.assertEqual(len(cols), 1)
+		self.assertEqual(len(cols), 2)  # group_name + hbt
 
 
 class TestCustomerAnalysisData(unittest.TestCase):
+	@patch(MODULE + ".get_customer_hbt_map", return_value={})
 	@patch(MODULE + ".frappe")
-	def test_aggregates_by_group_and_month(self, mock_frappe):
+	def test_aggregates_by_group_and_month(self, mock_frappe, _mock_hbt):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_data
 		mock_frappe.db.sql.return_value = [
 			MagicMock(group_name="GroupA", yr=2025, mo=4, val=100.0),
@@ -51,8 +52,9 @@ class TestCustomerAnalysisData(unittest.TestCase):
 		self.assertAlmostEqual(ga["m_2025_05"], 200.0)
 		self.assertAlmostEqual(ga["m_2025_06"], 0.0)
 
+	@patch(MODULE + ".get_customer_hbt_map", return_value={})
 	@patch(MODULE + ".frappe")
-	def test_sorted_alphabetically(self, mock_frappe):
+	def test_sorted_alphabetically(self, mock_frappe, _mock_hbt):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_data
 		mock_frappe.db.sql.return_value = [
 			MagicMock(group_name="Zebra", yr=2025, mo=4, val=10.0),
@@ -62,8 +64,9 @@ class TestCustomerAnalysisData(unittest.TestCase):
 		self.assertEqual(result[0]["group_name"], "Alpha")
 		self.assertEqual(result[1]["group_name"], "Zebra")
 
+	@patch(MODULE + ".get_customer_hbt_map", return_value={})
 	@patch(MODULE + ".frappe")
-	def test_empty_result(self, mock_frappe):
+	def test_empty_result(self, mock_frappe, _mock_hbt):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_data
 		mock_frappe.db.sql.return_value = []
 		result = _get_data({}, _PERIOD)
@@ -83,8 +86,9 @@ class TestCustomerAnalysisData(unittest.TestCase):
 		with self.assertRaises(Exception):
 			_get_data({"view_by": "Throughput"}, _PERIOD)
 
+	@patch(MODULE + ".get_customer_hbt_map", return_value={})
 	@patch(MODULE + ".frappe")
-	def test_months_outside_period_ignored(self, mock_frappe):
+	def test_months_outside_period_ignored(self, mock_frappe, _mock_hbt):
 		from prakash_steel.prakash_steel.report.customer_analysis.customer_analysis import _get_data
 		mock_frappe.db.sql.return_value = [
 			MagicMock(group_name="GroupA", yr=2025, mo=1, val=999.0),  # January not in period

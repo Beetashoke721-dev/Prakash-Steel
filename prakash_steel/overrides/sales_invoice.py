@@ -374,7 +374,10 @@ class CustomSalesInvoice(SalesInvoice):
 			stock_entry.posting_date = posting_date
 			stock_entry.posting_time = posting_time
 
-			# Insert the stock entry
+			# Permission decision: this stock entry is created automatically as a side
+			# effect of submitting the Sales Invoice (server-side document event). The
+			# user's permission to act has already been enforced by the Sales Invoice
+			# submit; the auto-generated Stock Entry bypasses the interactive check.
 			stock_entry.insert(ignore_permissions=True)
 
 			# Submit the stock entry
@@ -382,20 +385,9 @@ class CustomSalesInvoice(SalesInvoice):
 			stock_entry.posting_date = posting_date
 			stock_entry.submit()
 
-			# Final check - if posting_date was changed, force set it via SQL
-			if stock_entry.posting_date != posting_date:
-				frappe.db.sql(
-					"UPDATE `tabStock Entry` SET posting_date = %s WHERE name = %s",
-					(posting_date, stock_entry.name),
-				)
-				frappe.db.commit()
-				stock_entry.reload()
-
 			# Save Stock Entry ID to custom field
 			self.custom_stock_entry_id = stock_entry.name
-			# Update the field in database since we're in on_submit
 			frappe.db.set_value("Sales Invoice", self.name, "custom_stock_entry_id", stock_entry.name)
-			frappe.db.commit()
 
 			# Show success message
 			item_list = ", ".join([f"{r['item'].item_code} ({r['shortage_qty']})" for r in items_to_receipt])

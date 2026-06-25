@@ -53,7 +53,7 @@ def _get_columns(period_months: list[tuple[int, int]]) -> list[dict]:
 			{
 				"label": f"{MONTH_SHORT[month]} {str(year)[-2:]}",
 				"fieldname": month_key(year, month),
-				"fieldtype": "Int",
+				"fieldtype": "Float",
 				"width": 110,
 			}
 		)

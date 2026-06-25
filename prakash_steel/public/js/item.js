@@ -134,12 +134,7 @@ frappe.ui.form.on("Item", {
             'finished good'
         ]);
 
-        console.log("Checking item group:", normalized);
-
         if (groupsRequiringBOM.has(normalized)) {
-            console.log("Matched group requiring BOM");
-
-            // Check if item already has a BOM before showing the message
             frappe.call({
                 method: "prakash_steel.api.check_item_has_bom.check_item_has_bom",
                 args: {
@@ -147,21 +142,14 @@ frappe.ui.form.on("Item", {
                 },
                 callback: function (r) {
                     if (r.message === false) {
-                        // Item does not have a BOM, show the message
-                        console.log("Item does not have BOM, showing message");
                         frappe.msgprint({
                             title: 'Action Required',
                             message: 'Please create a BOM for this item.',
                             indicator: 'green'
                         });
-                    } else {
-                        // Item already has a BOM, don't show the message
-                        console.log("Item already has BOM, skipping message");
                     }
                 },
-                error: function (err) {
-                    console.error("Error checking BOM:", err);
-                    // On error, show the message to be safe
+                error: function () {
                     frappe.msgprint({
                         title: 'Action Required',
                         message: 'Please create a BOM for this item.',
@@ -169,8 +157,6 @@ frappe.ui.form.on("Item", {
                     });
                 }
             });
-        } else {
-            console.log("Item group does not require BOM");
         }
     }
 
@@ -255,12 +241,10 @@ function toggle_group_for_sub_assemblies_visibility(frm) {
 
 function update_decoupled_lead_time(frm, allow_when_dirty) {
     if (!frm.doc.item_code) {
-        console.log("[Lead Time] No item_code, skipping calculation");
         return;
     }
 
     if (frm.is_new() || frm.doc.__islocal) {
-        console.log("[Lead Time] Item is new/unsaved, skipping calculation until saved");
         if (frm.doc.lead_time_days) {
             frm.doc.custom_decoupled_lead_time = frm.doc.lead_time_days;
             frm.refresh_field('custom_decoupled_lead_time');
@@ -269,19 +253,8 @@ function update_decoupled_lead_time(frm, allow_when_dirty) {
     }
 
     if (!frm.fields_dict['custom_decoupled_lead_time']) {
-        console.log("[Lead Time] custom_decoupled_lead_time field not found");
         return;
     }
-
-    console.log("========================================");
-    console.log("[Lead Time] Starting calculation for item:", frm.doc.item_code);
-    console.log("[Lead Time] Item details:", {
-        item_code: frm.doc.item_code,
-        lead_time_days: frm.doc.lead_time_days,
-        custom_buffer_flag: frm.doc.custom_buffer_flag,
-        current_decoupled_lead_time: frm.doc.custom_decoupled_lead_time,
-        form_is_dirty: frm.is_dirty()
-    });
 
     const original_modified = frm.doc.modified;
     frappe.call({
@@ -290,17 +263,9 @@ function update_decoupled_lead_time(frm, allow_when_dirty) {
             item_code: frm.doc.item_code
         },
         callback: function (r) {
-            console.log("[Lead Time] Server response:", r);
-
             if (r.message !== undefined && r.message !== null) {
                 const current_value = frm.doc.custom_decoupled_lead_time;
                 const new_value = r.message;
-
-                console.log("[Lead Time] Calculation result:", {
-                    current_value: current_value,
-                    new_value: new_value,
-                    changed: current_value !== new_value
-                });
 
                 if (current_value !== new_value) {
                     const was_dirty = frm.is_dirty();
@@ -338,144 +303,8 @@ function update_decoupled_lead_time(frm, allow_when_dirty) {
                             }
                         }, 100);
                     }
-
-                    console.log("[Lead Time] Updated custom_decoupled_lead_time to:", new_value);
-                } else {
-                    console.log("[Lead Time] Value unchanged, no update needed");
                 }
-            } else {
-                console.warn("[Lead Time] Server returned null/undefined value");
             }
-
-            get_lead_time_debug_info(frm);
-        },
-        error: function (err) {
-            console.error("========================================");
-            console.error("[Lead Time] ERROR fetching decoupled lead time:");
-            console.error("Item Code:", frm.doc.item_code);
-            console.error("Error:", err);
-            if (err.exc) {
-                console.error("Exception:", err.exc);
-            }
-            if (err.exc_type) {
-                console.error("Exception Type:", err.exc_type);
-            }
-            console.error("========================================");
-        }
-    });
-}
-
-function get_lead_time_debug_info(frm) {
-    if (!frm.doc.item_code) {
-        return;
-    }
-
-    if (frm.is_new() || frm.doc.__islocal) {
-        console.log("[Lead Time] Item is new/unsaved, skipping debug info");
-        return;
-    }
-
-    console.log("[Lead Time] Fetching debug information...");
-
-    frappe.call({
-        method: "prakash_steel.utils.lead_time.debug_lead_time_calculation",
-        args: {
-            item_code: frm.doc.item_code
-        },
-        callback: function (r) {
-            console.log("========================================");
-            console.log("[Lead Time] DEBUG INFORMATION:");
-            console.log("========================================");
-
-            if (r.message) {
-                const debug = r.message;
-
-                if (debug.error) {
-                    console.error("[Lead Time] Debug Error:", debug.error);
-                    if (debug.traceback) {
-                        console.error("[Lead Time] Traceback:", debug.traceback);
-                    }
-                } else {
-                    console.log("Item Code:", debug.item_code);
-                    console.log("Lead Time Days:", debug.lead_time_days);
-                    console.log("Buffer Flag:", debug.custom_buffer_flag);
-                    console.log("Is Buffer:", debug.is_buffer);
-                    console.log("Has BOM:", debug.has_bom);
-                    console.log("BOM Name:", debug.bom_name);
-                    console.log("Calculated Decoupled Lead Time:", debug.calculated_decoupled_lead_time);
-
-                    console.log("Raw Calculation Trace:", debug.calculation_trace);
-                    if (debug.calculation_trace && debug.calculation_trace.length > 0) {
-                        console.log("\n[Lead Time] DETAILED CALCULATION BREAKDOWN:");
-                        console.log("========================================");
-                        debug.calculation_trace.forEach((trace, index) => {
-                            const indent = "  ".repeat(trace.level);
-                            console.log(`${indent}Level ${trace.level}: ${trace.item_code}`);
-                            console.log(`${indent}  Own Lead Time: ${trace.own_lead_time || 0}`);
-                            console.log(`${indent}  Is Buffer: ${trace.is_buffer}`);
-
-                            if (trace.is_buffer) {
-                                console.log(`${indent}  → Result: 0 (buffer item)`);
-                            } else if (!trace.has_bom) {
-                                console.log(`${indent}  → Result: ${trace.own_lead_time} (no BOM)`);
-                            } else {
-                                console.log(`${indent}  BOM: ${trace.bom_name || 'N/A'}`);
-
-                                if (trace.bom_items && trace.bom_items.length > 0) {
-                                    console.log(`${indent}  BOM Items:`);
-                                    trace.bom_items.forEach((item, idx) => {
-                                        if (item.error) {
-                                            console.log(`${indent}    ${idx + 1}. ${item.item_code}: ERROR - ${item.error}`);
-                                        } else {
-                                            const bufferNote = item.is_buffer ? " (BUFFER - IGNORED)" : "";
-                                            console.log(`${indent}    ${idx + 1}. ${item.item_code}: Lead Time = ${item.lead_time}${bufferNote}`);
-                                        }
-                                    });
-                                }
-
-                                if (trace.max_lead_time_at_level !== null && trace.max_lead_time_at_level !== undefined) {
-                                    console.log(`${indent}  Max Lead Time at Level: ${trace.max_lead_time_at_level}`);
-                                    if (trace.items_with_max && trace.items_with_max.length > 0) {
-                                        console.log(`${indent}  Item(s) with Max: ${trace.items_with_max.join(", ")}`);
-                                    }
-                                }
-
-                                if (trace.recursive_contribution !== null && trace.recursive_contribution !== undefined) {
-                                    console.log(`${indent}  Recursive Contribution: ${trace.recursive_contribution}`);
-                                }
-
-                                console.log(`${indent}  → Calculation: ${trace.own_lead_time || 0} + ${trace.max_lead_time_at_level || 0} + ${trace.recursive_contribution || 0} = ${trace.total}`);
-                            }
-                            console.log("");
-                        });
-                        console.log("========================================");
-                    }
-
-                    if (debug.bom_items && debug.bom_items.length > 0) {
-                        console.log("\n[Lead Time] BOM Items Summary:");
-                        debug.bom_items.forEach((item, index) => {
-                            if (item.error) {
-                                console.error(`  ${index + 1}. ${item.item_code}: ERROR - ${item.error}`);
-                            } else {
-                                console.log(`  ${index + 1}. ${item.item_code}:`, {
-                                    lead_time_days: item.lead_time_days,
-                                    buffer_flag: item.custom_buffer_flag,
-                                    is_buffer: item.is_buffer
-                                });
-                            }
-                        });
-                    } else if (debug.has_bom) {
-                        console.log("[Lead Time] BOM has no items or all items are buffer");
-                    }
-                }
-            } else {
-                console.warn("[Lead Time] No debug information returned");
-            }
-
-            console.log("========================================");
-        },
-        error: function (err) {
-            console.error("[Lead Time] Error fetching debug info:", err);
         }
     });
 }

@@ -80,7 +80,8 @@ class TestGetColumns(unittest.TestCase):
 class TestGetData(unittest.TestCase):
 	def _call(self, filters, period_months, sql_rows):
 		fn = _import()._get_data
-		with patch(f"{MOD}.frappe.db.sql", return_value=sql_rows):
+		with patch(f"{MOD}.frappe") as mock_frappe:
+			mock_frappe.db.sql.return_value = sql_rows
 			return fn(filters, period_months)
 
 	def test_empty_period_months_returns_empty(self):

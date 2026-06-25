@@ -182,7 +182,7 @@ def _get_employee_map() -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _create_checkins(checkins, employee_map) -> None:
+def _create_checkins(checkins, employee_map) -> dict:
 	success = failed = skipped = 0
 
 	for log in checkins:
@@ -197,6 +197,9 @@ def _create_checkins(checkins, employee_map) -> None:
 			continue
 
 		try:
+			# Permission decision: biometric sync runs either as a scheduled job (no
+			# user) or via manual_sync(), which already enforces Employee Checkin
+			# create/write permission. Records originate from the device, not the user.
 			frappe.get_doc(
 				{
 					"doctype": "Employee Checkin",
@@ -234,7 +237,7 @@ def _seconds_to_hhmmss(total_seconds) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _create_attendance(attendance_list, employee_map) -> None:
+def _create_attendance(attendance_list, employee_map) -> dict:
 	success = skipped = failed = 0
 
 	for rec in attendance_list:
@@ -310,6 +313,8 @@ def _insert_and_submit_attendance(employee, company, att_date, rec) -> None:
 		doc_data["custom_punch_out_time"] = rec["out_time"]
 
 	doc = frappe.get_doc(doc_data)
+	# Permission decision: Attendance is generated from synced device punches in a
+	# scheduled/gated context (see manual_sync permission checks); not user-entered.
 	doc.insert(ignore_permissions=True)
 	doc.submit()
 
@@ -412,7 +417,7 @@ def sync_essl_checkins(from_dt=None, to_dt=None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _mark_absent_employees(punched_user_ids, employee_map, att_date) -> None:
+def _mark_absent_employees(punched_user_ids, employee_map, att_date) -> dict:
 	"""
 	For every ESSL-mapped employee NOT in punched_user_ids, create a submitted
 	Absent attendance record (if one doesn't already exist for that date).
@@ -445,6 +450,8 @@ def _mark_absent_employees(punched_user_ids, employee_map, att_date) -> None:
 					"status": "Absent",
 				}
 			)
+			# Permission decision: system-generated "Absent" Attendance from the
+			# scheduled/gated biometric sync; bypasses interactive permission model.
 			doc.insert(ignore_permissions=True)
 			doc.submit()
 			success += 1

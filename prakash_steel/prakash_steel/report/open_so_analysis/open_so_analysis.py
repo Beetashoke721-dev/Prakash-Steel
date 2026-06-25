@@ -54,6 +54,12 @@ def get_conditions(filters) -> str:
 	if filters.get("warehouse"):
 		conditions += " and soi.warehouse = %(warehouse)s"
 
+	if filters.get("customer"):
+		conditions += " and so.customer = %(customer)s"
+
+	if filters.get("item_code"):
+		conditions += " and soi.item_code = %(item_code)s"
+
 	return conditions
 
 

@@ -7,7 +7,6 @@ if (!frappe.pages['item-insight-dashboard']) {
 }
 
 frappe.pages['item-insight-dashboard'].on_page_load = function (wrapper) {
-	console.log('Item Insight Dashboard page loading...');
 
 	// Build page shell
 	const page = frappe.ui.make_app_page({
@@ -149,7 +148,6 @@ frappe.pages['item-insight-dashboard'].on_page_load = function (wrapper) {
 };
 
 frappe.pages['item-insight-dashboard'].on_page_show = function () {
-	console.log('Item Insight Dashboard shown');
 };
 
 function initializeDashboard(state) {
