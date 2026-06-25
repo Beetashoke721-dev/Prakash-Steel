@@ -422,26 +422,23 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	}
 
 	// ── render both tabs ──────────────────────────────────────────────────────
-	function render_all(data) {
-		// Tab 1 – Analysis
-		let f_analysis = active_filter_analysis === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === active_filter_analysis);
-		build_filter_bar($filter_bar_analysis, data, active_filter_analysis, key => {
-			active_filter_analysis = key;
-			let fd = key === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === key);
-			build_filter_bar($filter_bar_analysis, data, key, arguments.callee);
-			render_table($table_wrap_analysis, COLS_ANALYSIS, fd, true);
-		});
-		render_table($table_wrap_analysis, COLS_ANALYSIS, f_analysis, true);
+	function filter_analysis(data, key) {
+		active_filter_analysis = key;
+		let fd = key === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === key);
+		build_filter_bar($filter_bar_analysis, data, key, k => filter_analysis(data, k));
+		render_table($table_wrap_analysis, COLS_ANALYSIS, fd, true);
+	}
 
-		// Tab 2 – Ready to Dispatch (read-only delay columns)
-		let f_dispatch = active_filter_dispatch === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === active_filter_dispatch);
-		build_filter_bar($filter_bar_dispatch, data, active_filter_dispatch, key => {
-			active_filter_dispatch = key;
-			let fd = key === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === key);
-			build_filter_bar($filter_bar_dispatch, data, key, arguments.callee);
-			render_table($table_wrap_dispatch, COLS_DISPATCH, fd, false);
-		});
-		render_table($table_wrap_dispatch, COLS_DISPATCH, f_dispatch, false);
+	function filter_dispatch(data, key) {
+		active_filter_dispatch = key;
+		let fd = key === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === key);
+		build_filter_bar($filter_bar_dispatch, data, key, k => filter_dispatch(data, k));
+		render_table($table_wrap_dispatch, COLS_DISPATCH, fd, false);
+	}
+
+	function render_all(data) {
+		filter_analysis(data, active_filter_analysis);
+		filter_dispatch(data, active_filter_dispatch);
 	}
 
 	// ── execute save ──────────────────────────────────────────────────────────

@@ -23,6 +23,25 @@ def set_custom_closed_on(doc, method=None) -> None:
 		doc.custom_closed_on = None
 
 
+def set_custom_completed_on(doc, method=None) -> None:
+	"""Store datetime when Purchase Order status changes to Completed."""
+	if not frappe.db.has_column(doc.doctype, "custom_completed_on"):
+		return
+
+	before = doc.get_doc_before_save()
+	prev_status = before.get("status") if before else None
+
+	if doc.status == "Completed" and prev_status != "Completed":
+		completed_on = now_datetime()
+		frappe.db.set_value(
+			doc.doctype, doc.name, "custom_completed_on", completed_on, update_modified=False
+		)
+		doc.custom_completed_on = completed_on
+	elif prev_status == "Completed" and doc.status != "Completed":
+		frappe.db.set_value(doc.doctype, doc.name, "custom_completed_on", None, update_modified=False)
+		doc.custom_completed_on = None
+
+
 def validate_purchase_order_quantity_on_close(doc, method=None) -> None:
 	"""
 	Validate Purchase Order items when status is changed to "Closed".

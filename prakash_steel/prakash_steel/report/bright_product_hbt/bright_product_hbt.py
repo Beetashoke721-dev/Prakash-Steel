@@ -2,7 +2,6 @@
 # For license information, please see license.txt
 
 from collections import defaultdict
-from datetime import date
 
 import frappe
 from frappe import _
@@ -15,9 +14,6 @@ from prakash_steel.utils.hbt_utils import (
 	period_date_range,
 )
 from prakash_steel.utils.whitelist_permissions import require_permission
-
-_EMPTY_BUCKETS: dict[str, float] = {"H": 0.0, "B": 0.0, "T": 0.0}
-
 
 # ---------------------------------------------------------------------------
 # Entry point
@@ -56,26 +52,20 @@ def _get_columns(view_by: str) -> list[dict]:
 	#     total_fieldtype = "Currency"
 	# else:
 	total_label = _("Total Sale Quantity")
-	total_fieldtype = "Float"
+	total_fieldtype = "Int"
 
 	return [
 		{"label": _("Item Name"), "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 220},
-		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160, "precision": 2},
-		*(
-			[
-				{"label": _("Consumption"), "fieldname": "consumption", "fieldtype": "Float", "width": 140, "precision": 2},
-				{"label": _("Total Value"), "fieldname": "total_value", "fieldtype": "Float", "width": 140, "precision": 2},
-			]
-			if view_by == "Sale Quantity"
-			else []
-		),
+		{"label": _("Item Type"), "fieldname": "item_type", "fieldtype": "Data", "width": 100},
+		{"label": _("SKU Type"), "fieldname": "sku_type", "fieldtype": "Data", "width": 110},
+		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160},
 		{"label": _("Contr%"), "fieldname": "contr_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("Cumu%"), "fieldname": "cumu_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("HBT"), "fieldname": "hbt", "fieldtype": "Data", "width": 60},
 		{"label": _("Frequency"), "fieldname": "frequency", "fieldtype": "Int", "width": 100},
-		{"label": _("H"), "fieldname": "h", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
-		{"label": _("B"), "fieldname": "b", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
-		{"label": _("T"), "fieldname": "t", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
+		{"label": "<span style='color:#1a7a3f;font-weight:700;'>Head Customer</span>", "fieldname": "h", "fieldtype": total_fieldtype, "width": 160},
+		{"label": "<span style='color:#d4a000;font-weight:700;'>Body Customer</span>", "fieldname": "b", "fieldtype": total_fieldtype, "width": 160},
+		{"label": "<span style='color:#c0152a;font-weight:700;'>Tail Customer</span>", "fieldname": "t", "fieldtype": total_fieldtype, "width": 160},
 	]
 
 
@@ -110,7 +100,7 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 		INNER JOIN `tabItem` i ON i.name = sii.item_code
 		WHERE
 			si.docstatus = 1
-			AND i.custom_item_type IN ('RB', 'Traded', 'BO')
+			AND i.custom_item_type = 'BB'
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY sii.item_code
 		ORDER BY total DESC
@@ -125,7 +115,7 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	# Step 2: company-wide customer-group HBT map
 	customer_hbt_map = get_customer_hbt_map(from_date, to_date, metric_col)
 
-	# Step 3: per-item per-customer-group totals (RB only)
+	# Step 3: per-item per-customer-group totals (BB only)
 	item_group_rows: list[dict] = frappe.db.sql(
 		f"""
 		SELECT
@@ -138,7 +128,7 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 		INNER JOIN `tabCustomer` cust ON cust.name = si.customer
 		WHERE
 			si.docstatus = 1
-			AND i.custom_item_type = 'RB'
+			AND i.custom_item_type = 'BB'
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY
 			sii.item_code,
@@ -149,78 +139,40 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	)
 
 	# Build {item_code: {H: x, B: x, T: x}} buckets
-	item_hbt_buckets: dict[str, dict[str, float]] = defaultdict(lambda: dict(_EMPTY_BUCKETS))
+	item_hbt_buckets: dict[str, dict[str, float]] = defaultdict(lambda: {"H": 0.0, "B": 0.0, "T": 0.0})
 	for r in item_group_rows:
 		bucket = customer_hbt_map.get(r.group_name, "T")
 		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
 
-	# Step 4: consumption from Bright Bar Production (Sale Quantity only)
-	consumption_map: dict[str, float] = {}
-	if view_by == "Sale Quantity":
-		consumption_map = _get_consumption_map(from_date, to_date)
+	# Step 4: assign HBT labels in-place via shared utility
+	assign_hbt_labels(raw_rows)
 
-	# Enrich raw_rows with consumption + total_value, then re-sort
-	for row in raw_rows:
-		consumption = consumption_map.get(row.item_code, 0.0)
-		row["consumption"] = consumption
-		row["total_value"] = float(row.total or 0) + consumption
+	# Step 5: fetch item_type and sku_type from Item master
+	item_codes = [row["item_code"] for row in raw_rows]
+	item_master_rows = frappe.db.sql(
+		"""
+		SELECT name AS item_code, custom_item_type AS item_type, custom_sku_type AS sku_type
+		FROM `tabItem` WHERE name IN %(item_codes)s
+		""",
+		{"item_codes": item_codes},
+		as_dict=True,
+	)
+	item_master_map = {r.item_code: r for r in item_master_rows}
 
-	if view_by == "Sale Quantity":
-		raw_rows.sort(key=lambda r: r["total_value"], reverse=True)
-
-	# Step 5: assign HBT labels using total_value when sorting by quantity
-	ranking_key = "total_value" if view_by == "Sale Quantity" else "total"
-	assign_hbt_labels(raw_rows, total_key=ranking_key)
-
+	_empty = {"H": 0.0, "B": 0.0, "T": 0.0}
 	return [
 		{
-			"item_code": row.item_code,
-			"total": float(row.total or 0),
-			"consumption": row.get("consumption", 0.0),
-			"total_value": row.get("total_value", float(row.total or 0)),
+			"item_code": row["item_code"],
+			"item_type": item_master_map.get(row["item_code"], {}).get("item_type") or "",
+			"sku_type": item_master_map.get(row["item_code"], {}).get("sku_type") or "",
+			"total": int(row["total"] or 0),
 			"contr_pct": row["contr_pct"],
 			"cumu_pct": row["cumu_pct"],
 			"hbt": row["hbt"],
-			"frequency": int(row.frequency or 0),
-			"h": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["H"],
-			"b": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["B"],
-			"t": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["T"],
+			"frequency": int(row["frequency"] or 0),
+			"h": int(item_hbt_buckets.get(row["item_code"], _empty)["H"]),
+			"b": int(item_hbt_buckets.get(row["item_code"], _empty)["B"]),
+			"t": int(item_hbt_buckets.get(row["item_code"], _empty)["T"]),
 		}
 		for row in raw_rows
 	]
-
-
-# ---------------------------------------------------------------------------
-# Consumption map
-# ---------------------------------------------------------------------------
-
-
-def _get_consumption_map(from_date: date, to_date: date) -> dict[str, float]:
-	"""Return ``{item_code: total_actual_rm_consumption}`` from submitted Bright Bar Production docs."""
-	rows: list[dict] = frappe.db.sql(
-		"""
-		SELECT material AS item_code, SUM(actual_rm_consumption) AS consumption
-		FROM `tabBright Bar Production`
-		WHERE docstatus = 1
-			AND NULLIF(material, '') IS NOT NULL
-			AND production_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY material
-
-		UNION ALL
-
-		SELECT raw_material AS item_code, SUM(actual_rm_consumption) AS consumption
-		FROM `tabBright Bar Production`
-		WHERE docstatus = 1
-			AND NULLIF(raw_material, '') IS NOT NULL
-			AND production_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY raw_material
-		""",
-		{"from_date": from_date, "to_date": to_date},
-		as_dict=True,
-	)
-
-	consumption_map: dict[str, float] = {}
-	for r in rows:
-		if r.item_code:
-			consumption_map[r.item_code] = consumption_map.get(r.item_code, 0.0) + float(r.consumption or 0)
-	return consumption_map

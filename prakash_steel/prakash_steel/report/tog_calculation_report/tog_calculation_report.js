@@ -193,27 +193,27 @@ function tog_debug_item(item_code) {
 frappe.query_reports["Tog calculation report"] = {
 	filters: [],
 
-	onload: function (report) {
-		report.page.add_inner_button(__("Debug Item"), function () {
-			var d = new frappe.ui.Dialog({
-				title: __("Debug Item — Tog Calculation"),
-				fields: [
-					{
-						fieldtype: "Link",
-						fieldname: "item_code",
-						options: "Item",
-						label: __("Item Code"),
-						reqd: 1,
-						description: __("Open DevTools Console (F12) before clicking Show"),
-					},
-				],
-				primary_action_label: __("Show in Console"),
-				primary_action: function (values) {
-					d.hide();
-					tog_debug_item(values.item_code);
-				},
-			});
-			d.show();
-		});
-	},
+	// onload: function (report) {
+	// 	report.page.add_inner_button(__("Debug Item"), function () {
+	// 		var d = new frappe.ui.Dialog({
+	// 			title: __("Debug Item — Tog Calculation"),
+	// 			fields: [
+	// 				{
+	// 					fieldtype: "Link",
+	// 					fieldname: "item_code",
+	// 					options: "Item",
+	// 					label: __("Item Code"),
+	// 					reqd: 1,
+	// 					description: __("Open DevTools Console (F12) before clicking Show"),
+	// 				},
+	// 			],
+	// 			primary_action_label: __("Show in Console"),
+	// 			primary_action: function (values) {
+	// 				d.hide();
+	// 				tog_debug_item(values.item_code);
+	// 			},
+	// 		});
+	// 		d.show();
+	// 	});
+	// },
 };
