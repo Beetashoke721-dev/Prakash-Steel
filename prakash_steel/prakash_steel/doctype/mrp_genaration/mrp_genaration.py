@@ -96,7 +96,7 @@ def _generate_mrp_order_recommendations_worker() -> None:
 		job = frappe.get_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
-	except:
+	except Exception:
 		pass
 
 	if not job_id:
@@ -470,7 +470,7 @@ def _generate_mrp_order_recommendations_worker() -> None:
 		job = frappe.get_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
-	except:
+	except Exception:
 		pass
 
 	if not job_id:
@@ -498,34 +498,6 @@ def _generate_mrp_order_recommendations_worker() -> None:
 	frappe.log_error(completion_msg, "MRP Generation Job")
 
 	return result
-
-
-@frappe.whitelist()
-def get_mr_creation_progress(job_id) -> dict | list:
-	"""
-	Get progress of Material Request creation job.
-	Returns: current, total, percent, current_item, success_count, error_count
-	"""
-	if not frappe.has_permission("Item", "report"):
-		frappe.throw("Not permitted to access MRP job progress.", frappe.PermissionError)
-
-	if not job_id:
-		return {"error": "Job ID is required"}
-
-	progress_cache_key = f"mr_creation_progress_{job_id}"
-	progress = frappe.cache().get_value(progress_cache_key)
-
-	if progress:
-		return progress
-	else:
-		return {
-			"current": 0,
-			"total": 0,
-			"percent": 0,
-			"current_item": None,
-			"success_count": 0,
-			"error_count": 0,
-		}
 
 
 @frappe.whitelist()
@@ -623,7 +595,7 @@ def get_mrp_job_result(job_id) -> dict | list:
 
 
 @frappe.whitelist()
-def get_mr_creation_progress(job_id) -> dict | None:  # noqa: F811
+def get_mr_creation_progress(job_id) -> dict | None:
 	"""
 	Get progress of Material Request creation job.
 	Returns: current, total, percent, current_item, success_count, error_count
@@ -689,7 +661,7 @@ def list_active_mrp_jobs() -> None:
 					"created_at": str(job.created_at) if hasattr(job, "created_at") else None,
 				}
 			)
-		except:
+		except Exception:
 			active_jobs.append(
 				{
 					"job_id": mrp_job_id,
@@ -715,7 +687,7 @@ def list_active_mrp_jobs() -> None:
 					"created_at": str(job.created_at) if hasattr(job, "created_at") else None,
 				}
 			)
-		except:
+		except Exception:
 			active_jobs.append(
 				{
 					"job_id": mr_job_id,
@@ -940,7 +912,7 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 		job = frappe.get_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
-	except:  # noqa: E722
+	except Exception:
 		pass
 
 	if not job_id:
@@ -999,7 +971,7 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 			mrp_result = frappe.cache().get_value(cache_key)
 			if mrp_result:
 				detailed_info = mrp_result.get("detailed_info", {})
-	except:
+	except Exception:
 		pass
 
 	# Filter items with net_order_recommendation > 0
@@ -1124,7 +1096,7 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 		job = frappe.get_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
-	except:
+	except Exception:
 		pass
 
 	if not job_id:

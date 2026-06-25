@@ -178,6 +178,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	let $panel_dispatch  = $(`<div class="so-tab-panel" data-panel="dispatch"></div>`).appendTo($wrap);
 
 	// each panel has its own filter bar + table wrap
+	let $filter_bar_analysis = $(`<div class="so-filter-bar"></div>`).appendTo($panel_analysis);
 	let $table_wrap_analysis = $(`<div class="so-table-wrap"></div>`).appendTo($panel_analysis);
 
 	let $filter_bar_dispatch = $(`<div class="so-filter-bar"></div>`).appendTo($panel_dispatch);
@@ -201,6 +202,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	let all_data             = [];
 	let delay_reasons        = [];
 	let changes              = {};
+	let active_filter_analysis = "ALL";
 	let active_filter_dispatch = "ALL";
 	let dt_instances         = { analysis: null, dispatch: null };
 
@@ -212,8 +214,8 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	// ── colour filter buttons ─────────────────────────────────────────────────
 	const COLOR_FILTERS = [
 		{ key: "ALL",    label: "All",    bg: "#607d8b", fg: "#fff"    },
-		{ key: "GREEN",  label: "Green",  bg: "#00c853", fg: "#003300" },
-		{ key: "YELLOW", label: "Yellow", bg: "#ffd600", fg: "#3d2f00" },
+		{ key: "GREEN",  label: "Green",  bg: "#00c853", fg: "#003300", count_fg: "#fff" },
+		{ key: "YELLOW", label: "Yellow", bg: "#ffd600", fg: "#3d2f00", count_fg: "#fff" },
 		{ key: "RED",    label: "Red",    bg: "#e53935", fg: "#fff"    },
 		{ key: "BLACK",  label: "Black",  bg: "#212121", fg: "#fff"    },
 		{ key: "WHITE",  label: "White",  bg: "#e0e0e0", fg: "#333"    },
@@ -231,7 +233,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			let $btn = $(`
 				<div class="so-btn ${active_key === f.key ? "active" : ""}"
 					style="background:${f.bg};color:${f.fg};">
-					${f.label} <span class="so-btn-count">${counts[f.key]}</span>
+					${f.label} <span class="so-btn-count"${f.count_fg ? ` style="color:${f.count_fg};"` : ""}>${counts[f.key]}</span>
 				</div>
 			`);
 			$btn.on("click", () => on_click(f.key));
@@ -398,19 +400,61 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		let total_pending = data.reduce((sum, r) => sum + (parseFloat(r.pending_qty) || 0), 0);
 		let pending_idx = cols.findIndex(c => c.fieldname === "pending_qty");
 		if (pending_idx >= 0) {
-			let cells = cols.map((c, i) => {
-				let st = "padding:6px 10px;border-top:2px solid #b0c8df;white-space:nowrap;font-size:12px;";
-				if (i === 0) return `<td style="${st}font-weight:700;">Total</td>`;
-				if (i === pending_idx) return `<td style="${st}font-weight:700;">${total_pending % 1 === 0 ? total_pending : total_pending.toFixed(2)}</td>`;
-				return `<td style="${st}"></td>`;
-			}).join("");
-			$wrap_el.append(`
-				<div style="overflow-x:auto;">
-					<table style="border-collapse:collapse;background:linear-gradient(135deg,#dce8f5,#c5d9ee);min-width:max-content;width:100%;">
-						<tr>${cells}</tr>
+			let total_pending_str = total_pending % 1 === 0 ? total_pending : total_pending.toFixed(2);
+			let $total = $(`
+				<div class="so-total-row" style="overflow:hidden;">
+					<table style="border-collapse:collapse;background:linear-gradient(135deg,#dce8f5,#c5d9ee);table-layout:fixed;">
+						<colgroup></colgroup>
+						<tr></tr>
 					</table>
 				</div>
 			`);
+			$wrap_el.append($total);
+
+			// Mirror the DataTable's actual rendered column widths so the total value
+			// stays aligned under the "Qty to Deliver" column, and keep its horizontal
+			// scroll in sync with the table body so it moves together when scrolling.
+			let sync_total = () => {
+				let $scrollable = $dt_el.find(".dt-scrollable");
+				// Measure widths from the first body row (one cell per column, no
+				// serial/checkbox columns here); fall back to the header row.
+				let $cells = $scrollable.find(".dt-row").first().find(".dt-cell");
+				if (!$cells.length) $cells = $dt_el.find(".dt-header .dt-cell--header");
+				if (!$cells.length) return;
+
+				let widths = $cells.map((i, el) => $(el).outerWidth()).get();
+				let $colgroup = $total.find("colgroup").empty();
+				let $tr = $total.find("tr").empty();
+				let st = "padding:6px 10px;border-top:2px solid #b0c8df;white-space:nowrap;font-size:12px;overflow:hidden;text-overflow:ellipsis;";
+
+				cols.forEach((c, i) => {
+					let w = widths[i] || c.width || 120;
+					$colgroup.append(`<col style="width:${w}px;">`);
+					if (i === 0) {
+						$tr.append(`<td style="${st}font-weight:700;">Total</td>`);
+					} else if (i === pending_idx) {
+						$tr.append(`<td style="${st}font-weight:700;text-align:right;">${total_pending_str}</td>`);
+					} else {
+						$tr.append(`<td style="${st}"></td>`);
+					}
+				});
+
+				let total_width = widths.reduce((a, b) => a + b, 0);
+				$total.find("table").css("width", total_width + "px");
+
+				let $scroll = $scrollable.length ? $scrollable : $dt_el.find(".dt-scrollable");
+				if ($scroll.length) {
+					$scroll.off("scroll.so-total").on("scroll.so-total", function () {
+						$total.scrollLeft(this.scrollLeft);
+					});
+					$total.scrollLeft($scroll.scrollLeft());
+				}
+			};
+
+			// DataTable finalizes column widths asynchronously after construction.
+			sync_total();
+			setTimeout(sync_total, 100);
+			$(window).off("resize.so-total").on("resize.so-total", sync_total);
 		}
 
 		if (!editable) return;
@@ -466,8 +510,15 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		render_table($table_wrap_dispatch, COLS_DISPATCH, fd, false, "dispatch");
 	}
 
+	function filter_analysis(data, key) {
+		active_filter_analysis = key;
+		let fd = key === "ALL" ? data : data.filter(r => (r.order_status || "").toUpperCase() === key);
+		build_filter_bar($filter_bar_analysis, data, key, k => filter_analysis(data, k));
+		render_table($table_wrap_analysis, COLS_ANALYSIS, fd, true, "analysis");
+	}
+
 	function render_all(data) {
-		render_table($table_wrap_analysis, COLS_ANALYSIS, data, true, "analysis");
+		filter_analysis(data, active_filter_analysis);
 		filter_dispatch(data, active_filter_dispatch);
 	}
 
@@ -545,6 +596,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		}
 
 		changes = {};
+		active_filter_analysis = "ALL";
 		active_filter_dispatch = "ALL";
 
 		// Destroy existing DataTable instances before clearing the DOM
@@ -555,6 +607,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			}
 		});
 
+		$filter_bar_analysis.empty();
 		$filter_bar_dispatch.empty();
 		let loading = `<div style="text-align:center;padding:60px;color:#888;">Loading…</div>`;
 		$table_wrap_analysis.html(loading);
@@ -569,6 +622,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 
 				if (!result || !result.length) {
 					let empty = `<div style="text-align:center;padding:60px;color:#888;">No data found.</div>`;
+					$filter_bar_analysis.empty();
 					$filter_bar_dispatch.empty();
 					$table_wrap_analysis.html(empty);
 					$table_wrap_dispatch.html(empty);

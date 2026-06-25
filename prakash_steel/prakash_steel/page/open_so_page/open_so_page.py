@@ -1,8 +1,11 @@
 import frappe
 
+from prakash_steel.utils.whitelist_permissions import require_permission
+
 
 @frappe.whitelist()
 def get_delay_reasons():
+	require_permission("Sales Order", "read")
 	return frappe.get_all(
 		"Delivery Delay Reason Master",
 		fields=["name", "delay_reason"],
@@ -12,6 +15,7 @@ def get_delay_reasons():
 
 @frappe.whitelist()
 def save_delay_info(rows):
+	require_permission("Sales Order", "write")
 	if isinstance(rows, str):
 		import json
 		rows = json.loads(rows)

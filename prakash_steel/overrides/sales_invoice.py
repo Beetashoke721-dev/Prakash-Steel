@@ -374,7 +374,10 @@ class CustomSalesInvoice(SalesInvoice):
 			stock_entry.posting_date = posting_date
 			stock_entry.posting_time = posting_time
 
-			# Insert the stock entry
+			# Permission decision: this stock entry is created automatically as a side
+			# effect of submitting the Sales Invoice (server-side document event). The
+			# user's permission to act has already been enforced by the Sales Invoice
+			# submit; the auto-generated Stock Entry bypasses the interactive check.
 			stock_entry.insert(ignore_permissions=True)
 
 			# Submit the stock entry

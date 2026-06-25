@@ -106,6 +106,9 @@ def save_daily_on_hand_colour() -> None:
 		if saved_rows == 0:
 			return
 
+		# Permission decision: this runs as a scheduled job (no logged-in user) and
+		# persists a system-generated daily colour snapshot, so it must bypass the
+		# interactive permission model. Inputs are derived server-side, not user-supplied.
 		doc.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception as e:
@@ -1437,7 +1440,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 							sku_type_list = [str(s).strip() for s in parsed if s]
 						else:
 							sku_type_list = [str(parsed).strip()] if parsed else []
-					except:
+					except (ValueError, TypeError):
 						# If JSON parsing fails, treat as comma-separated string
 						sku_type_list = [s.strip() for s in sku_type_filter.split(",") if s.strip()]
 				else:
@@ -1704,7 +1707,7 @@ def create_material_requests_automatically(filters: dict | str | None = None) ->
 
 		try:
 			filters = json.loads(filters)
-		except:
+		except (ValueError, TypeError):
 			filters = {}
 
 	if not filters:

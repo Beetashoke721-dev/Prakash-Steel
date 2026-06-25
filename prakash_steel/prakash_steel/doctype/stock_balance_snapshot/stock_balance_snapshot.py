@@ -56,6 +56,9 @@ def _capture_snapshot(trigger="Scheduled", filters=None) -> None:
 		)
 
 	snap.row_count = len(snap.items)
+	# Permission decision: snapshots are system-generated. Scheduled capture has no
+	# user; the manual trigger (run_manual_snapshot) already enforces create+write
+	# via require_all_permissions(). Data is computed server-side, not user-supplied.
 	snap.insert(ignore_permissions=True)
 	frappe.db.commit()
 	return snap.name

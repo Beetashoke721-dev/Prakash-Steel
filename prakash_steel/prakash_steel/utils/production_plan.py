@@ -105,6 +105,9 @@ def create_billet_cutting_for_rolled_plan(production_plan_name: str) -> dict:
 				billet_doc.billet_weight = 0
 				billet_doc.total_billet_cutting_pcs = 0
 
+				# Permission decision: the whitelisted entry point already enforces the
+				# caller's permission; these Billet Cutting rows are derived server-side
+				# from the Production Plan, so the auto-insert bypasses the interactive check.
 				billet_doc.insert(ignore_permissions=True)
 
 				created_docs.append(

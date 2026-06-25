@@ -197,6 +197,9 @@ def _create_checkins(checkins, employee_map) -> dict:
 			continue
 
 		try:
+			# Permission decision: biometric sync runs either as a scheduled job (no
+			# user) or via manual_sync(), which already enforces Employee Checkin
+			# create/write permission. Records originate from the device, not the user.
 			frappe.get_doc(
 				{
 					"doctype": "Employee Checkin",
@@ -310,6 +313,8 @@ def _insert_and_submit_attendance(employee, company, att_date, rec) -> None:
 		doc_data["custom_punch_out_time"] = rec["out_time"]
 
 	doc = frappe.get_doc(doc_data)
+	# Permission decision: Attendance is generated from synced device punches in a
+	# scheduled/gated context (see manual_sync permission checks); not user-entered.
 	doc.insert(ignore_permissions=True)
 	doc.submit()
 
@@ -445,6 +450,8 @@ def _mark_absent_employees(punched_user_ids, employee_map, att_date) -> dict:
 					"status": "Absent",
 				}
 			)
+			# Permission decision: system-generated "Absent" Attendance from the
+			# scheduled/gated biometric sync; bypasses interactive permission model.
 			doc.insert(ignore_permissions=True)
 			doc.submit()
 			success += 1
