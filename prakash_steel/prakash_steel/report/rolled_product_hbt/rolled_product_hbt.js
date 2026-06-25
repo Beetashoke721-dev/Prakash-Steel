@@ -1,7 +1,9 @@
+
+
 // Copyright (c) 2026, Beetashoke Chakraborty and contributors
 // For license information, please see license.txt
 
-frappe.query_reports["Bright Production HBT"] = {
+frappe.query_reports["Rolled Product HBT"] = {
 	filters: [
 		{
 			fieldname: "view_by",

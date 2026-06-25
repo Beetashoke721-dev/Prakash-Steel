@@ -13,11 +13,11 @@
  "modified": "2026-06-20 11:44:32.036327",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
- "name": "Rolled Production HBT",
+ "name": "Rolled Product HBT",
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Item",
- "report_name": "Rolled Production HBT",
+ "report_name": "Rolled Product HBT",
  "report_type": "Script Report",
  "roles": [
   {
