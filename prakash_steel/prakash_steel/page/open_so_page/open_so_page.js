@@ -110,10 +110,27 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		fieldtype: "MultiSelectList", options: "Sales Order",
 		change() { refresh(); },
 	});
+	let customer_field = page.add_field({
+		fieldname: "customer", label: __("Customer"),
+		fieldtype: "Link", options: "Customer",
+		change() { refresh(); },
+	});
+	let item_code_field = page.add_field({
+		fieldname: "item_code", label: __("Item Code"),
+		fieldtype: "Link", options: "Item",
+		change() { refresh(); },
+	});
 	let warehouse_field = page.add_field({
 		fieldname: "warehouse", label: __("Warehouse"),
 		fieldtype: "Link", options: "Warehouse",
 		change() { refresh(); },
+	});
+
+	// The Link "clear" (×) button only does `$input.val("").focus()` and never
+	// fires a native change event, so `change()` above won't run on clear.
+	// Bind the clear button explicitly so removing a filter auto-refreshes.
+	[customer_field, item_code_field, warehouse_field].forEach((f) => {
+		f.$wrapper.find(".btn-clear").on("click", () => setTimeout(() => refresh(), 100));
 	});
 	let status_field = page.add_field({
 		fieldname: "status", label: __("Status"), fieldtype: "MultiSelectList",
@@ -514,6 +531,8 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			from_date:           from_date_field.get_value(),
 			to_date:             to_date_field.get_value(),
 			sales_order:         sales_order_field.get_value(),
+			customer:            customer_field.get_value(),
+			item_code:           item_code_field.get_value(),
 			warehouse:           warehouse_field.get_value(),
 			status:              status_field.get_value(),
 			line_fullkit_status: ["Partial", "Full-kit", "Pending"],
