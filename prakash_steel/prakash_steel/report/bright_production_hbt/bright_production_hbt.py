@@ -52,18 +52,20 @@ def _get_columns(view_by: str) -> list[dict]:
 	#     total_fieldtype = "Currency"
 	# else:
 	total_label = _("Total Sale Quantity")
-	total_fieldtype = "Float"
+	total_fieldtype = "Int"
 
 	return [
 		{"label": _("Item Name"), "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 220},
-		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160, "precision": 2},
+		{"label": _("Item Type"), "fieldname": "item_type", "fieldtype": "Data", "width": 100},
+		{"label": _("SKU Type"), "fieldname": "sku_type", "fieldtype": "Data", "width": 110},
+		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160},
 		{"label": _("Contr%"), "fieldname": "contr_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("Cumu%"), "fieldname": "cumu_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("HBT"), "fieldname": "hbt", "fieldtype": "Data", "width": 60},
 		{"label": _("Frequency"), "fieldname": "frequency", "fieldtype": "Int", "width": 100},
-		{"label": _("H"), "fieldname": "h", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
-		{"label": _("B"), "fieldname": "b", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
-		{"label": _("T"), "fieldname": "t", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
+		{"label": _("Head Customer"), "fieldname": "h", "fieldtype": total_fieldtype, "width": 160},
+		{"label": _("Body Customer"), "fieldname": "b", "fieldtype": total_fieldtype, "width": 160},
+		{"label": _("Tail Customer"), "fieldname": "t", "fieldtype": total_fieldtype, "width": 160},
 	]
 
 
@@ -145,18 +147,32 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	# Step 4: assign HBT labels in-place via shared utility
 	assign_hbt_labels(raw_rows)
 
+	# Step 5: fetch item_type and sku_type from Item master
+	item_codes = [row["item_code"] for row in raw_rows]
+	item_master_rows = frappe.db.sql(
+		"""
+		SELECT name AS item_code, custom_item_type AS item_type, custom_sku_type AS sku_type
+		FROM `tabItem` WHERE name IN %(item_codes)s
+		""",
+		{"item_codes": item_codes},
+		as_dict=True,
+	)
+	item_master_map = {r.item_code: r for r in item_master_rows}
+
 	_empty = {"H": 0.0, "B": 0.0, "T": 0.0}
 	return [
 		{
 			"item_code": row["item_code"],
-			"total": float(row["total"] or 0),
+			"item_type": item_master_map.get(row["item_code"], {}).get("item_type") or "",
+			"sku_type": item_master_map.get(row["item_code"], {}).get("sku_type") or "",
+			"total": int(row["total"] or 0),
 			"contr_pct": row["contr_pct"],
 			"cumu_pct": row["cumu_pct"],
 			"hbt": row["hbt"],
 			"frequency": int(row["frequency"] or 0),
-			"h": item_hbt_buckets.get(row["item_code"], _empty)["H"],
-			"b": item_hbt_buckets.get(row["item_code"], _empty)["B"],
-			"t": item_hbt_buckets.get(row["item_code"], _empty)["T"],
+			"h": int(item_hbt_buckets.get(row["item_code"], _empty)["H"]),
+			"b": int(item_hbt_buckets.get(row["item_code"], _empty)["B"]),
+			"t": int(item_hbt_buckets.get(row["item_code"], _empty)["T"]),
 		}
 		for row in raw_rows
 	]

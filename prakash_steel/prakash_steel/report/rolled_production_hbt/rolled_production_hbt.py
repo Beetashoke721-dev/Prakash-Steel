@@ -56,15 +56,17 @@ def _get_columns(view_by: str) -> list[dict]:
 	#     total_fieldtype = "Currency"
 	# else:
 	total_label = _("Total Sale Quantity")
-	total_fieldtype = "Float"
+	total_fieldtype = "Int"
 
 	return [
 		{"label": _("Item Name"), "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 220},
-		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160, "precision": 2},
+		{"label": _("Item Type"), "fieldname": "item_type", "fieldtype": "Data", "width": 100},
+		{"label": _("SKU Type"), "fieldname": "sku_type", "fieldtype": "Data", "width": 110},
+		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160},
 		*(
 			[
-				{"label": _("Consumption"), "fieldname": "consumption", "fieldtype": "Float", "width": 140, "precision": 2},
-				{"label": _("Total Value"), "fieldname": "total_value", "fieldtype": "Float", "width": 140, "precision": 2},
+				{"label": _("Consumption"), "fieldname": "consumption", "fieldtype": "Int", "width": 140},
+				{"label": _("Total Value"), "fieldname": "total_value", "fieldtype": "Int", "width": 140},
 			]
 			if view_by == "Sale Quantity"
 			else []
@@ -73,9 +75,9 @@ def _get_columns(view_by: str) -> list[dict]:
 		{"label": _("Cumu%"), "fieldname": "cumu_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("HBT"), "fieldname": "hbt", "fieldtype": "Data", "width": 60},
 		{"label": _("Frequency"), "fieldname": "frequency", "fieldtype": "Int", "width": 100},
-		{"label": _("H"), "fieldname": "h", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
-		{"label": _("B"), "fieldname": "b", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
-		{"label": _("T"), "fieldname": "t", "fieldtype": total_fieldtype, "width": 140, "precision": 2},
+		{"label": _("Head Customer"), "fieldname": "h", "fieldtype": total_fieldtype, "width": 160},
+		{"label": _("Body Customer"), "fieldname": "b", "fieldtype": total_fieldtype, "width": 160},
+		{"label": _("Tail Customer"), "fieldname": "t", "fieldtype": total_fieldtype, "width": 160},
 	]
 
 
@@ -172,19 +174,33 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	ranking_key = "total_value" if view_by == "Sale Quantity" else "total"
 	assign_hbt_labels(raw_rows, total_key=ranking_key)
 
+	# Step 6: fetch item_type and sku_type from Item master
+	item_codes = [row.item_code for row in raw_rows]
+	item_master_rows = frappe.db.sql(
+		"""
+		SELECT name AS item_code, custom_item_type AS item_type, custom_sku_type AS sku_type
+		FROM `tabItem` WHERE name IN %(item_codes)s
+		""",
+		{"item_codes": item_codes},
+		as_dict=True,
+	)
+	item_master_map = {r.item_code: r for r in item_master_rows}
+
 	return [
 		{
 			"item_code": row.item_code,
-			"total": float(row.total or 0),
-			"consumption": row.get("consumption", 0.0),
-			"total_value": row.get("total_value", float(row.total or 0)),
+			"item_type": item_master_map.get(row.item_code, {}).get("item_type") or "",
+			"sku_type": item_master_map.get(row.item_code, {}).get("sku_type") or "",
+			"total": int(row.total or 0),
+			"consumption": int(row.get("consumption", 0)),
+			"total_value": int(row.get("total_value", int(row.total or 0))),
 			"contr_pct": row["contr_pct"],
 			"cumu_pct": row["cumu_pct"],
 			"hbt": row["hbt"],
 			"frequency": int(row.frequency or 0),
-			"h": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["H"],
-			"b": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["B"],
-			"t": item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["T"],
+			"h": int(item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["H"]),
+			"b": int(item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["B"]),
+			"t": int(item_hbt_buckets.get(row.item_code, _EMPTY_BUCKETS)["T"]),
 		}
 		for row in raw_rows
 	]

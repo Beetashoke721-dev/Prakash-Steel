@@ -50,11 +50,11 @@ def _get_columns(view_by: str) -> list[dict]:
 	#     total_fieldtype = "Currency"
 	# else:
 	total_label = _("Total Sale Quantity")
-	total_fieldtype = "Float"
+	total_fieldtype = "Int"
 
 	return [
 		{"label": _("Customer / Group"), "fieldname": "group_name", "fieldtype": "Data", "width": 220},
-		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160, "precision": 2},
+		{"label": total_label, "fieldname": "total", "fieldtype": total_fieldtype, "width": 160},
 		{"label": _("Contr%"), "fieldname": "contr_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("Cumu%"), "fieldname": "cumu_pct", "fieldtype": "Percent", "width": 100, "precision": 1},
 		{"label": _("HBT"), "fieldname": "hbt", "fieldtype": "Data", "width": 60},
@@ -109,7 +109,7 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 	return [
 		{
 			"group_name": row["group_name"],
-			"total": float(row["total"] or 0),
+			"total": int(row["total"] or 0),
 			"contr_pct": row["contr_pct"],
 			"cumu_pct": row["cumu_pct"],
 			"hbt": row["hbt"],

@@ -59,9 +59,8 @@ def _get_columns(period_months: list[tuple[int, int]]) -> list[dict]:
 			{
 				"label": f"{MONTH_SHORT[month]} {str(year)[-2:]}",
 				"fieldname": month_key(year, month),
-				"fieldtype": "Float",
+				"fieldtype": "Int",
 				"width": 110,
-				"precision": 2,
 			}
 		)
 
@@ -116,14 +115,14 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 	)
 
 	period_lookup: dict[tuple[int, int], str] = {(y, m): month_key(y, m) for y, m in period_months}
-	empty_row: dict[str, float] = {fn: 0.0 for fn in period_lookup.values()}
-	group_data: dict[str, dict[str, float]] = defaultdict(lambda: dict(empty_row))
+	empty_row: dict[str, int] = {fn: 0 for fn in period_lookup.values()}
+	group_data: dict[str, dict[str, int]] = defaultdict(lambda: dict(empty_row))
 
 	for row in raw_rows:
 		key = (int(row.yr), int(row.mo))
 		fieldname = period_lookup.get(key)
 		if fieldname:
-			group_data[row.group_name][fieldname] += float(row.val or 0)
+			group_data[row.group_name][fieldname] += int(row.val or 0)
 
 	hbt_map = get_customer_hbt_map(from_date, to_date, metric_col)
 
