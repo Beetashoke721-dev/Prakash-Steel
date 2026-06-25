@@ -108,6 +108,15 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	let sales_order_field = page.add_field({
 		fieldname: "sales_order", label: __("Sales Order"),
 		fieldtype: "MultiSelectList", options: "Sales Order",
+		get_data(txt) {
+			let filters = { docstatus: 1 };
+			const from_date = from_date_field.get_value();
+			const to_date = to_date_field.get_value();
+			if (from_date && to_date) {
+				filters.transaction_date = ["between", [from_date, to_date]];
+			}
+			return frappe.db.get_link_options("Sales Order", txt, filters);
+		},
 		change() { refresh(); },
 	});
 	let customer_field = page.add_field({
