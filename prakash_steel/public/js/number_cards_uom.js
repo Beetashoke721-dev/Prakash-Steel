@@ -19,7 +19,6 @@
             callback: function (r) {
                 uom_settings = r.message || {};
                 settings_loaded = true;
-                console.log("UOM Settings loaded:", uom_settings);
                 callback && callback();
             }
         });
@@ -39,12 +38,6 @@
             // Try to find UOM by widget name first, then by label
             let uom = uom_settings[widget_name] || uom_settings[widget_label];
 
-            // Debug logging
-            if (!$widget.attr("data-uom-logged")) {
-                console.log("Widget:", widget_name, "| Label:", widget_label, "| UOM found:", uom);
-                $widget.attr("data-uom-logged", "true");
-            }
-
             if (!uom) return;
 
             // Find the value element
@@ -58,7 +51,6 @@
             if (!current_text.endsWith(uom)) {
                 $value.text(current_text + " " + uom);
                 $widget.attr("data-uom-done", "true");
-                console.log("✅ Applied UOM:", current_text, "->", current_text + " " + uom);
             }
         });
     }
@@ -82,11 +74,9 @@
 
         // Reload settings and reset on page change
         $(document).on("page-change", function () {
-            $(".number-widget-box").removeAttr("data-uom-done").removeAttr("data-uom-logged");
+            $(".number-widget-box").removeAttr("data-uom-done");
             settings_loaded = false;
             load_uom_settings();
         });
-
-        console.log("Number Card UOM override loaded!");
     });
 })();

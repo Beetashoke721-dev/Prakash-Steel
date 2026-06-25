@@ -57,6 +57,8 @@ def _create_billet_cutting_for_rows(production_planning_name, rows, shift_type, 
 		billet_doc.billet_weight = 0
 		billet_doc.total_billet_cutting_pcs = 0
 
+		# Permission decision: caller permission is enforced at the whitelisted entry
+		# point; these Billet Cutting rows are derived server-side from Production Planning.
 		billet_doc.insert(ignore_permissions=True)
 		created.append(billet_doc.name)
 
@@ -137,6 +139,9 @@ def update_production_plan(source_name, items) -> None:
 			)
 
 	doc.flags.ignore_validate_update_after_submit = True
+	# Permission decision: update_production_plan already enforces Production Planning
+	# write + Billet Cutting create via require_all_permissions() above; this save
+	# bypasses the update-after-submit interactive check, not the permission decision.
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
 

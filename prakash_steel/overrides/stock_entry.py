@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
-from frappe.utils import flt, formatdate, format_time
+from frappe.utils import flt
 from erpnext.stock.stock_ledger import (
     NegativeStockError,
     get_previous_sle,
@@ -22,13 +22,6 @@ class CustomStockEntry(StockEntry):
 
     def validate(self):
         """Override validate to check stock availability on save (docstatus 0) as well."""
-        print("=" * 80)
-        print("[CONSOLE] CustomStockEntry.validate() called")
-        print(f"[CONSOLE] Document name: {self.name}")
-        print(f"[CONSOLE] Document status: {self.docstatus}")
-        print(f"[CONSOLE] Number of items: {len(self.items) if self.items else 0}")
-        print("=" * 80)
-        
         # Call parent validate first
         super().validate()
 
@@ -57,11 +50,7 @@ class CustomStockEntry(StockEntry):
                         item.basic_rate = rm_cost / flt(item.qty)
                         item.basic_amount = flt(item.basic_rate) * flt(item.qty)
 
-        # Check stock availability during save (docstatus 0) and submit (docstatus 1)
-        print("[CONSOLE] Calling validate_stock_availability()...")
         self.validate_stock_availability()
-        print("[CONSOLE] validate_stock_availability() completed")
-        print("=" * 80)
 
     def get_basic_rate_for_manufactured_item(self, finished_item_qty, outgoing_items_cost=0) -> float:
         """Prevent negative FG rate when RM cost is zero but scrap has existing valuation.
@@ -70,39 +59,27 @@ class CustomStockEntry(StockEntry):
         When RM cost = 0 and scrap has value, the result goes negative.
         We zero the scrap cost so FG rate = RM cost / FG qty, floored at 0.
         """
-        scrap_items_cost = sum(
-            flt(d.basic_amount) for d in self.get("items") if d.is_legacy_scrap_item
-        )
         rate = super().get_basic_rate_for_manufactured_item(finished_item_qty, outgoing_items_cost)
         if rate < 0:
-            # Recalculate ignoring scrap so FG rate is never negative
             rate = flt((outgoing_items_cost) / finished_item_qty) if finished_item_qty else 0
         return max(flt(rate), 0.0)
 
     def validate_stock_availability(self):
         """Validate stock availability for all items and collect all errors."""
-        print("[CONSOLE] validate_stock_availability() started")
         errors = []
 
         if not self.items:
-            print("[CONSOLE] No items found, skipping validation")
             return
 
         for d in self.get("items"):
-            print(f"[CONSOLE] Checking item row {d.idx}: {d.item_code}")
-            
-            # Skip if no item code
             if not d.item_code:
-                print(f"[CONSOLE] Row {d.idx}: No item_code, skipping")
                 continue
-            
+
             # Only validate if there's a source warehouse
             if not d.s_warehouse:
-                print(f"[CONSOLE] Row {d.idx}: No source warehouse, skipping")
                 continue
-            
+
             allow_negative_stock = is_negative_stock_allowed(item_code=d.item_code)
-            print(f"[CONSOLE] Row {d.idx}: Allow negative stock: {allow_negative_stock}")
 
             previous_sle = get_previous_sle(
                 {
@@ -113,25 +90,19 @@ class CustomStockEntry(StockEntry):
                 }
             )
 
-            # Get actual stock at warehouse
             actual_qty = previous_sle.get("qty_after_transaction") or 0
             transfer_qty = flt(d.transfer_qty, d.precision("transfer_qty"))
-            
-            print(f"[CONSOLE] Row {d.idx}: Actual Qty: {actual_qty}, Transfer Qty: {transfer_qty}")
 
-            # Check stock availability (for both save and submit)
-            # During save (docstatus 0), we still want to validate
             if (
                 d.s_warehouse
                 and not allow_negative_stock
                 and flt(actual_qty, d.precision("actual_qty"))
                 < flt(transfer_qty, d.precision("transfer_qty"))
             ):
-                # Calculate shortage quantity
                 shortage_qty = flt(transfer_qty - actual_qty, d.precision("transfer_qty"))
                 actual_qty_formatted = flt(actual_qty, d.precision("actual_qty"))
                 transfer_qty_formatted = flt(transfer_qty, d.precision("transfer_qty"))
-                
+
                 msg = (
                     _("Row {0}: {1} Quantity not available for {2} in warehouse {3}").format(
                         d.idx,
@@ -146,21 +117,13 @@ class CustomStockEntry(StockEntry):
                     )
                 )
                 errors.append(msg)
-                print(f"[CONSOLE] Row {d.idx}: INSUFFICIENT STOCK ERROR added - Shortage: {shortage_qty}")
 
-        # After checking all rows, if any errors were found, throw them together
         if errors:
-            print(f"[CONSOLE] Found {len(errors)} stock validation errors")
             combined = "<br><br>".join(errors)
-            print("[CONSOLE] Throwing validation error...")
             frappe.throw(combined, NegativeStockError, title=_("Insufficient Stock"))
-        else:
-            print("[CONSOLE] No stock validation errors found")
 
     def set_actual_qty(self):
         """Copy of core `set_actual_qty`, but collect errors instead of early-throwing."""
-        print("[CONSOLE] set_actual_qty() called")
-        
         errors = []
 
         for d in self.get("items"):
@@ -186,11 +149,10 @@ class CustomStockEntry(StockEntry):
                 and flt(d.actual_qty, d.precision("actual_qty"))
                 < flt(d.transfer_qty, d.precision("actual_qty"))
             ):
-                # Calculate shortage quantity
                 shortage_qty = flt(d.transfer_qty - d.actual_qty, d.precision("transfer_qty"))
                 actual_qty_formatted = flt(d.actual_qty, d.precision("actual_qty"))
                 transfer_qty_formatted = flt(d.transfer_qty, d.precision("transfer_qty"))
-                
+
                 msg = (
                     _("Row {0}: {1} Quantity not available for {2} in warehouse {3}").format(
                         d.idx,
@@ -206,7 +168,6 @@ class CustomStockEntry(StockEntry):
                 )
                 errors.append(msg)
 
-        # After checking all rows, if any errors were found, throw them together
         if errors:
             combined = "<br><br>".join(errors)
             frappe.throw(combined, NegativeStockError, title=_("Insufficient Stock"))

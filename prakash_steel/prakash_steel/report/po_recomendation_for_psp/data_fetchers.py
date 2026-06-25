@@ -123,7 +123,7 @@ def get_wip_map() -> dict[str, float]:
 		production_plans = frappe.get_all("Production Plan", filters=pp_filters, fields=["name"])
 
 		for pp in production_plans:
-			pp_name = pp.name
+			pp_name = pp["name"]
 
 			try:
 				pp_doc = frappe.get_doc("Production Plan", pp_name)

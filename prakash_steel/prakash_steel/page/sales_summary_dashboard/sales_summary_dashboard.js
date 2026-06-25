@@ -7,7 +7,6 @@ if (!frappe.pages['sales-summary-dashboard']) {
 }
 
 frappe.pages['sales-summary-dashboard'].on_page_load = function (wrapper) {
-    console.log('Sales Summary Dashboard page loading...');
 
     // Build page shell
     const page = frappe.ui.make_app_page({
@@ -53,7 +52,6 @@ frappe.pages['sales-summary-dashboard'].on_page_load = function (wrapper) {
 };
 
 frappe.pages['sales-summary-dashboard'].on_page_show = function () {
-    console.log('Sales Summary Dashboard shown');
 };
 
 function initializeDashboard(state) {
@@ -502,7 +500,6 @@ function updateTabStyles(state) {
 }
 
 function refreshDashboard(state) {
-    console.log('Refreshing sales dashboard...');
 
     const filters = getFilters(state);
 

@@ -6,6 +6,8 @@ import unittest
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+
+import pytest
 from frappe.utils import add_days, nowdate
 
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
@@ -334,6 +336,7 @@ class TestNonBufferPriority(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(reason="integration test — requires bench run-tests with a live Frappe site")
 class TestPOReportExecute(FrappeTestCase):
 	"""Integration tests for execute() function."""
 
