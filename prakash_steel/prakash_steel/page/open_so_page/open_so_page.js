@@ -73,6 +73,10 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				font-size: 11px; padding: 2px 6px; border-radius: 3px;
 				border: 1px solid #d0d7e8; width: 100%;
 			}
+			.so-total-row {
+				overflow: hidden;
+				border-radius: 0 0 10px 10px;
+			}
 			.so-table-wrap .delay-select {
 				width: 100%; padding: 3px 5px; border: 1px solid #d0d7e8;
 				border-radius: 4px; font-size: 12px; background: #fff;
@@ -368,6 +372,9 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 
 	// ── DataTable renderer ────────────────────────────────────────────────────
 	function render_table($wrap_el, cols, data, editable, tab_key) {
+		const total_evt_ns = "so-total-" + tab_key;
+		$(document).off("mouseup." + total_evt_ns + " mousemove." + total_evt_ns);
+
 		if (dt_instances[tab_key]) {
 			try { dt_instances[tab_key].destroy(); } catch(e) {}
 			dt_instances[tab_key] = null;
@@ -442,7 +449,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		if (pending_idx >= 0) {
 			let total_pending_str = total_pending % 1 === 0 ? total_pending : total_pending.toFixed(2);
 			let $total = $(`
-				<div class="so-total-row" style="overflow:hidden;">
+				<div class="so-total-row">
 					<table style="border-collapse:collapse;background:linear-gradient(135deg,#dce8f5,#c5d9ee);table-layout:fixed;">
 						<colgroup></colgroup>
 						<tr></tr>
@@ -450,16 +457,22 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				</div>
 			`);
 			$wrap_el.append($total);
+			let $total_table = $total.find("table");
+
+			let apply_total_scroll = (scroll_left) => {
+				$total_table.css("transform", `translateX(-${scroll_left}px)`);
+			};
 
 			// Mirror the DataTable's actual rendered column widths so the total value
 			// stays aligned under the "Qty to Deliver" column, and keep its horizontal
 			// scroll in sync with the table body so it moves together when scrolling.
 			let sync_total = () => {
 				let $scrollable = $dt_el.find(".dt-scrollable");
-				// Measure widths from the first body row (one cell per column, no
-				// serial/checkbox columns here); fall back to the header row.
-				let $cells = $scrollable.find(".dt-row").first().find(".dt-cell");
-				if (!$cells.length) $cells = $dt_el.find(".dt-header .dt-cell--header");
+				// Measure from header cells — stable and matches column layout exactly.
+				let $cells = $dt_el.find(".dt-row--header .dt-cell--header");
+				if (!$cells.length) {
+					$cells = $scrollable.find(".dt-row:not(.dt-row--filter)").first().find(".dt-cell");
+				}
 				if (!$cells.length) return;
 
 				let widths = $cells.map((i, el) => $(el).outerWidth()).get();
@@ -480,21 +493,35 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				});
 
 				let total_width = widths.reduce((a, b) => a + b, 0);
-				$total.find("table").css("width", total_width + "px");
+				$total_table.css("width", total_width + "px");
 
 				let $scroll = $scrollable.length ? $scrollable : $dt_el.find(".dt-scrollable");
-				if ($scroll.length) {
-					$scroll.off("scroll.so-total").on("scroll.so-total", function () {
-						$total.scrollLeft(this.scrollLeft);
-					});
-					$total.scrollLeft($scroll.scrollLeft());
-				}
+				if ($scroll.length) apply_total_scroll($scroll.scrollLeft());
 			};
+
+			let $scrollable = $dt_el.find(".dt-scrollable");
+			$scrollable.off("scroll.so-total").on("scroll.so-total", function () {
+				apply_total_scroll(this.scrollLeft);
+			});
+
+			// Re-sync when the user drags a column resize handle (widths change live).
+			let resize_sync_raf = null;
+			let schedule_sync_total = () => {
+				if (resize_sync_raf) return;
+				resize_sync_raf = requestAnimationFrame(() => {
+					resize_sync_raf = null;
+					sync_total();
+				});
+			};
+			$(document).on("mousemove." + total_evt_ns, () => {
+				if (document.body.classList.contains("dt-resize")) schedule_sync_total();
+			});
+			$(document).on("mouseup." + total_evt_ns, schedule_sync_total);
 
 			// DataTable finalizes column widths asynchronously after construction.
 			sync_total();
 			setTimeout(sync_total, 100);
-			$(window).off("resize.so-total").on("resize.so-total", sync_total);
+			$(window).off("resize.so-total-" + tab_key).on("resize.so-total-" + tab_key, sync_total);
 		}
 
 		if (!editable) return;
