@@ -443,11 +443,10 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		});
 
 		// Total row pinned below the DataTable
-		let total_pending = data.reduce((sum, r) => sum + (parseFloat(r.pending_qty) || 0), 0);
 		let pending_idx = cols.findIndex(c => c.fieldname === "pending_qty");
 		let total_label_idx = cols.findIndex(c => c.fieldname !== "__pad");
 		if (pending_idx >= 0) {
-			let total_pending_str = total_pending % 1 === 0 ? total_pending : total_pending.toFixed(2);
+			let total_pending_str = "";
 			let $total = $(`
 				<div class="so-total-row">
 					<table style="border-collapse:collapse;background:linear-gradient(135deg,#dce8f5,#c5d9ee);table-layout:fixed;">
@@ -461,6 +460,16 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 
 			let apply_total_scroll = (scroll_left) => {
 				$total_table.css("transform", `translateX(-${scroll_left}px)`);
+			};
+
+			let update_pending_total = () => {
+				let dt = dt_instances[tab_key];
+				let indices = dt?.datamanager?.getFilteredRowIndices();
+				if (!indices) indices = data.map((_, i) => i);
+				let total = indices.reduce((sum, idx) => sum + (parseFloat(data[idx]?.pending_qty) || 0), 0);
+				total_pending_str = total % 1 === 0 ? String(total) : total.toFixed(2);
+				let $pending_td = $total.find("tr").children().eq(pending_idx);
+				if ($pending_td.length) $pending_td.text(total_pending_str);
 			};
 
 			// Mirror the DataTable's actual rendered column widths so the total value
@@ -518,9 +527,20 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			});
 			$(document).on("mouseup." + total_evt_ns, schedule_sync_total);
 
+			// Re-sum pending qty when inline column filters change visible rows.
+			let dm = dt_instances[tab_key].datamanager;
+			let orig_filter_rows = dm.filterRows.bind(dm);
+			dm.filterRows = function (filters) {
+				return orig_filter_rows(filters).then((result) => {
+					update_pending_total();
+					return result;
+				});
+			};
+
 			// DataTable finalizes column widths asynchronously after construction.
 			sync_total();
-			setTimeout(sync_total, 100);
+			update_pending_total();
+			setTimeout(() => { sync_total(); update_pending_total(); }, 100);
 			$(window).off("resize.so-total-" + tab_key).on("resize.so-total-" + tab_key, sync_total);
 		}
 
