@@ -141,6 +141,9 @@ def get_data() -> list[dict]:
 	mrq_map = get_mrq_map()
 	cs_tog_map = get_cs_tog_map(item_codes)
 
+	# Only keep items that have Bright Bar Unit - PSPL selected in CS Tog table
+	items = [item for item in items if item.item_code in cs_tog_map]
+
 	data = []
 	for item in items:
 		item_code = item.item_code
@@ -152,7 +155,7 @@ def get_data() -> list[dict]:
 		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
 		on_hand_status = f"{on_hand_status_value:.2f}%"
 		moq = int(flt(item.moq))
-		net_order_recommendation = max(order_recommendation, moq)
+		net_order_recommendation = 0 if order_recommendation == 0 else max(order_recommendation, moq)
 
 		if on_hand_status_value == 0:
 			on_hand_colour = "BLACK"
