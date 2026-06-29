@@ -309,6 +309,18 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		{ fieldname: "__delay_remarks",  label: "Delay Remarks",     width: 200 },
 	];
 
+	const DATE_FIELDS = new Set(["date", "delivery_date"]);
+
+	function format_date_dd_mm_yy(value) {
+		if (value === null || value === undefined || value === "") return "";
+		let d = frappe.datetime.str_to_obj(String(value).trim());
+		if (!d || isNaN(d.getTime())) return String(value);
+		let dd = String(d.getDate()).padStart(2, "0");
+		let mm = String(d.getMonth() + 1).padStart(2, "0");
+		let yy = String(d.getFullYear()).slice(-2);
+		return `${dd}/${mm}/${yy}`;
+	}
+
 	// ── cell formatter ────────────────────────────────────────────────────────
 	function format_cell(fieldname, value) {
 		if (value === null || value === undefined || value === "") return "";
@@ -347,6 +359,9 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 
 		if (fieldname === "sales_order")
 			return `<a href="/app/sales-order/${value}" target="_blank">${value}</a>`;
+
+		if (DATE_FIELDS.has(fieldname))
+			return frappe.utils.escape_html(format_date_dd_mm_yy(value));
 
 		return frappe.utils.escape_html(String(value));
 	}
