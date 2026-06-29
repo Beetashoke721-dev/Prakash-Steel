@@ -577,14 +577,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			// Keep dt_data in sync so virtual-scroll re-renders show the updated value
 			let dt_row = dt_data.find(r => r.__soi === soi);
 			if (dt_row) dt_row.__delay_reason = val;
-
-			let $remarks = $wrap_el.find(`.delay-remarks[data-soi="${soi}"]`);
-			let remarks_val = $remarks.val() || "";
-			if (val && !remarks_val) {
-				$remarks.css({ "border-color": "#e53935", "background": "#fff5f5" });
-			} else {
-				$remarks.css({ "border-color": "", "background": "" });
-			}
 		});
 
 		$wrap_el.on("input.so", ".delay-remarks", function () {
@@ -594,15 +586,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			changes[soi].delay_remarks = val;
 			let dt_row = dt_data.find(r => r.__soi === soi);
 			if (dt_row) dt_row.__delay_remarks = val;
-
-			let reason_val = (changes[soi].delay_reason !== undefined)
-				? changes[soi].delay_reason
-				: (all_data.find(r => r.name === soi) || {}).delay_reasons || "";
-			if (reason_val && val) {
-				$(this).css({ "border-color": "", "background": "" });
-			} else if (reason_val && !val) {
-				$(this).css({ "border-color": "#e53935", "background": "#fff5f5" });
-			}
 		});
 	}
 
@@ -634,27 +617,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	function execute_save() {
 		if (!Object.keys(changes).length) {
 			frappe.show_alert({ message: __("No changes to save."), indicator: "orange" });
-			return;
-		}
-
-		let missing_remarks = [];
-		Object.entries(changes).forEach(([soi_name, vals]) => {
-			let existing = all_data.find(r => r.name === soi_name) || {};
-			let reason  = vals.delay_reason  !== undefined ? vals.delay_reason  : existing.delay_reasons  || "";
-			let remarks = vals.delay_remarks !== undefined ? vals.delay_remarks : existing.delay_remarks || "";
-			if (reason && !remarks.trim()) {
-				missing_remarks.push(soi_name);
-				$table_wrap_analysis.find(`.delay-remarks[data-soi="${soi_name}"]`)
-					.css({ "border-color": "#e53935", "background": "#fff5f5" });
-			}
-		});
-
-		if (missing_remarks.length) {
-			frappe.msgprint({
-				title: __("Mandatory Field"),
-				message: __(`Delay Remarks is mandatory for ${missing_remarks.length} row(s) where a Delay Reason is selected.`),
-				indicator: "red",
-			});
 			return;
 		}
 
