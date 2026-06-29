@@ -73,6 +73,8 @@ def get_data(conditions, filters) -> list[dict]:
             so.name as sales_order,
             so.status,
             so.customer,
+            so.payment_terms_template as payment_terms_template,
+            so.custom_special_condition as special_condition,
             soi.item_code,
             i.custom_category_name as category_name,
             i.custom_buffer_flag as buffer_flag,
