@@ -6,10 +6,13 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	});
 
 	// ── styles ────────────────────────────────────────────────────────────────
-	if (!document.getElementById("open-so-page-style")) {
-		let style = document.createElement("style");
+	let style = document.getElementById("open-so-page-style");
+	if (!style) {
+		style = document.createElement("style");
 		style.id = "open-so-page-style";
-		style.textContent = `
+		document.head.appendChild(style);
+	}
+	style.textContent = `
 			.so-page-wrap { padding: 0 16px 24px; }
 
 			/* tab bar */
@@ -89,6 +92,23 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			}
 			.so-table-wrap .delay-remarks:focus { border-color: #1e88e5; outline: none; }
 
+			/* Save button — center label in the button */
+			body[data-route="open-so-page"] .page-actions .so-save-btn,
+			.page-container[data-page-route="open-so-page"] .page-actions .so-save-btn {
+				display: inline-flex !important;
+				align-items: center !important;
+				justify-content: center !important;
+				min-width: 72px !important;
+				padding: 4px 16px !important;
+				gap: 0 !important;
+			}
+			body[data-route="open-so-page"] .page-actions .so-save-btn .so-save-label,
+			.page-container[data-page-route="open-so-page"] .page-actions .so-save-btn .so-save-label {
+				display: block;
+				width: 100%;
+				text-align: center;
+			}
+
 			/* hidden pad column — occupies col-0 so real data columns get working inline filters */
 			.so-table-wrap .dt-cell--col-0 {
 				width: 0 !important; min-width: 0 !important; max-width: 0 !important;
@@ -96,8 +116,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				overflow: hidden; visibility: hidden;
 			}
 		`;
-		document.head.appendChild(style);
-	}
 
 	// ── page filters ──────────────────────────────────────────────────────────
 	let company_field = page.add_field({
@@ -180,7 +198,10 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	});
 
 	page.set_primary_action(__("Refresh"), () => refresh(), "octicon octicon-sync");
-	page.set_secondary_action(__("Save"), () => execute_save(), "octicon octicon-check");
+	page.set_secondary_action(__("Save"), () => execute_save());
+	page.btn_secondary
+		.addClass("so-save-btn")
+		.html(`<span class="so-save-label">${__("Save")}</span>`);
 
 	// ── layout ────────────────────────────────────────────────────────────────
 	let $wrap = $(`<div class="so-page-wrap"></div>`).appendTo(page.main);
