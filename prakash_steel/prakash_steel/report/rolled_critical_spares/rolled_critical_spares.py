@@ -141,6 +141,9 @@ def get_data() -> list[dict]:
 	mrq_map = get_mrq_map()
 	cs_tog_map = get_cs_tog_map(item_codes)
 
+	# Only keep items that have Rolling Mill - PSPL selected in CS Tog table
+	items = [item for item in items if item.item_code in cs_tog_map]
+
 	data = []
 	for item in items:
 		item_code = item.item_code
