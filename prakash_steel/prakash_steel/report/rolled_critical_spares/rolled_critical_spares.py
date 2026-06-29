@@ -152,7 +152,7 @@ def get_data() -> list[dict]:
 		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
 		on_hand_status = f"{on_hand_status_value:.2f}%"
 		moq = int(flt(item.moq))
-		net_order_recommendation = max(order_recommendation, moq)
+		net_order_recommendation = 0 if order_recommendation == 0 else max(order_recommendation, moq)
 
 		if on_hand_status_value == 0:
 			on_hand_colour = "BLACK"
