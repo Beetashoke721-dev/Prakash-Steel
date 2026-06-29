@@ -6,10 +6,13 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	});
 
 	// ── styles ────────────────────────────────────────────────────────────────
-	if (!document.getElementById("open-so-page-style")) {
-		let style = document.createElement("style");
+	let style = document.getElementById("open-so-page-style");
+	if (!style) {
+		style = document.createElement("style");
 		style.id = "open-so-page-style";
-		style.textContent = `
+		document.head.appendChild(style);
+	}
+	style.textContent = `
 			.so-page-wrap { padding: 0 16px 24px; }
 
 			/* tab bar */
@@ -73,6 +76,10 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				font-size: 11px; padding: 2px 6px; border-radius: 3px;
 				border: 1px solid #d0d7e8; width: 100%;
 			}
+			.so-total-row {
+				overflow: hidden;
+				border-radius: 0 0 10px 10px;
+			}
 			.so-table-wrap .delay-select {
 				width: 100%; padding: 3px 5px; border: 1px solid #d0d7e8;
 				border-radius: 4px; font-size: 12px; background: #fff;
@@ -84,9 +91,31 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				font-family: inherit;
 			}
 			.so-table-wrap .delay-remarks:focus { border-color: #1e88e5; outline: none; }
+
+			/* Save button — center label in the button */
+			body[data-route="open-so-page"] .page-actions .so-save-btn,
+			.page-container[data-page-route="open-so-page"] .page-actions .so-save-btn {
+				display: inline-flex !important;
+				align-items: center !important;
+				justify-content: center !important;
+				min-width: 72px !important;
+				padding: 4px 16px !important;
+				gap: 0 !important;
+			}
+			body[data-route="open-so-page"] .page-actions .so-save-btn .so-save-label,
+			.page-container[data-page-route="open-so-page"] .page-actions .so-save-btn .so-save-label {
+				display: block;
+				width: 100%;
+				text-align: center;
+			}
+
+			/* hidden pad column — occupies col-0 so real data columns get working inline filters */
+			.so-table-wrap .dt-cell--col-0 {
+				width: 0 !important; min-width: 0 !important; max-width: 0 !important;
+				padding: 0 !important; border: none !important;
+				overflow: hidden; visibility: hidden;
+			}
 		`;
-		document.head.appendChild(style);
-	}
 
 	// ── page filters ──────────────────────────────────────────────────────────
 	let company_field = page.add_field({
@@ -169,7 +198,10 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	});
 
 	page.set_primary_action(__("Refresh"), () => refresh(), "octicon octicon-sync");
-	page.set_secondary_action(__("Save"), () => execute_save(), "octicon octicon-check");
+	page.set_secondary_action(__("Save"), () => execute_save());
+	page.btn_secondary
+		.addClass("so-save-btn")
+		.html(`<span class="so-save-label">${__("Save")}</span>`);
 
 	// ── layout ────────────────────────────────────────────────────────────────
 	let $wrap = $(`<div class="so-page-wrap"></div>`).appendTo(page.main);
@@ -251,7 +283,11 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	}
 
 	// ── column definitions ────────────────────────────────────────────────────
+	// frappe-datatable disables inline filters on column 0; pad column keeps real cols filterable.
+	const COL_PAD = { fieldname: "__pad", label: "", width: 1 };
+
 	const COLS_ANALYSIS = [
+		COL_PAD,
 		{ fieldname: "date",                   label: "SO Date",          width: 100 },
 		{ fieldname: "customer",               label: "Customer Name",    width: 150 },
 		{ fieldname: "item_code",              label: "Item Code",        width: 120 },
@@ -282,6 +318,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	];
 
 	const COLS_DISPATCH = [
+		COL_PAD,
 		{ fieldname: "order_status",     label: "Order Status",      width: 110 },
 		{ fieldname: "date",             label: "Sales Order Date",  width: 110 },
 		{ fieldname: "delivery_date",    label: "Delivery Date",     width: 110 },
@@ -296,6 +333,18 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		{ fieldname: "__delay_reason",   label: "Delay Reason",      width: 160 },
 		{ fieldname: "__delay_remarks",  label: "Delay Remarks",     width: 200 },
 	];
+
+	const DATE_FIELDS = new Set(["date", "delivery_date"]);
+
+	function format_date_display(value) {
+		if (value === null || value === undefined || value === "") return "";
+		let d = frappe.datetime.str_to_obj(String(value).trim());
+		if (!d || isNaN(d.getTime())) return String(value);
+		let dd = String(d.getDate()).padStart(2, "0");
+		let mm = String(d.getMonth() + 1).padStart(2, "0");
+		let yyyy = String(d.getFullYear());
+		return `${dd}-${mm}-${yyyy}`;
+	}
 
 	// ── cell formatter ────────────────────────────────────────────────────────
 	function format_cell(fieldname, value) {
@@ -336,11 +385,17 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		if (fieldname === "sales_order")
 			return `<a href="/app/sales-order/${value}" target="_blank">${value}</a>`;
 
+		if (DATE_FIELDS.has(fieldname))
+			return frappe.utils.escape_html(format_date_display(value));
+
 		return frappe.utils.escape_html(String(value));
 	}
 
 	// ── DataTable renderer ────────────────────────────────────────────────────
 	function render_table($wrap_el, cols, data, editable, tab_key) {
+		const total_evt_ns = "so-total-" + tab_key;
+		$(document).off("mouseup." + total_evt_ns + " mousemove." + total_evt_ns);
+
 		if (dt_instances[tab_key]) {
 			try { dt_instances[tab_key].destroy(); } catch(e) {}
 			dt_instances[tab_key] = null;
@@ -357,7 +412,9 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			let ch = changes[row.name] || {};
 			let obj = { __soi: row.name || "" };
 			cols.forEach(col => {
-				if (col.fieldname === "__delay_reason") {
+				if (col.fieldname === "__pad") {
+					obj[col.fieldname] = "";
+				} else if (col.fieldname === "__delay_reason") {
 					obj[col.fieldname] = ch.delay_reason !== undefined ? ch.delay_reason : (row.delay_reasons || "");
 				} else if (col.fieldname === "__delay_remarks") {
 					obj[col.fieldname] = ch.delay_remarks !== undefined ? ch.delay_remarks : (row.delay_remarks || "");
@@ -376,6 +433,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			resizable: true,
 			format(value, row, column, rowData) {
 				let soi = rowData ? (rowData.__soi || "") : "";
+				if (col.fieldname === "__pad") return "";
 				if (col.fieldname === "__delay_reason") {
 					if (!editable) return frappe.utils.escape_html(String(value || ""));
 					let opts = `<option value=""></option>` + delay_reasons.map(r => {
@@ -406,12 +464,12 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		});
 
 		// Total row pinned below the DataTable
-		let total_pending = data.reduce((sum, r) => sum + (parseFloat(r.pending_qty) || 0), 0);
 		let pending_idx = cols.findIndex(c => c.fieldname === "pending_qty");
+		let total_label_idx = cols.findIndex(c => c.fieldname !== "__pad");
 		if (pending_idx >= 0) {
-			let total_pending_str = total_pending % 1 === 0 ? total_pending : total_pending.toFixed(2);
+			let total_pending_str = "";
 			let $total = $(`
-				<div class="so-total-row" style="overflow:hidden;">
+				<div class="so-total-row">
 					<table style="border-collapse:collapse;background:linear-gradient(135deg,#dce8f5,#c5d9ee);table-layout:fixed;">
 						<colgroup></colgroup>
 						<tr></tr>
@@ -419,16 +477,32 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				</div>
 			`);
 			$wrap_el.append($total);
+			let $total_table = $total.find("table");
+
+			let apply_total_scroll = (scroll_left) => {
+				$total_table.css("transform", `translateX(-${scroll_left}px)`);
+			};
+
+			let update_pending_total = () => {
+				let dt = dt_instances[tab_key];
+				let indices = dt?.datamanager?.getFilteredRowIndices();
+				if (!indices) indices = data.map((_, i) => i);
+				let total = indices.reduce((sum, idx) => sum + (parseFloat(data[idx]?.pending_qty) || 0), 0);
+				total_pending_str = total % 1 === 0 ? String(total) : total.toFixed(2);
+				let $pending_td = $total.find("tr").children().eq(pending_idx);
+				if ($pending_td.length) $pending_td.text(total_pending_str);
+			};
 
 			// Mirror the DataTable's actual rendered column widths so the total value
 			// stays aligned under the "Qty to Deliver" column, and keep its horizontal
 			// scroll in sync with the table body so it moves together when scrolling.
 			let sync_total = () => {
 				let $scrollable = $dt_el.find(".dt-scrollable");
-				// Measure widths from the first body row (one cell per column, no
-				// serial/checkbox columns here); fall back to the header row.
-				let $cells = $scrollable.find(".dt-row").first().find(".dt-cell");
-				if (!$cells.length) $cells = $dt_el.find(".dt-header .dt-cell--header");
+				// Measure from header cells — stable and matches column layout exactly.
+				let $cells = $dt_el.find(".dt-row--header .dt-cell--header");
+				if (!$cells.length) {
+					$cells = $scrollable.find(".dt-row:not(.dt-row--filter)").first().find(".dt-cell");
+				}
 				if (!$cells.length) return;
 
 				let widths = $cells.map((i, el) => $(el).outerWidth()).get();
@@ -439,7 +513,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				cols.forEach((c, i) => {
 					let w = widths[i] || c.width || 120;
 					$colgroup.append(`<col style="width:${w}px;">`);
-					if (i === 0) {
+					if (i === total_label_idx) {
 						$tr.append(`<td style="${st}font-weight:700;">Total</td>`);
 					} else if (i === pending_idx) {
 						$tr.append(`<td style="${st}font-weight:700;text-align:right;">${total_pending_str}</td>`);
@@ -449,21 +523,46 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				});
 
 				let total_width = widths.reduce((a, b) => a + b, 0);
-				$total.find("table").css("width", total_width + "px");
+				$total_table.css("width", total_width + "px");
 
 				let $scroll = $scrollable.length ? $scrollable : $dt_el.find(".dt-scrollable");
-				if ($scroll.length) {
-					$scroll.off("scroll.so-total").on("scroll.so-total", function () {
-						$total.scrollLeft(this.scrollLeft);
-					});
-					$total.scrollLeft($scroll.scrollLeft());
-				}
+				if ($scroll.length) apply_total_scroll($scroll.scrollLeft());
+			};
+
+			let $scrollable = $dt_el.find(".dt-scrollable");
+			$scrollable.off("scroll.so-total").on("scroll.so-total", function () {
+				apply_total_scroll(this.scrollLeft);
+			});
+
+			// Re-sync when the user drags a column resize handle (widths change live).
+			let resize_sync_raf = null;
+			let schedule_sync_total = () => {
+				if (resize_sync_raf) return;
+				resize_sync_raf = requestAnimationFrame(() => {
+					resize_sync_raf = null;
+					sync_total();
+				});
+			};
+			$(document).on("mousemove." + total_evt_ns, () => {
+				if (document.body.classList.contains("dt-resize")) schedule_sync_total();
+			});
+			$(document).on("mouseup." + total_evt_ns, schedule_sync_total);
+
+			// Re-sum pending qty when inline column filters change visible rows.
+			let dm = dt_instances[tab_key].datamanager;
+			let orig_filter_rows = dm.filterRows.bind(dm);
+			dm.filterRows = function (filters) {
+				return orig_filter_rows(filters).then((result) => {
+					update_pending_total();
+					return result;
+				});
 			};
 
 			// DataTable finalizes column widths asynchronously after construction.
 			sync_total();
-			setTimeout(sync_total, 100);
-			$(window).off("resize.so-total").on("resize.so-total", sync_total);
+			update_pending_total();
+			setTimeout(() => { sync_total(); update_pending_total(); }, 100);
+			$(window).off("resize.so-total-" + tab_key).on("resize.so-total-" + tab_key, sync_total);
 		}
 
 		if (!editable) return;
@@ -478,14 +577,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			// Keep dt_data in sync so virtual-scroll re-renders show the updated value
 			let dt_row = dt_data.find(r => r.__soi === soi);
 			if (dt_row) dt_row.__delay_reason = val;
-
-			let $remarks = $wrap_el.find(`.delay-remarks[data-soi="${soi}"]`);
-			let remarks_val = $remarks.val() || "";
-			if (val && !remarks_val) {
-				$remarks.css({ "border-color": "#e53935", "background": "#fff5f5" });
-			} else {
-				$remarks.css({ "border-color": "", "background": "" });
-			}
 		});
 
 		$wrap_el.on("input.so", ".delay-remarks", function () {
@@ -495,15 +586,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			changes[soi].delay_remarks = val;
 			let dt_row = dt_data.find(r => r.__soi === soi);
 			if (dt_row) dt_row.__delay_remarks = val;
-
-			let reason_val = (changes[soi].delay_reason !== undefined)
-				? changes[soi].delay_reason
-				: (all_data.find(r => r.name === soi) || {}).delay_reasons || "";
-			if (reason_val && val) {
-				$(this).css({ "border-color": "", "background": "" });
-			} else if (reason_val && !val) {
-				$(this).css({ "border-color": "#e53935", "background": "#fff5f5" });
-			}
 		});
 	}
 
@@ -535,27 +617,6 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	function execute_save() {
 		if (!Object.keys(changes).length) {
 			frappe.show_alert({ message: __("No changes to save."), indicator: "orange" });
-			return;
-		}
-
-		let missing_remarks = [];
-		Object.entries(changes).forEach(([soi_name, vals]) => {
-			let existing = all_data.find(r => r.name === soi_name) || {};
-			let reason  = vals.delay_reason  !== undefined ? vals.delay_reason  : existing.delay_reasons  || "";
-			let remarks = vals.delay_remarks !== undefined ? vals.delay_remarks : existing.delay_remarks || "";
-			if (reason && !remarks.trim()) {
-				missing_remarks.push(soi_name);
-				$table_wrap_analysis.find(`.delay-remarks[data-soi="${soi_name}"]`)
-					.css({ "border-color": "#e53935", "background": "#fff5f5" });
-			}
-		});
-
-		if (missing_remarks.length) {
-			frappe.msgprint({
-				title: __("Mandatory Field"),
-				message: __(`Delay Remarks is mandatory for ${missing_remarks.length} row(s) where a Delay Reason is selected.`),
-				indicator: "red",
-			});
 			return;
 		}
 
