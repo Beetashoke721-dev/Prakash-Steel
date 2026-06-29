@@ -84,6 +84,13 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				font-family: inherit;
 			}
 			.so-table-wrap .delay-remarks:focus { border-color: #1e88e5; outline: none; }
+
+			/* hidden pad column — occupies col-0 so real data columns get working inline filters */
+			.so-table-wrap .dt-cell--col-0 {
+				width: 0 !important; min-width: 0 !important; max-width: 0 !important;
+				padding: 0 !important; border: none !important;
+				overflow: hidden; visibility: hidden;
+			}
 		`;
 		document.head.appendChild(style);
 	}
@@ -251,7 +258,11 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	}
 
 	// ── column definitions ────────────────────────────────────────────────────
+	// frappe-datatable disables inline filters on column 0; pad column keeps real cols filterable.
+	const COL_PAD = { fieldname: "__pad", label: "", width: 1 };
+
 	const COLS_ANALYSIS = [
+		COL_PAD,
 		{ fieldname: "date",                   label: "SO Date",          width: 100 },
 		{ fieldname: "customer",               label: "Customer Name",    width: 150 },
 		{ fieldname: "item_code",              label: "Item Code",        width: 120 },
@@ -282,6 +293,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	];
 
 	const COLS_DISPATCH = [
+		COL_PAD,
 		{ fieldname: "order_status",     label: "Order Status",      width: 110 },
 		{ fieldname: "date",             label: "Sales Order Date",  width: 110 },
 		{ fieldname: "delivery_date",    label: "Delivery Date",     width: 110 },
@@ -357,7 +369,9 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			let ch = changes[row.name] || {};
 			let obj = { __soi: row.name || "" };
 			cols.forEach(col => {
-				if (col.fieldname === "__delay_reason") {
+				if (col.fieldname === "__pad") {
+					obj[col.fieldname] = "";
+				} else if (col.fieldname === "__delay_reason") {
 					obj[col.fieldname] = ch.delay_reason !== undefined ? ch.delay_reason : (row.delay_reasons || "");
 				} else if (col.fieldname === "__delay_remarks") {
 					obj[col.fieldname] = ch.delay_remarks !== undefined ? ch.delay_remarks : (row.delay_remarks || "");
@@ -376,6 +390,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			resizable: true,
 			format(value, row, column, rowData) {
 				let soi = rowData ? (rowData.__soi || "") : "";
+				if (col.fieldname === "__pad") return "";
 				if (col.fieldname === "__delay_reason") {
 					if (!editable) return frappe.utils.escape_html(String(value || ""));
 					let opts = `<option value=""></option>` + delay_reasons.map(r => {
@@ -408,6 +423,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		// Total row pinned below the DataTable
 		let total_pending = data.reduce((sum, r) => sum + (parseFloat(r.pending_qty) || 0), 0);
 		let pending_idx = cols.findIndex(c => c.fieldname === "pending_qty");
+		let total_label_idx = cols.findIndex(c => c.fieldname !== "__pad");
 		if (pending_idx >= 0) {
 			let total_pending_str = total_pending % 1 === 0 ? total_pending : total_pending.toFixed(2);
 			let $total = $(`
@@ -439,7 +455,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				cols.forEach((c, i) => {
 					let w = widths[i] || c.width || 120;
 					$colgroup.append(`<col style="width:${w}px;">`);
-					if (i === 0) {
+					if (i === total_label_idx) {
 						$tr.append(`<td style="${st}font-weight:700;">Total</td>`);
 					} else if (i === pending_idx) {
 						$tr.append(`<td style="${st}font-weight:700;text-align:right;">${total_pending_str}</td>`);
