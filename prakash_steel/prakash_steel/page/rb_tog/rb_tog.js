@@ -261,17 +261,24 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		_dt_observer.observe(dt_el, { childList: true, subtree: true });
 	}
 
+	function recalc_change_pct(idx) {
+		const row = _all_data[idx];
+		const tog = row.tog;
+		const current_tog = row.current_tog || 0;
+		const change_pct = (tog !== null && tog !== undefined && current_tog)
+			? Math.round((tog - current_tog) / current_tog * 1000) / 10
+			: null;
+		row.change_pct = change_pct;
+		$(`.rbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
+	}
+
 	function recalc_tog(idx) {
 		const row = _all_data[idx];
 		const fos = row.fos !== null && row.fos !== undefined ? row.fos : 25;
 		const tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 		row.tog = tog;
 		$(`.rbt-tog-input[data-idx="${idx}"]`).val(tog);
-
-		const current_tog = row.current_tog || 0;
-		const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
-		row.change_pct = change_pct;
-		$(`.rbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
+		recalc_change_pct(idx);
 	}
 
 	function bind_events() {
@@ -291,6 +298,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
 			_all_data[idx].tog = val === "" ? null : parseInt(val);
+			recalc_change_pct(idx);
 		});
 	}
 

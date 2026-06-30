@@ -261,6 +261,17 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		_dt_observer.observe(dt_el, { childList: true, subtree: true });
 	}
 
+	function recalc_change_pct(idx) {
+		const row = _all_data[idx];
+		const tog = row.tog;
+		const current_tog = row.current_tog || 0;
+		const change_pct = (tog !== null && tog !== undefined && current_tog)
+			? Math.round((tog - current_tog) / current_tog * 1000) / 10
+			: null;
+		row.change_pct = change_pct;
+		$(`.bbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
+	}
+
 	function recalc_tog(idx) {
 		const row = _all_data[idx];
 		const fos = row.fos !== null && row.fos !== undefined ? row.fos : 25;
@@ -269,11 +280,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		const tog = Math.ceil(adu * lt * (1 + fos / 100));
 		row.tog = tog;
 		$(`.bbt-tog-input[data-idx="${idx}"]`).val(tog);
-
-		const current_tog = row.current_tog || 0;
-		const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
-		row.change_pct = change_pct;
-		$(`.bbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
+		recalc_change_pct(idx);
 	}
 
 	function bind_events() {
@@ -293,6 +300,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
 			_all_data[idx].tog = val === "" ? null : parseInt(val);
+			recalc_change_pct(idx);
 		});
 	}
 
