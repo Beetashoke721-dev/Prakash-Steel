@@ -1,52 +1,51 @@
 # Copyright (c) 2026, beetashoke chakraborty and contributors
 # For license information, please see license.txt
 
-"""Backfill Purchase Order.custom_completed_on from Completed activity comments.
+"""Backfill Purchase Order.custom_completed_on for Completed purchase orders.
 
-Uses the latest Label comment with content "Completed" on each Purchase Order,
-matching the timestamp shown in the form timeline.
+Uses the Completed activity comment when present; otherwise falls back to the latest
+linked submitted Purchase Receipt/Invoice time, then the Purchase Order modified time.
 """
 
 import frappe
+
+from prakash_steel.utils.purchase_order import get_completed_on_fallback
 
 
 def backfill_completed_purchase_orders(*, only_if_empty: bool = True) -> int:
 	if not frappe.db.has_column("Purchase Order", "custom_completed_on"):
 		return 0
 
-	empty_clause = "AND IFNULL(po.custom_completed_on, '') = ''" if only_if_empty else ""
-
-	rows = frappe.db.sql(
+	empty_clause = "AND IFNULL(custom_completed_on, '') = ''" if only_if_empty else ""
+	po_names = frappe.db.sql(
 		f"""
-		SELECT po.name, completed_comment.creation AS completed_on
-		FROM `tabPurchase Order` po
-		INNER JOIN (
-			SELECT reference_name, MAX(creation) AS creation
-			FROM `tabComment`
-			WHERE reference_doctype = 'Purchase Order'
-				AND comment_type = 'Label'
-				AND content = 'Completed'
-			GROUP BY reference_name
-		) completed_comment ON completed_comment.reference_name = po.name
-		WHERE po.status = 'Completed'
+		SELECT name
+		FROM `tabPurchase Order`
+		WHERE status = 'Completed'
 			{empty_clause}
 		""",
-		as_dict=True,
+		pluck=True,
 	)
 
-	for row in rows:
+	updated = 0
+	for po_name in po_names:
+		completed_on = get_completed_on_fallback(po_name)
+		if not completed_on:
+			continue
+
 		frappe.db.set_value(
 			"Purchase Order",
-			row.name,
+			po_name,
 			"custom_completed_on",
-			row.completed_on,
+			completed_on,
 			update_modified=False,
 		)
+		updated += 1
 
-	if rows:
+	if updated:
 		frappe.db.commit()
 
-	return len(rows)
+	return updated
 
 
 def run_after_migrate() -> None:
