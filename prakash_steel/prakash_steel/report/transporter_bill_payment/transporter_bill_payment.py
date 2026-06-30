@@ -78,6 +78,13 @@ def get_columns(invoice_type) -> list[dict]:
             "width": 160,
         },
         {
+            "label": "Approval Status",
+            "fieldname": "approval_status",
+            "fieldtype": "Data",
+            "width": 130,
+            "align": "center",
+        },
+        {
             "label": "Supplier Invoice Date",
             "fieldname": "invoice_date",
             "fieldtype": "Date",
@@ -174,6 +181,7 @@ def get_purchase_data(filters) -> list[dict]:
         SELECT
             pi.posting_date AS bill_date,
             pi.name AS purchase_invoice,
+            CASE WHEN pi.workflow_state = 'Approved' THEN 'Approved' ELSE '' END AS approval_status,
             pi.bill_date AS invoice_date,
             pi.supplier AS vendor_name,
             pi.bill_no AS bill_no,
