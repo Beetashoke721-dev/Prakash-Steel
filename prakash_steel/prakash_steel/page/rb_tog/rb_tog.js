@@ -121,6 +121,8 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			noDataMessage: __("No items found."),
 			layout: "fixed",
 		});
+		setup_dt_observer("rbt-dt");
+		apply_table_styles("rbt-dt");
 		bind_events();
 	}
 
@@ -163,17 +165,17 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			format: val => (val !== null && val !== undefined) ? String(val) : dash(),
 		},
 		{
-			name: `<span style="color:#1a7a3f;font-weight:700;">Head Customer</span>`,
+			name: "Head Customer",
 			id: "h", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "H"),
 		},
 		{
-			name: `<span style="color:#d4a000;font-weight:700;">Body Customer</span>`,
+			name: "Body Customer",
 			id: "b", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "B"),
 		},
 		{
-			name: `<span style="color:#c0152a;font-weight:700;">Tail Customer</span>`,
+			name: "Tail Customer",
 			id: "t", width: 150, align: "right", editable: false,
 			format: val => num_badge(val, "T"),
 		},
@@ -211,17 +213,72 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		},
 	];
 
+	function apply_row_colors(root_id = "rbt-dt") {
+		const tbody = document.querySelector(`#${root_id} .dt-body`);
+		if (!tbody) return;
+		tbody.querySelectorAll(".dt-row").forEach(tr => {
+			const idx = parseInt(tr.getAttribute("data-row-index"));
+			if (isNaN(idx)) return;
+			const row = _all_data[idx];
+			if (!row) return;
+			const bg = HBT[row.hbt] ? HBT[row.hbt].light : "";
+			tr.querySelectorAll(".dt-cell").forEach(td => {
+				td.style.backgroundColor = bg;
+			});
+		});
+	}
+
+	function apply_hbt_header_colors(root_id = "rbt-dt") {
+		COLS.forEach((col, idx) => {
+			const hbt_key = { h: "H", b: "B", t: "T" }[col.id];
+			if (!hbt_key) return;
+			const { bg, fg } = HBT[hbt_key];
+			document.querySelectorAll(`#${root_id} .dt-row-header .dt-cell--col-${idx}`).forEach(cell => {
+				cell.style.backgroundColor = bg;
+				cell.querySelectorAll(".dt-cell__content, .content").forEach(el => {
+					el.style.backgroundColor = bg;
+					el.style.color = fg;
+					el.style.fontWeight = "700";
+				});
+			});
+		});
+	}
+
+	function apply_table_styles(root_id = "rbt-dt") {
+		apply_row_colors(root_id);
+		apply_hbt_header_colors(root_id);
+	}
+
+	function setup_dt_observer(root_id = "rbt-dt") {
+		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
+		let _obs_timer = null;
+		const dt_el = document.getElementById(root_id);
+		if (!dt_el) return;
+		_dt_observer = new MutationObserver(() => {
+			clearTimeout(_obs_timer);
+			_obs_timer = setTimeout(() => apply_table_styles(root_id), 30);
+		});
+		_dt_observer.observe(dt_el, { childList: true, subtree: true });
+	}
+
+	function recalc_change_pct(idx) {
+		const row = _all_data[idx];
+		const tog = row.tog;
+		const current_tog = row.current_tog || 0;
+		const change_pct = (tog !== null && tog !== undefined && current_tog)
+			? Math.round((tog - current_tog) / current_tog * 1000) / 10
+			: null;
+		row.change_pct = change_pct;
+		$(`.rbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
+	}
+
 	function recalc_tog(idx) {
 		const row = _all_data[idx];
 		const fos = row.fos !== null && row.fos !== undefined ? row.fos : 25;
 		const tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 		row.tog = tog;
 		$(`.rbt-tog-input[data-idx="${idx}"]`).val(tog);
-
-		const current_tog = row.current_tog || 0;
-		const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
-		row.change_pct = change_pct;
-		$(`.rbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
+		recalc_change_pct(idx);
 	}
 
 	function bind_events() {
@@ -241,6 +298,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
 			_all_data[idx].tog = val === "" ? null : parseInt(val);
+			recalc_change_pct(idx);
 		});
 	}
 
@@ -270,30 +328,8 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			layout: "fixed",
 		});
 
-		function apply_row_colors() {
-			const tbody = document.querySelector("#rbt-dt .dt-body");
-			if (!tbody) return;
-			tbody.querySelectorAll(".dt-row").forEach(tr => {
-				const idx = parseInt(tr.getAttribute("data-row-index"));
-				if (isNaN(idx)) return;
-				const row = _all_data[idx];
-				if (!row) return;
-				const bg = HBT[row.hbt] ? HBT[row.hbt].light : "";
-				tr.querySelectorAll(".dt-cell").forEach(td => {
-					td.style.backgroundColor = bg;
-				});
-			});
-		}
-
-		let _obs_timer = null;
-		const dt_el = document.getElementById("rbt-dt");
-		_dt_observer = new MutationObserver(() => {
-			clearTimeout(_obs_timer);
-			_obs_timer = setTimeout(apply_row_colors, 30);
-		});
-		_dt_observer.observe(dt_el, { childList: true, subtree: true });
-
-		apply_row_colors();
+		setup_dt_observer("rbt-dt");
+		apply_table_styles("rbt-dt");
 		bind_events();
 	}
 

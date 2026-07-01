@@ -3,6 +3,7 @@
  "add_translate_data": 0,
  "columns": [],
  "creation": "2026-01-16 16:30:00.099905",
+ "disable_prepared_report_automation": 0,
  "disabled": 0,
  "docstatus": 0,
  "doctype": "Report",
@@ -12,14 +13,14 @@
    "fieldtype": "Date",
    "label": "From Date",
    "mandatory": 1,
-   "wildcard": 0
+   "wildcard_filter": 0
   },
   {
    "fieldname": "to_date",
    "fieldtype": "Date",
    "label": "To Date",
    "mandatory": 1,
-   "wildcard": 0
+   "wildcard_filter": 0
   },
   {
    "fieldname": "sku_type",
@@ -27,21 +28,21 @@
    "label": "SKU Type",
    "mandatory": 1,
    "options": "BBMTA\nRBMTA\nPTA\nBOTA\nTRMTA",
-   "wildcard": 0
+   "wildcard_filter": 0
   },
   {
    "fieldname": "item_code",
-   "fieldtype": "MultiSelectList",
+   "fieldtype": "Link",
    "label": "Item Code",
    "mandatory": 0,
    "options": "Item",
-   "wildcard": 0
+   "wildcard_filter": 0
   }
  ],
- "idx": 0,
+ "idx": 3,
  "is_standard": "Yes",
- "letterhead": null,
- "modified": "2026-01-16 16:30:00.099905",
+ "letter_head": null,
+ "modified": "2026-07-01 09:59:39.722771",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "SKU wise Trend Report",
@@ -54,7 +55,30 @@
   {
    "role": "System Manager"
   },
-  {}
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Desk User"
+  },
+  {
+   "role": "Manufacturing Manager"
+  },
+  {
+   "role": "Sales Manager"
+  }
  ],
  "timeout": 0
 }
