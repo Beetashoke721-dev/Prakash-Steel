@@ -1713,7 +1713,9 @@ def get_wip_map_for_mrp() -> dict:
 		settings = frappe.get_single("Production planning settings")
 	except Exception:
 		# If settings don't exist, default to work order method
-		settings = frappe._dict({"from_work_order": 1, "from_production_plan": 0})
+		settings = frappe._dict(
+			{"from_work_order": 1, "from_production_plan": 0, "from_production_planning": 0}
+		)
 
 	wip_map = {}
 
@@ -1865,6 +1867,34 @@ def get_wip_map_for_mrp() -> dict:
 					"MRP Generation WIP Calculation Error",
 				)
 				continue
+
+	elif settings.get("from_production_planning"):
+		# WIP from Production Planning (fg_production_qty − produced_qty; closed rows excluded)
+		wip_rows_pp = frappe.db.sql(
+			"""
+			SELECT
+				fg.fg_item as item_code,
+				SUM(
+					CASE
+						WHEN IFNULL(fg.closed, 0) = 1 THEN 0
+						ELSE GREATEST(0, IFNULL(fg.fg_production_qty, 0) - IFNULL(fg.produced_qty, 0))
+					END
+				) as wip_qty
+			FROM
+				`tabProduction Planning FG Table` fg
+			INNER JOIN
+				`tabProduction Planning` pp ON pp.name = fg.parent
+			WHERE
+				pp.docstatus = 1
+				AND fg.fg_item IS NOT NULL
+			GROUP BY
+				fg.fg_item
+			""",
+			as_dict=True,
+		)
+
+		for row in wip_rows_pp:
+			wip_map[row.item_code] = flt(row.wip_qty)
 
 	return wip_map
 

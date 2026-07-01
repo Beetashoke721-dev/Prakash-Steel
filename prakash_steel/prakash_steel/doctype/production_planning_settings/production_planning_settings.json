@@ -6,7 +6,8 @@
  "engine": "InnoDB",
  "field_order": [
   "from_work_order",
-  "from_production_plan"
+  "from_production_plan",
+  "from_production_planning"
  ],
  "fields": [
   {
@@ -20,6 +21,12 @@
    "fieldname": "from_production_plan",
    "fieldtype": "Check",
    "label": "From Production Plan"
+  },
+  {
+   "default": "0",
+   "fieldname": "from_production_planning",
+   "fieldtype": "Check",
+   "label": "From Production Planning"
   }
  ],
  "grid_page_length": 50,
