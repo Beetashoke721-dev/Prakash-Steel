@@ -182,12 +182,17 @@ def get_wip_map() -> dict[str, float]:
 				continue
 
 	elif settings.get("from_production_planning"):
-		# WIP from Production Planning (fg_production_qty − produced_qty; produced_qty synced on Finish Weight / Bright Bar Production submit)
+		# WIP from Production Planning (fg_production_qty − produced_qty; closed rows excluded)
 		wip_rows_pp = frappe.db.sql(
 			"""
 			SELECT
 				fg.fg_item as item_code,
-				SUM(GREATEST(0, IFNULL(fg.fg_production_qty, 0) - IFNULL(fg.produced_qty, 0))) as wip_qty
+				SUM(
+					CASE
+						WHEN IFNULL(fg.closed, 0) = 1 THEN 0
+						ELSE GREATEST(0, IFNULL(fg.fg_production_qty, 0) - IFNULL(fg.produced_qty, 0))
+					END
+				) as wip_qty
 			FROM
 				`tabProduction Planning FG Table` fg
 			INNER JOIN
