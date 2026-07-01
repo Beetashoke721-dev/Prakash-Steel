@@ -310,11 +310,12 @@ class TestGetWipMap(unittest.TestCase):
 		from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import get_wip_map
 		self._fn = get_wip_map
 
-	def _settings(self, from_work_order=1, from_production_plan=0):
+	def _settings(self, from_work_order=1, from_production_plan=0, from_production_planning=0):
 		settings = MagicMock()
 		settings.get.side_effect = lambda key, default=None: {
 			"from_work_order": from_work_order,
 			"from_production_plan": from_production_plan,
+			"from_production_planning": from_production_planning,
 		}.get(key, default)
 		return settings
 
@@ -369,6 +370,21 @@ class TestGetWipMap(unittest.TestCase):
 			mf.get_doc.return_value = pp_doc
 			result = self._fn()
 		self.assertEqual(result, {})
+
+	def test_production_planning_path_planned_minus_produced(self):
+		rows = [
+			_row(item_code="FG-1", wip_qty=50.0),
+			_row(item_code="FG-2", wip_qty=0.0),
+		]
+		with patch(MODULE + ".frappe") as mf:
+			mf.get_single.return_value = self._settings(
+				from_work_order=0, from_production_plan=0, from_production_planning=1
+			)
+			mf.db.sql.return_value = rows
+			result = self._fn()
+		self.assertEqual(result["FG-1"], 50.0)
+		self.assertEqual(result["FG-2"], 0.0)
+		mf.db.sql.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
