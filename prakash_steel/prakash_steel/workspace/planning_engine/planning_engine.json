@@ -1,7 +1,7 @@
 {
  "app": "prakash_steel",
  "charts": [],
- "content": "[{\"id\":\"p_14y26G3I\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"Q8fQvz_Wi3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine\",\"col\":4}},{\"id\":\"LaS_JUlxLb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine Master\",\"col\":4}},{\"id\":\"x1CkjVFxAf\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Colour Weightage Master\",\"col\":4}},{\"id\":\"O5-4ofYR7P\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour\",\"col\":4}},{\"id\":\"BvCHpBPAkY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour Sequence Master\",\"col\":4}},{\"id\":\"JzzkrJGCSA\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Machine Load Colour Master\",\"col\":4}},{\"id\":\"hLcJIjEQH5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rolling Algo\",\"col\":4}},{\"id\":\"H5ZFdro68k\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"ADU Horizon\",\"col\":4}},{\"id\":\"wOY7rNMSkX\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Spike Master\",\"col\":4}},{\"id\":\"q5wHB2klBR\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"W_MyEfNOZd\",\"type\":\"card\",\"data\":{\"card_name\":\"Buffer Reports\",\"col\":4}},{\"id\":\"Vwuw1s_qnN\",\"type\":\"card\",\"data\":{\"card_name\":\"Non Buffer Reports\",\"col\":4}},{\"id\":\"ATL6AvoO4H\",\"type\":\"card\",\"data\":{\"card_name\":\"Trend Reports\",\"col\":4}},{\"id\":\"XibLh2Md69\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning Reports\",\"col\":4}},{\"id\":\"6xGcFTcfXV\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"Q9z4KO6hIy\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"bcy5sZHzDu\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboard</b></span>\",\"col\":12}},{\"id\":\"KA4aZcZgPy\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Planning Engine Dashboard\",\"col\":4}}]",
+ "content": "[{\"id\":\"p_14y26G3I\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"KA4aZcZgPy\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Dashboard\",\"col\":12}},{\"id\":\"q5wHB2klBR\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"xa6JO0H-Kr\",\"type\":\"card\",\"data\":{\"card_name\":\"Production & Purchase Planning\",\"col\":4}},{\"id\":\"W_MyEfNOZd\",\"type\":\"card\",\"data\":{\"card_name\":\"Buffer Reports\",\"col\":4}},{\"id\":\"Vwuw1s_qnN\",\"type\":\"card\",\"data\":{\"card_name\":\"Non Buffer Reports\",\"col\":4}},{\"id\":\"ZabQUQysVv\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Review\",\"col\":4}},{\"id\":\"qdSCrHKahE\",\"type\":\"card\",\"data\":{\"card_name\":\"TOG Calculation\",\"col\":4}},{\"id\":\"Wl_z4uQOb5\",\"type\":\"card\",\"data\":{\"card_name\":\"Head Body Tail Analysis\",\"col\":4}},{\"id\":\"V0kT7eeieQ\",\"type\":\"card\",\"data\":{\"card_name\":\"Trend Reports\",\"col\":4}},{\"id\":\"Xf5aof9GZ9\",\"type\":\"card\",\"data\":{\"card_name\":\"More Reports\",\"col\":4}},{\"id\":\"6xGcFTcfXV\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"utofq7wIoq\",\"type\":\"card\",\"data\":{\"card_name\":\"Exceptions\",\"col\":4}},{\"id\":\"Q9z4KO6hIy\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"Rg6KSC3X5u\",\"type\":\"paragraph\",\"data\":{\"text\":\"Settings\",\"col\":12}},{\"id\":\"Q8fQvz_Wi3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine\",\"col\":4}},{\"id\":\"LaS_JUlxLb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine Master\",\"col\":4}},{\"id\":\"x1CkjVFxAf\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Colour Weightage Master\",\"col\":4}},{\"id\":\"O5-4ofYR7P\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour\",\"col\":4}},{\"id\":\"BvCHpBPAkY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour Sequence Master\",\"col\":4}},{\"id\":\"JzzkrJGCSA\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Machine Load Colour Master\",\"col\":4}},{\"id\":\"hLcJIjEQH5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rolling Algo\",\"col\":4}},{\"id\":\"wOY7rNMSkX\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Spike Master\",\"col\":4}},{\"id\":\"epRro3mlh5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Delivery Delay Reason Master\",\"col\":4}}]",
  "creation": "2026-05-15 13:01:04.636013",
  "custom_blocks": [],
  "docstatus": 0,
@@ -9,41 +9,11 @@
  "for_user": "",
  "hide_custom": 0,
  "icon": "milestone",
- "idx": 0,
+ "idx": 2,
  "indicator_color": "green",
  "is_hidden": 0,
  "label": "Planning Engine",
  "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Trend Reports",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Category wise Trend Report",
-   "link_count": 0,
-   "link_to": "Category wise Trend Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "SKU wise Trend Report",
-   "link_count": 0,
-   "link_to": "SKU wise Trend Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
   {
    "hidden": 0,
    "is_query_report": 0,
@@ -89,36 +59,6 @@
    "label": "Rolled Bar Sales report",
    "link_count": 0,
    "link_to": "Rolled Bar Sales report",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Planning Reports",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Bright Plan",
-   "link_count": 0,
-   "link_to": "bright-plan-page",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bright Machine Load",
-   "link_count": 0,
-   "link_to": "Bright Machine Load",
    "link_type": "Report",
    "onboard": 0,
    "report_ref_doctype": "Item",
@@ -261,9 +201,283 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production & Purchase Planning",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bright Plan",
+   "link_count": 0,
+   "link_to": "bright-plan-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bright Machine Load",
+   "link_count": 0,
+   "link_to": "Bright Machine Load",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Review",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Open SO",
+   "link_count": 0,
+   "link_to": "open-so-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Ready to Dispatch",
+   "link_count": 0,
+   "link_to": "open-so-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "TOG Calculation",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bright TOG",
+   "link_count": 0,
+   "link_to": "bb-tog",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rolled TOG",
+   "link_count": 0,
+   "link_to": "rb-tog",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Head Body Tail Analysis",
+   "link_count": 6,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bright Product HBT",
+   "link_count": 0,
+   "link_to": "Bright Product HBT",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bright Product Analysis",
+   "link_count": 0,
+   "link_to": "Bright Production Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rolled Product HBT",
+   "link_count": 0,
+   "link_to": "Rolled Product HBT",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rolled Product Analysis",
+   "link_count": 0,
+   "link_to": "Rolled Production Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customer HBT",
+   "link_count": 0,
+   "link_to": "Customer HBT",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Customer",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customer Analysis",
+   "link_count": 0,
+   "link_to": "Customer Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "More Reports",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Open MR for Manufacture",
+   "link_count": 0,
+   "link_to": "Open MR for Manufacture",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Material Request",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Open MR for Purchase",
+   "link_count": 0,
+   "link_to": "Open MR for Purchase",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Open MR (WO)",
+   "link_count": 0,
+   "link_to": "Open MR (WO) Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Work Order",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Open Work Order",
+   "link_count": 0,
+   "link_to": "Open Work Order Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Work Order",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Trend Reports",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Category wise Trend Report",
+   "link_count": 0,
+   "link_to": "Category wise Trend Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "SKU wise Trend Report",
+   "link_count": 0,
+   "link_to": "SKU wise Trend Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item wise Daily On Hand Colour",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Exceptions",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Missing BOM",
+   "link_count": 0,
+   "link_to": "Missing BOM Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Duplicate BOMs",
+   "link_count": 0,
+   "link_to": "Bom Cleanup report",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
   }
  ],
- "modified": "2026-06-30 10:36:57.998048",
+ "modified": "2026-07-01 10:36:15.881808",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Planning Engine",
@@ -278,15 +492,16 @@
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "Planning Engine Dashboard",
+   "label": "Dashboard",
    "link_to": "prakash-steel-planni",
    "type": "Page"
   },
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "ADU Horizon",
-   "link_to": "ADU Horizon",
+   "label": "Delivery Delay Reason Master",
+   "link_to": "Delivery Delay Reason Master",
+   "stats_filter": "[]",
    "type": "DocType"
   },
   {
