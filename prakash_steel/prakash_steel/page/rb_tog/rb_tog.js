@@ -86,7 +86,9 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 
 
 	function fmt_change_pct(val, idx) {
-		if (val === null || val === undefined) return dash();
+		if (val === null || val === undefined) {
+			return `<span class="rbt-change-pct" data-idx="${idx}" style="color:#ccc;">—</span>`;
+		}
 		const n = parseFloat(val);
 		const color = n > 0 ? "#1a7a3f" : n < 0 ? "#c0152a" : "#888";
 		const arrow = n > 0 ? "▲" : n < 0 ? "▼" : "";
@@ -265,11 +267,24 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		const row = _all_data[idx];
 		const tog = row.tog;
 		const current_tog = row.current_tog || 0;
-		const change_pct = (tog !== null && tog !== undefined && current_tog)
+		const change_pct = (tog !== null && tog !== undefined && !Number.isNaN(tog) && current_tog)
 			? Math.round((tog - current_tog) / current_tog * 1000) / 10
 			: null;
 		row.change_pct = change_pct;
-		$(`.rbt-change-pct[data-idx="${idx}"]`).replaceWith(fmt_change_pct(change_pct, idx));
+		const html = fmt_change_pct(change_pct, idx);
+		const $el = $(`.rbt-change-pct[data-idx="${idx}"]`);
+		if ($el.length) {
+			$el.replaceWith(html);
+			return;
+		}
+		// Fallback for cells already showing an untagged dash from before the fix
+		const col_idx = COLS.findIndex(c => c.id === "change_pct");
+		const $row = $(`.rbt-tog-input[data-idx="${idx}"]`).closest(".dt-row");
+		if ($row.length && col_idx >= 0) {
+			$row.find(`.dt-cell--col-${col_idx} .dt-cell__content, .dt-cell--col-${col_idx} .content`)
+				.first()
+				.html(html);
+		}
 	}
 
 	function recalc_tog(idx) {
