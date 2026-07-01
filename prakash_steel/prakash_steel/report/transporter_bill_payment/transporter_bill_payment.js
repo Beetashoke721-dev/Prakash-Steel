@@ -92,6 +92,17 @@ frappe.query_reports["Transporter Bill Payment"] = {
 		},
 	],
 
+	formatter: function (value, row, column, data, default_formatter) {
+		value = default_formatter(value, row, column, data);
+
+		if (column.fieldname === "approval_status" && value === "Approved") {
+			value =
+				"<div style='text-align:center;color:green;'>" + value + "</div>";
+		}
+
+		return value;
+	},
+
 	onload: function (report) {
 		syncDateFiltersInUrl(report);
 

@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt, now_datetime
+from frappe.utils import cint, flt, now_datetime
 
 
 def set_custom_closed_on(doc, method=None) -> None:
@@ -23,6 +23,62 @@ def set_custom_closed_on(doc, method=None) -> None:
 		doc.custom_closed_on = None
 
 
+def is_purchase_order_fully_completed(doc) -> bool:
+	return (
+		doc.status == "Completed"
+		and cint(doc.docstatus) == 1
+		and flt(doc.per_received) >= 100
+		and flt(doc.per_billed) >= 100
+	)
+
+
+def get_completed_on_fallback(po_name: str):
+	"""Best-effort completion timestamp when the Completed label was never logged."""
+	completed_comment = frappe.db.get_value(
+		"Comment",
+		{
+			"reference_doctype": "Purchase Order",
+			"reference_name": po_name,
+			"comment_type": "Label",
+			"content": "Completed",
+		},
+		"creation",
+		order_by="creation desc",
+	)
+	if completed_comment:
+		return completed_comment
+
+	linked_modified = frappe.db.sql(
+		"""
+		SELECT MAX(modified) AS completed_on
+		FROM (
+			SELECT pr.modified
+			FROM `tabPurchase Receipt` pr
+			INNER JOIN `tabPurchase Receipt Item` pri ON pri.parent = pr.name
+			INNER JOIN `tabPurchase Order Item` poi ON poi.name = pri.purchase_order_item
+			WHERE poi.parent = %s AND pr.docstatus = 1
+			UNION ALL
+			SELECT pi.modified
+			FROM `tabPurchase Invoice` pi
+			INNER JOIN `tabPurchase Invoice Item` pii ON pii.parent = pi.name
+			WHERE pii.purchase_order = %s AND pi.docstatus = 1
+		) linked
+		""",
+		(po_name, po_name),
+	)
+	if linked_modified and linked_modified[0][0]:
+		return linked_modified[0][0]
+
+	return frappe.db.get_value("Purchase Order", po_name, "modified")
+
+
+def _set_custom_completed_on_value(doc, completed_on) -> None:
+	frappe.db.set_value(
+		doc.doctype, doc.name, "custom_completed_on", completed_on, update_modified=False
+	)
+	doc.custom_completed_on = completed_on
+
+
 def set_custom_completed_on(doc, method=None) -> None:
 	"""Store datetime when Purchase Order status changes to Completed."""
 	if not frappe.db.has_column(doc.doctype, "custom_completed_on"):
@@ -32,14 +88,14 @@ def set_custom_completed_on(doc, method=None) -> None:
 	prev_status = before.get("status") if before else None
 
 	if doc.status == "Completed" and prev_status != "Completed":
-		completed_on = now_datetime()
-		frappe.db.set_value(
-			doc.doctype, doc.name, "custom_completed_on", completed_on, update_modified=False
-		)
-		doc.custom_completed_on = completed_on
+		_set_custom_completed_on_value(doc, now_datetime())
 	elif prev_status == "Completed" and doc.status != "Completed":
 		frappe.db.set_value(doc.doctype, doc.name, "custom_completed_on", None, update_modified=False)
 		doc.custom_completed_on = None
+	elif is_purchase_order_fully_completed(doc) and not doc.get("custom_completed_on"):
+		completed_on = get_completed_on_fallback(doc.name)
+		if completed_on:
+			_set_custom_completed_on_value(doc, completed_on)
 
 
 def validate_purchase_order_quantity_on_close(doc, method=None) -> None:

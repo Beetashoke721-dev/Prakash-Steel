@@ -33,6 +33,9 @@ class TestGetColumns(unittest.TestCase):
         cols = get_columns("purchase")
         fieldnames = [c["fieldname"] for c in cols]
         self.assertIn("bill_date", fieldnames)
+        self.assertIn("approval_status", fieldnames)
+        purchase_invoice_idx = fieldnames.index("purchase_invoice")
+        self.assertEqual(fieldnames[purchase_invoice_idx + 1], "approval_status")
 
     def test_sale_columns(self):
         from prakash_steel.prakash_steel.report.transporter_bill_payment.transporter_bill_payment import get_columns
