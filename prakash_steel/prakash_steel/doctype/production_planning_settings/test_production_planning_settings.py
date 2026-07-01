@@ -22,6 +22,7 @@ class TestProductionplanningsettings(FrappeTestCase):
 		# Check defaults exist (0 = False for Check fields)
 		self.assertIn(doc.from_work_order, [0, 1])
 		self.assertIn(doc.from_production_plan, [0, 1])
+		self.assertIn(doc.from_production_planning, [0, 1])
 
 	def test_update_from_work_order(self):
 		doc = frappe.get_single("Production planning settings")
@@ -43,4 +44,15 @@ class TestProductionplanningsettings(FrappeTestCase):
 		self.assertEqual(updated.from_production_plan, 1 if not original else 0)
 		# Restore
 		updated.from_production_plan = original
+		updated.save(ignore_permissions=True)
+
+	def test_update_from_production_planning(self):
+		doc = frappe.get_single("Production planning settings")
+		original = doc.from_production_planning
+		doc.from_production_planning = 1 if not original else 0
+		doc.save(ignore_permissions=True)
+		updated = frappe.get_single("Production planning settings")
+		self.assertEqual(updated.from_production_planning, 1 if not original else 0)
+		# Restore
+		updated.from_production_planning = original
 		updated.save(ignore_permissions=True)
