@@ -3,14 +3,15 @@
  "add_translate_data": 0,
  "columns": [],
  "creation": "2026-03-10 15:41:18.458496",
+ "disable_prepared_report_automation": 0,
  "disabled": 0,
  "docstatus": 0,
  "doctype": "Report",
  "filters": [],
  "idx": 0,
  "is_standard": "Yes",
- "letterhead": null,
- "modified": "2026-03-13 12:00:45.587956",
+ "letter_head": null,
+ "modified": "2026-07-04 12:32:35.958739",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "PSP Unsecured Loans and Transaction Report",
@@ -22,6 +23,12 @@
  "roles": [
   {
    "role": "System Manager"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
   }
  ],
  "timeout": 0
