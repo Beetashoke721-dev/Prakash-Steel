@@ -3,17 +3,14 @@
  "creation": "2026-05-10 20:35:10.816798",
  "docstatus": 0,
  "doctype": "Page",
- "idx": 0,
- "modified": "2026-05-10 20:35:10.816798",
+ "idx": 3,
+ "modified": "2026-07-04 10:42:46.647853",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "bright-plan-page",
  "owner": "Administrator",
  "page_name": "bright-plan-page",
  "roles": [
-  {
-   "role": "Accounts Manager"
-  },
   {
    "role": "Purchase Manager"
   },
@@ -22,6 +19,24 @@
   },
   {
    "role": "Stock Manager"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Purchase User"
   }
  ],
  "script": null,
