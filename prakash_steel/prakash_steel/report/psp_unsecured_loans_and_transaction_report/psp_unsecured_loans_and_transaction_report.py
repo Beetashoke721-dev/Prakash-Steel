@@ -200,7 +200,14 @@ def get_data(filters) -> list[dict]:
         loop_end = min(to_date, yesterday)
 
         if selected_month:
-            year = loop_start.year
+            # A financial year spans two calendar years (e.g. FY 25-26 runs
+            # Apr 2025 -> Mar 2026). Months on/after the fiscal start month
+            # (Apr-Dec) belong to the start year; earlier months (Jan-Mar)
+            # belong to the following calendar year.
+            if selected_month >= from_date.month:
+                year = from_date.year
+            else:
+                year = from_date.year + 1
             month_start = getdate(f"{year}-{selected_month}-01")
             month_end = add_days(month_start, calendar.monthrange(year, selected_month)[1] - 1)
 
