@@ -1,9 +1,90 @@
 # Copyright (c) 2026, Beetashoke Chakraborty and contributors
 # For license information, please see license.txt
 
+import json
 import frappe
 from frappe import _
 from typing import Optional
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_bom_items_for_filter(doctype, txt, searchfield, start, page_len, filters):
+	"""Return Items that have at least one BOM matching the is_active/is_default filters.
+
+	Used by the Parent Item Code autocomplete in the BOM Details report.
+	"""
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+
+	conditions = ["(b.is_active = 1 OR b.is_default = 1)"]
+
+	is_active = filters.get("is_active", "")
+	is_default = filters.get("is_default", "")
+
+	if is_active == "Yes":
+		conditions.append("b.is_active = 1")
+	elif is_active == "No":
+		conditions.append("b.is_active = 0")
+
+	if is_default == "Yes":
+		conditions.append("b.is_default = 1")
+	elif is_default == "No":
+		conditions.append("b.is_default = 0")
+
+	where = " AND ".join(conditions)
+
+	return frappe.db.sql(
+		f"""
+			SELECT DISTINCT b.item, b.item_name
+			FROM `tabBOM` b
+			WHERE {where}
+			  AND (b.item LIKE %(txt)s OR b.item_name LIKE %(txt)s)
+			ORDER BY b.item
+			LIMIT %(start)s, %(page_len)s
+		""",
+		{"txt": f"%{txt}%", "start": int(start), "page_len": int(page_len)},
+	)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_boms_for_filter(doctype, txt, searchfield, start, page_len, filters):
+	"""Return BOMs matching the is_active/is_default filters.
+
+	Used by the BOM Name autocomplete in the BOM Details report.
+	"""
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+
+	conditions = ["(b.is_active = 1 OR b.is_default = 1)"]
+
+	is_active = filters.get("is_active", "")
+	is_default = filters.get("is_default", "")
+
+	if is_active == "Yes":
+		conditions.append("b.is_active = 1")
+	elif is_active == "No":
+		conditions.append("b.is_active = 0")
+
+	if is_default == "Yes":
+		conditions.append("b.is_default = 1")
+	elif is_default == "No":
+		conditions.append("b.is_default = 0")
+
+	where = " AND ".join(conditions)
+
+	return frappe.db.sql(
+		f"""
+			SELECT DISTINCT b.name, b.item_name
+			FROM `tabBOM` b
+			WHERE {where}
+			  AND (b.name LIKE %(txt)s OR b.item_name LIKE %(txt)s)
+			ORDER BY b.name
+			LIMIT %(start)s, %(page_len)s
+		""",
+		{"txt": f"%{txt}%", "start": int(start), "page_len": int(page_len)},
+	)
 
 
 def execute(filters: dict | None = None):
@@ -30,8 +111,8 @@ def get_columns() -> list[dict]:
 		{"label": _("Child Item Name"), "fieldname": "child_item_name", "fieldtype": "Data", "width": 200},
 		{"label": _("Qty (Items)"), "fieldname": "child_qty", "fieldtype": "Float", "width": 80},
 		{"label": _("UOM (Items)"), "fieldname": "child_uom", "fieldtype": "Data", "width": 80},
-		{"label": _("isActive"), "fieldname": "is_active", "fieldtype": "Check", "width": 70},
-		{"label": _("isDefault"), "fieldname": "is_default", "fieldtype": "Check", "width": 70},
+		{"label": _("Is Active"), "fieldname": "is_active", "fieldtype": "Check", "width": 70},
+		{"label": _("Is Default"), "fieldname": "is_default", "fieldtype": "Check", "width": 70},
 	]
 
 
@@ -47,21 +128,40 @@ def get_data(filters: Optional[dict]) -> list[dict]:
 	# Build server-side filters for BOMs
 	bom_filters = {}
 	is_active_filter = filters.get("is_active")
-	if is_active_filter == "Yes":
+	is_default_filter = filters.get("is_default")
+	is_active_value = str(is_active_filter).strip().lower() if is_active_filter is not None else ""
+	is_default_value = str(is_default_filter).strip().lower() if is_default_filter is not None else ""
+
+	_yes_values = ("yes", "active", "1", "true", "on")
+	_no_values  = ("no", "inactive", "0", "false", "off")
+
+	# Yes → filter = 1 | No → filter = 0 | blank → no filter
+	if is_active_value in _yes_values:
 		bom_filters["is_active"] = 1
-	elif is_active_filter == "No":
+	elif is_active_value in _no_values:
 		bom_filters["is_active"] = 0
 
-	is_default_filter = filters.get("is_default")
-	if is_default_filter == "Yes":
+	if is_default_value in _yes_values:
 		bom_filters["is_default"] = 1
-	elif is_default_filter == "No":
+	elif is_default_value in _no_values:
 		bom_filters["is_default"] = 0
 
-	# Fetch BOMs matching the filters
+	parent_item_code = filters.get("parent_item_code")
+	if parent_item_code:
+		bom_filters["item"] = ["like", f"%{parent_item_code}%"]
+
+	bom_name = filters.get("bom_name")
+	if bom_name:
+		bom_filters["name"] = bom_name
+
+	# Always exclude BOMs where BOTH is_active and is_default are unchecked
 	boms = frappe.get_all(
 		"BOM",
 		filters=bom_filters,
+		or_filters=[
+			["is_active", "=", 1],
+			["is_default", "=", 1],
+		],
 		fields=[
 			"name",
 			"item as parent_item_code",
