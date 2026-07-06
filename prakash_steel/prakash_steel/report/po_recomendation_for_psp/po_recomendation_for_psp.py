@@ -1078,7 +1078,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 				on_hand_colour = None
 				on_hand_status = None
 			else:
-				numeric_status = round(on_hand_status_value, 2)
+				numeric_status = round(on_hand_status_value, 1)
 
 				if numeric_status == 0:
 					on_hand_colour = "BLACK"
@@ -1091,7 +1091,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 				else:  # > 100
 					on_hand_colour = "WHITE"
 
-				on_hand_status = f"{numeric_status:.2f}%"
+				on_hand_status = f"{numeric_status:.1f}%"
 
 		net_order_rec = flt(net_order_recommendations.get(item_code, 0))
 
@@ -2259,7 +2259,7 @@ def get_on_hand_status_breakdown(item_code: str) -> dict:
 
 	if buffer_flag == "Buffer" and denominator > 0:
 		on_hand_pct = (on_hand_stock / denominator) * 100
-		on_hand_pct_rounded = round(on_hand_pct, 2)
+		on_hand_pct_rounded = round(on_hand_pct, 1)
 		if on_hand_pct_rounded == 0:
 			colour = "BLACK"
 		elif on_hand_pct_rounded <= 34:
@@ -2294,7 +2294,7 @@ def get_on_hand_status_breakdown(item_code: str) -> dict:
 		"total_parent_demand": round(total_parent_demand, 3),
 		"total_demand": round(total_demand, 3),
 		"denominator": round(denominator, 3),
-		"on_hand_status": f"{on_hand_pct_rounded:.2f}%" if on_hand_pct_rounded is not None else "N/A",
+		"on_hand_status": f"{on_hand_pct_rounded:.1f}%" if on_hand_pct_rounded is not None else "N/A",
 		"on_hand_colour": colour,
 	}
 
