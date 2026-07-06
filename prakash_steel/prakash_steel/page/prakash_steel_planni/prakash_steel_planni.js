@@ -135,9 +135,27 @@ function getColorMap() {
 	};
 }
 
+const CARD_NAVIGATION = {
+	BBMTA: () => frappe.set_route('query-report', 'BBMTA'),
+	RBMTA: () => frappe.set_route('query-report', 'RBMTA'),
+	BOTA: () => frappe.set_route('query-report', 'BOTA'),
+	RMTA: () => frappe.set_route('query-report', 'PTA'),
+	PTA: () => frappe.set_route('query-report', 'PTA'),
+	'Pending SO Status': () => frappe.set_route('open-so-page'),
+};
+
+function navigate_from_card(key) {
+	const navigate = CARD_NAVIGATION[key];
+	if (navigate) {
+		navigate();
+	}
+}
+
 function createChartCard(key, data, colorMap) {
 	const title = key.includes('Status') ? key : `${key} On Hand Status`;
 	const chartId = key.replace(/\s+/g, '-');
+
+	const isClickable = Boolean(CARD_NAVIGATION[key]);
 
 	const $card = $(`
 		<div class="chart-card" style="
@@ -146,7 +164,8 @@ function createChartCard(key, data, colorMap) {
 			padding:16px;
 			box-shadow:0 2px 8px rgba(0,0,0,0.1);
 			position:relative;
-		">
+			${isClickable ? 'cursor:pointer;transition:box-shadow 0.15s ease, transform 0.15s ease;' : ''}
+		" ${isClickable ? `title="${__('Click to open report')}"` : ''}>
 			<h3 style="
 				margin:0 0 8px 0;
 				font-size:1rem;
@@ -241,6 +260,22 @@ function createChartCard(key, data, colorMap) {
 	rightColors.forEach((colorName) => {
 		$legendRight.append(createLegendItem(colorName));
 	});
+
+	if (isClickable) {
+		$card.on('mouseenter', function () {
+			$(this).css({
+				'box-shadow': '0 4px 14px rgba(0,0,0,0.15)',
+				transform: 'translateY(-2px)',
+			});
+		});
+		$card.on('mouseleave', function () {
+			$(this).css({
+				'box-shadow': '0 2px 8px rgba(0,0,0,0.1)',
+				transform: 'translateY(0)',
+			});
+		});
+		$card.on('click', () => navigate_from_card(key));
+	}
 
 	return $card;
 }
