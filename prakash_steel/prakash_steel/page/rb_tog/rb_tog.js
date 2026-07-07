@@ -167,21 +167,6 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			format: val => (val !== null && val !== undefined) ? String(val) : dash(),
 		},
 		{
-			name: "Head Customer",
-			id: "h", width: 150, align: "right", editable: false,
-			format: val => num_badge(val, "H"),
-		},
-		{
-			name: "Body Customer",
-			id: "b", width: 150, align: "right", editable: false,
-			format: val => num_badge(val, "B"),
-		},
-		{
-			name: "Tail Customer",
-			id: "t", width: 150, align: "right", editable: false,
-			format: val => num_badge(val, "T"),
-		},
-		{
 			name: "ADU", id: "adu", width: 110, align: "right", editable: false,
 			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
 		},
@@ -212,6 +197,21 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		{
 			name: "Change%", id: "change_pct", width: 110, align: "right", editable: false,
 			format: (val, _r, _c, d) => fmt_change_pct(val, d._idx),
+		},
+		{
+			name: "Head Customer",
+			id: "h", width: 150, align: "right", editable: false,
+			format: val => num_badge(val, "H"),
+		},
+		{
+			name: "Body Customer",
+			id: "b", width: 150, align: "right", editable: false,
+			format: val => num_badge(val, "B"),
+		},
+		{
+			name: "Tail Customer",
+			id: "t", width: 150, align: "right", editable: false,
+			format: val => num_badge(val, "T"),
 		},
 	];
 

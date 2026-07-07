@@ -130,23 +130,42 @@ function getColorMap() {
 		BLACK: '#000000',
 		RED: '#ff0000',
 		YELLOW: '#ffcc00', // Deeper yellow color
-		GREEN: '#4dff88',
+		GREEN: '#32b84a',
 		WHITE: '#d3d3d3', // Grayish white for better visibility
 	};
+}
+
+const CARD_NAVIGATION = {
+	BBMTA: () => frappe.set_route('query-report', 'BBMTA'),
+	RBMTA: () => frappe.set_route('query-report', 'RBMTA'),
+	BOTA: () => frappe.set_route('query-report', 'BOTA'),
+	RMTA: () => frappe.set_route('query-report', 'PTA'),
+	PTA: () => frappe.set_route('query-report', 'PTA'),
+	'Pending SO Status': () => frappe.set_route('open-so-page'),
+};
+
+function navigate_from_card(key) {
+	const navigate = CARD_NAVIGATION[key];
+	if (navigate) {
+		navigate();
+	}
 }
 
 function createChartCard(key, data, colorMap) {
 	const title = key.includes('Status') ? key : `${key} On Hand Status`;
 	const chartId = key.replace(/\s+/g, '-');
 
+	const isClickable = Boolean(CARD_NAVIGATION[key]);
+
 	const $card = $(`
 		<div class="chart-card" style="
 			background:#fff;
 			border-radius:8px;
-			padding:16px;
+			padding:16px 16px 4px;
 			box-shadow:0 2px 8px rgba(0,0,0,0.1);
 			position:relative;
-		">
+			${isClickable ? 'cursor:pointer;transition:box-shadow 0.15s ease, transform 0.15s ease;' : ''}
+		" ${isClickable ? `title="${__('Click to open report')}"` : ''}>
 			<h3 style="
 				margin:0 0 8px 0;
 				font-size:1rem;
@@ -159,12 +178,34 @@ function createChartCard(key, data, colorMap) {
 			</div>
 			<div class="chart-legend-${chartId}" style="
 				display:flex;
-				gap:12px;
 				justify-content:center;
 				margin-top:8px;
 			">
-				<div class="legend-left" style="display:flex;flex-direction:column;gap:6px;"></div>
-				<div class="legend-right" style="display:flex;flex-direction:column;gap:6px;"></div>
+				<div class="legend-grid" style="
+					display:grid;
+					grid-template-columns:repeat(3, 90px);
+					column-gap:12px;
+					row-gap:8px;
+				"></div>
+			</div>
+			<div class="chart-footer-stats" style="
+				display:flex;
+				justify-content:center;
+				align-items:center;
+				gap:24px;
+				margin-top:6px;
+				padding:8px 0 2px;
+				border-top:1px solid #eef1f5;
+			">
+				<div style="text-align:center;min-width:64px;display:flex;flex-direction:column;justify-content:center;">
+					<div style="font-size:0.65rem;color:#7f8c8d;font-weight:500;margin-bottom:1px;line-height:1.1;">${__('Availability')}</div>
+					<div class="chart-availability-value" style="font-size:0.85rem;color:#0066cc;font-weight:600;line-height:1.1;">—</div>
+				</div>
+				<div style="width:1px;align-self:stretch;background:#d8dee9;min-height:28px;"></div>
+				<div style="text-align:center;min-width:64px;display:flex;flex-direction:column;justify-content:center;">
+					<div style="font-size:0.65rem;color:#7f8c8d;font-weight:500;margin-bottom:1px;line-height:1.1;">${__('Total')}</div>
+					<div class="chart-total-value" style="font-size:0.85rem;color:#0066cc;font-weight:600;line-height:1.1;">—</div>
+				</div>
 			</div>
 		</div>
 	`);
@@ -172,29 +213,7 @@ function createChartCard(key, data, colorMap) {
 	// Calculate and display total
 	const total = data.total_items ?? data.total_orders ?? (data.colours ? data.colours.reduce((sum, c) => sum + c.count, 0) : 0);
 
-	const $legend = $card.find(`.chart-legend-${chartId}`);
-	const $legendLeft = $legend.find('.legend-left');
-	const $legendRight = $legend.find('.legend-right');
-
-	// Add Total to the bottom left corner of the card
-	const $totalItem = $(`
-		<div style="
-			position:absolute;
-			bottom:8px;
-			left:16px;
-		">
-			<span style="
-				color:#0066cc;
-				font-size:0.9rem;
-				font-weight:600;
-			">Total: ${total}</span>
-		</div>
-	`);
-	$card.append($totalItem);
-
-	// Define middle and right column colors
-	const middleColors = ['BLACK', 'RED', 'WHITE'];
-	const rightColors = ['YELLOW', 'GREEN'];
+	const $legendGrid = $card.find('.legend-grid');
 
 	// Create a map of existing colors from data
 	const colorDataMap = {};
@@ -204,43 +223,67 @@ function createChartCard(key, data, colorMap) {
 		});
 	}
 
+	const blackPct = colorDataMap.BLACK?.percentage ?? 0;
+	const redPct = colorDataMap.RED?.percentage ?? 0;
+	const availability = Math.max(0, 100 - blackPct - redPct);
+
+	$card.find('.chart-availability-value').text(`${availability}%`);
+	$card.find('.chart-total-value').text(total);
+
+	const legendColors = ['BLACK', 'RED', 'WHITE', 'YELLOW', 'GREEN'];
+
 	// Helper function to create legend item
 	const createLegendItem = (colorName) => {
 		const colorData = colorDataMap[colorName] || { name: colorName, count: 0, percentage: 0 };
-		const isHidden = colorData.count === 0;
+		const count = colorData.count ?? 0;
+		const percentage = colorData.percentage ?? 0;
 		return $(`
 			<div style="
 				display:flex;
 				align-items:center;
 				gap:5px;
-				padding:4px 8px;
-				border-radius:3px;
+				width:90px;
 				min-height:24px;
-				opacity:${isHidden ? '0' : '1'};
-				pointer-events:${isHidden ? 'none' : 'auto'};
+				box-sizing:border-box;
 			">
 				<div style="
 					width:12px;
 					height:12px;
+					flex-shrink:0;
 					background:${colorMap[colorName] || '#ccc'};
 					border-radius:2px;
 					border:1px solid #ddd;
 				"></div>
-				<span style="color:#000000;font-size:0.75rem;font-weight:bold;">${colorData.count}</span>
-				<span style="color:#000000;font-size:0.7rem;"><strong>(${colorData.percentage}%)</strong></span>
+				<span style="
+					color:#000000;
+					font-size:0.75rem;
+					font-weight:bold;
+					font-variant-numeric:tabular-nums;
+					white-space:nowrap;
+				">${count} (${percentage}%)</span>
 			</div>
 		`);
 	};
 
-	// Always show all left column colors (BLACK, RED, WHITE)
-	middleColors.forEach((colorName) => {
-		$legendLeft.append(createLegendItem(colorName));
+	legendColors.forEach((colorName) => {
+		$legendGrid.append(createLegendItem(colorName));
 	});
 
-	// Always show all right column colors (YELLOW, GREEN)
-	rightColors.forEach((colorName) => {
-		$legendRight.append(createLegendItem(colorName));
-	});
+	if (isClickable) {
+		$card.on('mouseenter', function () {
+			$(this).css({
+				'box-shadow': '0 4px 14px rgba(0,0,0,0.15)',
+				transform: 'translateY(-2px)',
+			});
+		});
+		$card.on('mouseleave', function () {
+			$(this).css({
+				'box-shadow': '0 2px 8px rgba(0,0,0,0.1)',
+				transform: 'translateY(0)',
+			});
+		});
+		$card.on('click', () => navigate_from_card(key));
+	}
 
 	return $card;
 }
