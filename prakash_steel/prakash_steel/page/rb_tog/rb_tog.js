@@ -43,6 +43,14 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		change() { apply_filter(); },
 	});
 
+	const fos_field = page.add_field({
+		fieldname: "global_fos",
+		label: __("FOS %"),
+		fieldtype: "Int",
+		default: 25,
+		change() { apply_global_fos(); },
+	});
+
 	page.add_inner_button(__("Refresh"), () => load_data());
 
 	$(`<div id="rbt-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
@@ -96,6 +104,22 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			style="font-weight:600;color:${color};">${Math.abs(n).toFixed(1)}% ${arrow}</span>`;
 	}
 
+	function get_global_fos() {
+		const v = parseInt(fos_field.get_value());
+		return isNaN(v) ? 25 : v;
+	}
+
+	function apply_global_fos() {
+		const fos = get_global_fos();
+		_all_data.forEach((row, idx) => {
+			row.fos = fos;
+			row.tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
+			$(`.rbt-fos-input[data-idx="${idx}"]`).val(fos);
+			$(`.rbt-tog-input[data-idx="${idx}"]`).val(row.tog);
+			recalc_change_pct(idx);
+		});
+	}
+
 	// ── DataTable ─────────────────────────────────────────────────────────────
 	let _dt = null;
 	let _dt_observer = null;
@@ -110,7 +134,14 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			if (item && r.item_code !== item) return false;
 			return true;
 		});
-		_all_data = filtered.map((row, idx) => ({ ...row, _idx: idx }));
+		const _gfos = get_global_fos();
+		_all_data = filtered.map((row, idx) => {
+			const fos = _gfos;
+			const tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
+			const current_tog = row.current_tog || 0;
+			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
+			return { ...row, _idx: idx, fos, tog, change_pct };
+		});
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 		_dt = new DataTable(document.getElementById("rbt-dt"), {
@@ -316,7 +347,14 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 
 	function build_datatable(data, period_label) {
 		_raw_data = data;
-		_all_data = data.map((row, idx) => ({ ...row, _idx: idx }));
+		const _gfos = get_global_fos();
+		_all_data = data.map((row, idx) => {
+			const fos = _gfos;
+			const tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
+			const current_tog = row.current_tog || 0;
+			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
+			return { ...row, _idx: idx, fos, tog, change_pct };
+		});
 
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
