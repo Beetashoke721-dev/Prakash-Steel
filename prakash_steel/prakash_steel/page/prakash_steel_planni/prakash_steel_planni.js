@@ -61,19 +61,26 @@ function load_all_charts(page, $chartsContainer) {
 		}),
 		new Promise((resolve, reject) => {
 			frappe.call({
-				method: 'prakash_steel.prakash_steel.page.prakash_steel_planni.prakash_steel_planni.get_cs_item_on_hand_status',
+				method: 'prakash_steel.prakash_steel.page.prakash_steel_planni.prakash_steel_planni.get_bright_cs_on_hand_status',
+				callback: resolve,
+				error: reject,
+			});
+		}),
+		new Promise((resolve, reject) => {
+			frappe.call({
+				method: 'prakash_steel.prakash_steel.page.prakash_steel_planni.prakash_steel_planni.get_rolled_cs_on_hand_status',
 				callback: resolve,
 				error: reject,
 			});
 		}),
 	])
-		.then(([skuRes, pendingSoRes, openPoRes, csRes]) => {
+		.then(([skuRes, pendingSoRes, openPoRes, brightCsRes, rolledCsRes]) => {
 			page.clear_indicator();
 
-			// 1) SKU type pies
+			// 1) BBMTA, RBMTA, BOTA, TRMTA pies (exact order)
 			if (skuRes && skuRes.message) {
 				const skuData = skuRes.message;
-				const skuTypes = ['BBMTA', 'RBMTA', 'BOTA', 'RMTA', 'PTA'];
+				const skuTypes = ['BBMTA', 'RBMTA', 'BOTA', 'TRMTA'];
 
 				skuTypes.forEach((sku) => {
 					if (skuData[sku] && skuData[sku].colours && skuData[sku].colours.length) {
@@ -84,25 +91,32 @@ function load_all_charts(page, $chartsContainer) {
 				});
 			}
 
-			// 2) Pending SO Status pie
+			// 2) Bright Critical Spares On Hand Status pie
+			if (brightCsRes && brightCsRes.message && brightCsRes.message.colours && brightCsRes.message.colours.length) {
+				const $card = createChartCard('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
+				$chartsContainer.append($card);
+				renderPieChart('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
+			}
+
+			// 3) Rolled Critical Spares On Hand Status pie
+			if (rolledCsRes && rolledCsRes.message && rolledCsRes.message.colours && rolledCsRes.message.colours.length) {
+				const $card = createChartCard('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
+				$chartsContainer.append($card);
+				renderPieChart('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
+			}
+
+			// 4) Pending SO Status pie (Open SO)
 			if (pendingSoRes && pendingSoRes.message && pendingSoRes.message.colours && pendingSoRes.message.colours.length) {
 				const $card = createChartCard('Pending SO Status', pendingSoRes.message, colorMap);
 				$chartsContainer.append($card);
 				renderPieChart('Pending SO Status', pendingSoRes.message, colorMap);
 			}
 
-			// 3) Open PO Status pie (all black for now)
+			// 5) Open PO Status pie
 			if (openPoRes && openPoRes.message) {
 				const $card = createChartCard('Open PO Status', openPoRes.message, colorMap);
 				$chartsContainer.append($card);
 				renderPieChart('Open PO Status', openPoRes.message, colorMap);
-			}
-
-			// 4) CS Item On Hand Status pie
-			if (csRes && csRes.message && csRes.message.colours && csRes.message.colours.length) {
-				const $card = createChartCard('CS Item On Hand Status', csRes.message, colorMap);
-				$chartsContainer.append($card);
-				renderPieChart('CS Item On Hand Status', csRes.message, colorMap);
 			}
 
 			if ($chartsContainer.children().length === 0) {
