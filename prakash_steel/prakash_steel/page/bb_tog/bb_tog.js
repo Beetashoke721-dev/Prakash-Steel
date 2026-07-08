@@ -151,10 +151,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		{
 			name: "Cumu%", id: "cumu_pct", width: 90, align: "right", editable: false,
 			format: (val, _r, _c, d) => {
-				const n = parseFloat(val);
-				let color = "#c0152a";
-				if (n <= 50) color = "#1a7a3f";
-				else if (n <= 90) color = "#d4a000";
+				const color = (d && HBT[d.hbt]) ? HBT[d.hbt].bg : "#c0152a";
 				return `<span style="font-weight:600;color:${color};">${fmt_pct(val)}</span>`;
 			},
 		},
