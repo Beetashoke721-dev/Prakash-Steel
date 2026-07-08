@@ -1,0 +1,270 @@
+# Copyright (c) 2026, Beetashoke Chakraborty and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe import _
+
+from prakash_steel.utils.hbt_utils import get_period_months, period_date_range
+
+MAX_PROD_COLS = 10
+
+
+def execute(filters: dict | None = None):
+	filters = filters or {}
+	period_months = get_period_months()
+	from_date, to_date = period_date_range(period_months)
+
+	data, max_prod_cols = get_data(filters, from_date, to_date)
+	columns = get_columns(max_prod_cols)
+	return columns, data
+
+
+def get_columns(max_prod_cols: int = 0) -> list[dict]:
+	cols = [
+		{
+			"label": _("Item Name"),
+			"fieldname": "item_name",
+			"fieldtype": "Data",
+			"width": 220,
+		},
+		{
+			"label": _("Item Type"),
+			"fieldname": "item_type",
+			"fieldtype": "Data",
+			"width": 100,
+		},
+		{
+			"label": _("SKU Type"),
+			"fieldname": "sku_type",
+			"fieldtype": "Data",
+			"width": 110,
+		},
+		{
+			"label": _("Sales Qty"),
+			"fieldname": "sales_qty",
+			"fieldtype": "Float",
+			"width": 110,
+		},
+		{
+			"label": _("Consumption Qty"),
+			"fieldname": "consumption_qty",
+			"fieldtype": "Float",
+			"width": 140,
+		},
+		{
+			"label": _("Total"),
+			"fieldname": "total",
+			"fieldtype": "Float",
+			"width": 110,
+		},
+		{
+			"label": _("Projected Qty"),
+			"fieldname": "projected_qty",
+			"fieldtype": "Float",
+			"width": 120,
+		},
+		{
+			"label": _("Batch Size"),
+			"fieldname": "batch_size",
+			"fieldtype": "Float",
+			"width": 110,
+		},
+		{
+			"label": _("Production Qty"),
+			"fieldname": "production_qty",
+			"fieldtype": "Float",
+			"width": 120,
+		},
+		{
+			"label": _("Production Count"),
+			"fieldname": "production_count",
+			"fieldtype": "Int",
+			"width": 130,
+		},
+	]
+
+	for i in range(1, max_prod_cols + 1):
+		cols.append({
+			"label": _(f"Prod {i}"),
+			"fieldname": f"prod_{i}",
+			"fieldtype": "Float",
+			"width": 110,
+		})
+
+	return cols
+
+
+def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
+	item_type_filter = filters.get("item_type")
+	sku_type_filter = filters.get("sku_type")
+
+	item_type_in = (item_type_filter,) if item_type_filter else ("RB", "BO", "Traded")
+
+	# ── Item master ──────────────────────────────────────────────────────────
+	item_rows = frappe.db.sql(
+		"""
+		SELECT
+			name AS item_code,
+			item_name,
+			custom_item_type AS item_type,
+			custom_sku_type AS sku_type
+		FROM `tabItem`
+		WHERE custom_item_type IN %(item_types)s
+		  AND disabled = 0
+		""",
+		{"item_types": item_type_in},
+		as_dict=True,
+	)
+
+	if not item_rows:
+		return [], 0
+
+	if sku_type_filter:
+		item_rows = [r for r in item_rows if r.sku_type == sku_type_filter]
+		if not item_rows:
+			return [], 0
+
+	item_codes = [r.item_code for r in item_rows]
+	item_names = [r.item_name for r in item_rows]
+	item_map = {r.item_code: r for r in item_rows}
+
+	# ── Sales qty from Sales Invoice (same logic as rolled_production_analysis) ─
+	sales_rows = frappe.db.sql(
+		"""
+		SELECT sii.item_code, SUM(sii.qty) AS qty
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		INNER JOIN `tabItem` i ON i.name = sii.item_code
+		WHERE si.docstatus = 1
+		  AND i.custom_item_type IN %(item_types)s
+		  AND sii.item_code IN %(item_codes)s
+		  AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY sii.item_code
+		""",
+		{"item_types": item_type_in, "item_codes": item_codes, "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	sales_map = {r.item_code: float(r.qty or 0) for r in sales_rows}
+
+	# ── Consumption: RB/BO from Bright Bar Production ─────────────────────
+	bb_rows = frappe.db.sql(
+		"""
+		SELECT bbp.raw_material AS item_code, COALESCE(SUM(bbp.actual_rm_consumption), 0) AS qty
+		FROM `tabBright Bar Production` bbp
+		INNER JOIN `tabItem` i ON i.name = bbp.raw_material
+		WHERE bbp.docstatus = 1
+		  AND LOWER(i.custom_item_type) IN ('rb', 'bo')
+		  AND bbp.raw_material IN %(item_codes)s
+		  AND bbp.production_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY bbp.raw_material
+		""",
+		{"item_codes": item_codes, "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	bb_map = {r.item_code: float(r.qty or 0) for r in bb_rows}
+
+	# ── Consumption: Traded from Billet Cutting ───────────────────────────
+	billet_rows = frappe.db.sql(
+		"""
+		SELECT bc.billet_size AS item_code, COALESCE(SUM(bc.billet_weight), 0) AS qty
+		FROM `tabBillet Cutting` bc
+		INNER JOIN `tabItem` i ON i.name = bc.billet_size
+		WHERE bc.docstatus = 1
+		  AND LOWER(i.custom_item_type) = 'traded'
+		  AND bc.billet_size IN %(item_codes)s
+		  AND bc.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY bc.billet_size
+		""",
+		{"item_codes": item_codes, "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	billet_map = {r.item_code: float(r.qty or 0) for r in billet_rows}
+
+	# ── Finish Weight: last MAX_PROD_COLS records per item + totals ────────
+	# Window function gives us individual weights (newest first) alongside
+	# total count and total weight without a second query.
+	fw_rows = frappe.db.sql(
+		"""
+		SELECT item_name, finish_weight, total_count, total_fw
+		FROM (
+			SELECT
+				item_name,
+				finish_weight,
+				ROW_NUMBER() OVER (
+					PARTITION BY item_name ORDER BY posting_date DESC, name DESC
+				) AS rn,
+				COUNT(*) OVER (PARTITION BY item_name) AS total_count,
+				SUM(finish_weight) OVER (PARTITION BY item_name) AS total_fw
+			FROM `tabFinish Weight`
+			WHERE docstatus = 1
+			  AND item_name IN %(item_names)s
+			  AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+		) ranked
+		WHERE rn <= %(max_cols)s
+		ORDER BY item_name, rn
+		""",
+		{"item_names": item_names, "from_date": from_date, "to_date": to_date, "max_cols": MAX_PROD_COLS},
+		as_dict=True,
+	)
+
+	# Build per-item structure: weights list is newest-first (prod_1 = most recent)
+	fw_map: dict[str, dict] = {}
+	for r in fw_rows:
+		if r.item_name not in fw_map:
+			fw_map[r.item_name] = {
+				"production_qty": float(r.total_fw or 0),
+				"production_count": int(r.total_count or 0),
+				"weights": [],
+			}
+		fw_map[r.item_name]["weights"].append(float(r.finish_weight or 0))
+
+	# max dynamic columns = min(highest count in this dataset, MAX_PROD_COLS)
+	max_prod_cols = min(
+		max((len(v["weights"]) for v in fw_map.values()), default=0),
+		MAX_PROD_COLS,
+	)
+
+	# ── Build rows ────────────────────────────────────────────────────────
+	data = []
+	for item_code in item_codes:
+		item = item_map[item_code]
+		item_type_lower = (item.item_type or "").lower()
+
+		sales_qty = sales_map.get(item_code, 0.0)
+
+		if item_type_lower in ("rb", "bo"):
+			consumption_qty = bb_map.get(item_code, 0.0)
+		elif item_type_lower == "traded":
+			consumption_qty = billet_map.get(item_code, 0.0)
+		else:
+			consumption_qty = 0.0
+
+		total = sales_qty + consumption_qty
+		projected_qty = round(total * 1.3, 2)
+		fw = fw_map.get(item.item_name, {})
+		production_qty = fw.get("production_qty", 0.0)
+		production_count = fw.get("production_count", 0)
+		weights = fw.get("weights", [])
+
+		batch_size = round(projected_qty / production_count, 2) if production_count else 0.0
+
+		row = {
+			"item_name": item.item_name,
+			"item_type": item.item_type,
+			"sku_type": item.sku_type,
+			"sales_qty": sales_qty,
+			"consumption_qty": consumption_qty,
+			"total": total,
+			"projected_qty": projected_qty,
+			"batch_size": batch_size,
+			"production_qty": production_qty,
+			"production_count": production_count,
+		}
+
+		for i in range(max_prod_cols):
+			row[f"prod_{i + 1}"] = weights[i] if i < len(weights) else None
+
+		data.append(row)
+
+	data.sort(key=lambda r: (-r["production_qty"], -r["total"]))
+	return data, max_prod_cols
