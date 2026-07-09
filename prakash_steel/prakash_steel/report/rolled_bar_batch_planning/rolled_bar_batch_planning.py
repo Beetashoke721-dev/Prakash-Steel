@@ -1,10 +1,17 @@
 # Copyright (c) 2026, Beetashoke Chakraborty and contributors
 # For license information, please see license.txt
 
+import math
+
 import frappe
 from frappe import _
 
 from prakash_steel.utils.hbt_utils import get_period_months, period_date_range
+
+
+def _ceil(v) -> int:
+	"""Round any numeric value up to the nearest integer."""
+	return math.ceil(v) if v else 0
 
 MAX_PROD_COLS = 10
 
@@ -21,6 +28,13 @@ def execute(filters: dict | None = None):
 
 def get_columns(max_prod_cols: int = 0) -> list[dict]:
 	cols = [
+		{
+			"label": _("Item Code"),
+			"fieldname": "item_code",
+			"fieldtype": "Link",
+			"options": "Item",
+			"width": 180,
+		},
 		{
 			"label": _("Item Name"),
 			"fieldname": "item_name",
@@ -42,37 +56,37 @@ def get_columns(max_prod_cols: int = 0) -> list[dict]:
 		{
 			"label": _("Sales Qty"),
 			"fieldname": "sales_qty",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 110,
 		},
 		{
 			"label": _("Consumption Qty"),
 			"fieldname": "consumption_qty",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 140,
 		},
 		{
 			"label": _("Total"),
 			"fieldname": "total",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 110,
 		},
 		{
 			"label": _("Projected Qty"),
 			"fieldname": "projected_qty",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 120,
 		},
 		{
 			"label": _("Batch Size"),
 			"fieldname": "batch_size",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 110,
 		},
 		{
 			"label": _("Production Qty"),
 			"fieldname": "production_qty",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 120,
 		},
 		{
@@ -87,7 +101,7 @@ def get_columns(max_prod_cols: int = 0) -> list[dict]:
 		cols.append({
 			"label": _(f"Prod {i}"),
 			"fieldname": f"prod_{i}",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 110,
 		})
 
@@ -97,22 +111,29 @@ def get_columns(max_prod_cols: int = 0) -> list[dict]:
 def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 	item_type_filter = filters.get("item_type")
 	sku_type_filter = filters.get("sku_type")
+	item_code_filter = filters.get("item_code")
 
 	item_type_in = (item_type_filter,) if item_type_filter else ("RB", "BO", "Traded")
 
 	# ── Item master ──────────────────────────────────────────────────────────
+	conditions = "WHERE custom_item_type IN %(item_types)s AND disabled = 0"
+	params = {"item_types": item_type_in}
+
+	if item_code_filter:
+		conditions += " AND name = %(item_code)s"
+		params["item_code"] = item_code_filter
+
 	item_rows = frappe.db.sql(
-		"""
+		f"""
 		SELECT
 			name AS item_code,
 			item_name,
 			custom_item_type AS item_type,
 			custom_sku_type AS sku_type
 		FROM `tabItem`
-		WHERE custom_item_type IN %(item_types)s
-		  AND disabled = 0
+		{conditions}
 		""",
-		{"item_types": item_type_in},
+		params,
 		as_dict=True,
 	)
 
@@ -216,19 +237,20 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 	for item_code in item_codes:
 		item = item_map[item_code]
 
-		sales_qty = sales_map.get(item_code, 0.0)
-		consumption_qty = consumption_map.get(item_code, 0.0)
+		sales_qty = _ceil(sales_map.get(item_code, 0.0))
+		consumption_qty = _ceil(consumption_map.get(item_code, 0.0))
 
 		total = sales_qty + consumption_qty
-		projected_qty = round(total * 1.3, 2)
+		projected_qty = _ceil(total * 1.3)
 		fw = fw_map.get(item.item_name, {})
-		production_qty = fw.get("production_qty", 0.0)
+		production_qty = _ceil(fw.get("production_qty", 0.0))
 		production_count = fw.get("production_count", 0)
-		weights = fw.get("weights", [])
+		weights = [_ceil(w) for w in fw.get("weights", [])]
 
-		batch_size = round(projected_qty / production_count, 2) if production_count else 0.0
+		batch_size = _ceil(projected_qty / production_count) if production_count else 0
 
 		row = {
+			"item_code": item_code,
 			"item_name": item.item_name,
 			"item_type": item.item_type,
 			"sku_type": item.sku_type,
@@ -280,7 +302,7 @@ def get_item_debug_info(item_code: str) -> dict:
 		{"item_code": item_code, "from_date": from_date, "to_date": to_date},
 		as_dict=True,
 	)
-	sales_qty = sum(float(r.qty or 0) for r in sales_records)
+	sales_qty = _ceil(sum(float(r.qty or 0) for r in sales_records))
 
 	# Consumption records from Bright Bar Production (raw_material OR material)
 	consumption_records = frappe.db.sql(
@@ -297,10 +319,10 @@ def get_item_debug_info(item_code: str) -> dict:
 		{"item_code": item_code, "from_date": from_date, "to_date": to_date},
 		as_dict=True,
 	)
-	consumption_qty = sum(float(r.actual_rm_consumption or 0) for r in consumption_records)
+	consumption_qty = _ceil(sum(float(r.actual_rm_consumption or 0) for r in consumption_records))
 
 	total = sales_qty + consumption_qty
-	projected_qty = round(total * 1.3, 2)
+	projected_qty = _ceil(total * 1.3)
 
 	# Finish Weight records (all in period, newest first for prod columns)
 	fw_records = frappe.db.sql(
@@ -317,8 +339,8 @@ def get_item_debug_info(item_code: str) -> dict:
 	)
 
 	production_count = len(fw_records)
-	production_qty = sum(float(r.finish_weight or 0) for r in fw_records)
-	batch_size = round(projected_qty / production_count, 2) if production_count else 0.0
+	production_qty = _ceil(sum(float(r.finish_weight or 0) for r in fw_records))
+	batch_size = _ceil(projected_qty / production_count) if production_count else 0
 
 	return {
 		"item_name": item.item_name,
@@ -327,7 +349,7 @@ def get_item_debug_info(item_code: str) -> dict:
 		"period_label": period_label,
 		"sales_qty": sales_qty,
 		"sales_records": [
-			{"name": r.name, "date": str(r.posting_date), "qty": float(r.qty or 0)}
+			{"name": r.name, "date": str(r.posting_date), "qty": _ceil(float(r.qty or 0))}
 			for r in sales_records
 		],
 		"consumption_qty": consumption_qty,
@@ -335,7 +357,7 @@ def get_item_debug_info(item_code: str) -> dict:
 			{
 				"name": r.name,
 				"date": str(r.production_date),
-				"qty": float(r.actual_rm_consumption or 0),
+				"qty": _ceil(float(r.actual_rm_consumption or 0)),
 				"matched_field": r.matched_field,
 			}
 			for r in consumption_records
@@ -346,7 +368,7 @@ def get_item_debug_info(item_code: str) -> dict:
 		"production_qty": production_qty,
 		"batch_size": batch_size,
 		"fw_records": [
-			{"name": r.name, "date": str(r.posting_date), "weight": float(r.finish_weight or 0)}
+			{"name": r.name, "date": str(r.posting_date), "weight": _ceil(float(r.finish_weight or 0))}
 			for r in fw_records
 		],
 	}

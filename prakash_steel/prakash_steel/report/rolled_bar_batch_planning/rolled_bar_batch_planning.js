@@ -4,6 +4,13 @@
 frappe.query_reports["Rolled Bar Batch Planning"] = {
 	filters: [
 		{
+			fieldname: "item_code",
+			label: __("Item Code"),
+			fieldtype: "Link",
+			options: "Item",
+			get_query: () => ({ filters: { custom_item_type: ["in", ["RB", "BO", "Traded"]], disabled: 0 } }),
+		},
+		{
 			fieldname: "item_type",
 			label: __("Item Type"),
 			fieldtype: "Select",
@@ -53,7 +60,7 @@ frappe.query_reports["Rolled Bar Batch Planning"] = {
 
 function fmt_num(v) {
 	if (v === null || v === undefined) return "—";
-	return parseFloat(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	return Math.ceil(parseFloat(v)).toLocaleString();
 }
 
 function fmt_str(v) {
