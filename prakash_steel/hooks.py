@@ -97,6 +97,7 @@ doc_events = {
 	},
 	"Job Card": {
 		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",
+		"validate": "prakash_steel.utils.work_order.lock_production_type_from_work_order",
 	},
 	"Production Plan": {
 		"on_submit": "prakash_steel.prakash_steel.utils.production_plan.on_production_plan_submit",

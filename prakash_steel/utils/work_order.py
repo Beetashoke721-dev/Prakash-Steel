@@ -44,3 +44,22 @@ def copy_production_type_to_job_card(doc, method=None):
 		},
 		update_modified=False,
 	)
+
+
+def lock_production_type_from_work_order(doc, method=None):
+	"""Keep Job Card production type in sync with the linked Work Order."""
+	if not doc.work_order:
+		return
+
+	wo = frappe.db.get_value(
+		"Work Order",
+		doc.work_order,
+		["custom_bright_production", "custom_rolled_production"],
+		as_dict=True,
+	)
+
+	if not wo:
+		return
+
+	doc.custom_bright_production = wo.custom_bright_production
+	doc.custom_rolled_production = wo.custom_rolled_production
