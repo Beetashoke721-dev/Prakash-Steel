@@ -95,8 +95,13 @@ doc_events = {
 	"Work Order": {
 		"validate": [
 			"prakash_steel.utils.work_order.validate_production_type",
+			"prakash_steel.utils.work_order.calculate_custom_wastage",
 			"prakash_steel.utils.work_order.calculate_cutting_weight_for_rolled_production",
 		],
+	},
+	"Stock Entry": {
+		"on_submit": "prakash_steel.utils.work_order.update_custom_wastage_after_stock_entry",
+		"on_cancel": "prakash_steel.utils.work_order.update_custom_wastage_after_stock_entry",
 	},
 	"Job Card": {
 		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",

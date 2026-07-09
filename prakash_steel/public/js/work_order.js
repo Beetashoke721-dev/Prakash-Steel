@@ -48,6 +48,15 @@ function get_consumed_qty(frm) {
 	);
 }
 
+function set_calculated_value(frm, fieldname, value) {
+	if (frm.doc.docstatus > 0) {
+		frm.set_value(fieldname, value, null, true);
+		return;
+	}
+
+	frm.set_value(fieldname, value);
+}
+
 function update_custom_wastage(frm) {
 	const produced_qty = flt(frm.doc.produced_qty) || 0;
 	const consumed_qty = get_consumed_qty(frm);
@@ -56,17 +65,21 @@ function update_custom_wastage(frm) {
 		frm.doc.produced_qty == null || frm.doc.produced_qty === "" ||
 		consumed_qty === 0
 	) {
-		frm.set_value("custom_wastage", null);
+		set_calculated_value(frm, "custom_wastage", null);
 		return;
 	}
 
-	frm.set_value("custom_wastage", (produced_qty / consumed_qty) * 100 - 100);
+	set_calculated_value(
+		frm,
+		"custom_wastage",
+		(produced_qty / consumed_qty) * 100 - 100
+	);
 }
 
 function update_custom_cutting_weight(frm) {
 	const is_rolled_production = cint(frm.doc.custom_rolled_production) === 1;
 	if (!is_rolled_production) {
-		frm.set_value("custom_cutting_weight", null);
+		set_calculated_value(frm, "custom_cutting_weight", null);
 		return;
 	}
 
@@ -74,9 +87,9 @@ function update_custom_cutting_weight(frm) {
 	const total_billet_cutting_pcs = flt(frm.doc.custom_total_billet_cutting_pcs) || 0;
 
 	if (total_billet_cutting_pcs <= 0) {
-		frm.set_value("custom_cutting_weight", null);
+		set_calculated_value(frm, "custom_cutting_weight", null);
 		return;
 	}
 
-	frm.set_value("custom_cutting_weight", consumed_qty / total_billet_cutting_pcs);
+	set_calculated_value(frm, "custom_cutting_weight", consumed_qty / total_billet_cutting_pcs);
 }
