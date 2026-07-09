@@ -76,7 +76,7 @@
   },
   {
    "fieldname": "raw_material",
-   "fieldtype": "Select",
+   "fieldtype": "Data",
    "hidden": 1,
    "label": "Raw Material",
    "read_only": 1
@@ -147,7 +147,7 @@
   },
   {
    "fieldname": "finished_good",
-   "fieldtype": "Select",
+   "fieldtype": "Data",
    "hidden": 1,
    "label": "Finished Good",
    "read_only": 1
