@@ -93,7 +93,10 @@ doc_events = {
 		"before_cancel": "prakash_steel.utils.purchase_receipt_cancel.validate_cancel_reason",
 	},
 	"Work Order": {
-		"validate": "prakash_steel.utils.work_order.validate_production_type",
+		"validate": [
+			"prakash_steel.utils.work_order.validate_production_type",
+			"prakash_steel.utils.work_order.calculate_cutting_weight_for_rolled_production",
+		],
 	},
 	"Job Card": {
 		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",

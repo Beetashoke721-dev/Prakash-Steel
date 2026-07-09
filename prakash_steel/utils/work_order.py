@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 
 def validate_production_type(doc, method=None):
@@ -18,6 +19,21 @@ def validate_production_type(doc, method=None):
 			_("Only one production type can be selected at a time: either <b>Bright Production</b> or <b>Rolled Production</b>, not both."),
 			title=_("Production Type Conflict"),
 		)
+
+
+def calculate_cutting_weight_for_rolled_production(doc, method=None):
+	"""Set custom_cutting_weight for rolled production work orders."""
+	if not bool(doc.custom_rolled_production):
+		doc.custom_cutting_weight = None
+		return
+
+	total_billet_cutting_pcs = flt(doc.custom_total_billet_cutting_pcs) or 0
+	if total_billet_cutting_pcs <= 0:
+		doc.custom_cutting_weight = None
+		return
+
+	consumed_qty = sum(flt(row.consumed_qty) for row in (doc.required_items or []))
+	doc.custom_cutting_weight = consumed_qty / total_billet_cutting_pcs
 
 
 def copy_production_type_to_job_card(doc, method=None):

@@ -1,6 +1,7 @@
 frappe.ui.form.on("Work Order", {
 	refresh(frm) {
 		update_custom_wastage(frm);
+		update_custom_cutting_weight(frm);
 	},
 
 	produced_qty(frm) {
@@ -17,6 +18,11 @@ frappe.ui.form.on("Work Order", {
 		if (frm.doc.custom_rolled_production) {
 			frm.set_value("custom_bright_production", 0);
 		}
+		update_custom_cutting_weight(frm);
+	},
+
+	custom_total_billet_cutting_pcs(frm) {
+		update_custom_cutting_weight(frm);
 	},
 
 	validate(frm) {
@@ -31,6 +37,7 @@ frappe.ui.form.on("Work Order", {
 frappe.ui.form.on("Work Order Item", {
 	consumed_qty(frm) {
 		update_custom_wastage(frm);
+		update_custom_cutting_weight(frm);
 	},
 });
 
@@ -54,4 +61,22 @@ function update_custom_wastage(frm) {
 	}
 
 	frm.set_value("custom_wastage", (produced_qty / consumed_qty) * 100 - 100);
+}
+
+function update_custom_cutting_weight(frm) {
+	const is_rolled_production = cint(frm.doc.custom_rolled_production) === 1;
+	if (!is_rolled_production) {
+		frm.set_value("custom_cutting_weight", null);
+		return;
+	}
+
+	const consumed_qty = get_consumed_qty(frm);
+	const total_billet_cutting_pcs = flt(frm.doc.custom_total_billet_cutting_pcs) || 0;
+
+	if (total_billet_cutting_pcs <= 0) {
+		frm.set_value("custom_cutting_weight", null);
+		return;
+	}
+
+	frm.set_value("custom_cutting_weight", consumed_qty / total_billet_cutting_pcs);
 }
