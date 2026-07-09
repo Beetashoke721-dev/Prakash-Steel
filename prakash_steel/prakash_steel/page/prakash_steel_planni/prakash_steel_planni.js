@@ -80,7 +80,7 @@ function load_all_charts(page, $chartsContainer) {
 			// 1) BBMTA, RBMTA, BOTA, TRMTA pies (exact order)
 			if (skuRes && skuRes.message) {
 				const skuData = skuRes.message;
-				const skuTypes = ['BBMTA', 'RBMTA', 'BOTA', 'TRMTA'];
+				const skuTypes = ['BBMTA', 'RBMTA', 'BOTA', 'TRMTA', 'RMTA'];
 
 				skuTypes.forEach((sku) => {
 					if (skuData[sku] && skuData[sku].colours && skuData[sku].colours.length) {
