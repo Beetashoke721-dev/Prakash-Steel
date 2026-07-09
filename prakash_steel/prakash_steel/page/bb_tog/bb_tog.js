@@ -111,13 +111,15 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 	function apply_global_fos() {
 		const fos = get_global_fos();
-		_all_data.forEach((row, idx) => {
+		_all_data.forEach(row => {
 			row.fos = fos;
 			row.tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
-			$(`.bbt-fos-input[data-idx="${idx}"]`).val(fos);
-			$(`.bbt-tog-input[data-idx="${idx}"]`).val(row.tog);
-			recalc_change_pct(idx);
+			const current_tog = row.current_tog || 0;
+			row.change_pct = current_tog
+				? Math.round((row.tog - current_tog) / current_tog * 1000) / 10
+				: null;
 		});
+		if (_dt) _dt.refresh(_all_data);
 	}
 
 	// ── DataTable ─────────────────────────────────────────────────────────────
