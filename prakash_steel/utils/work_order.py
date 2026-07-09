@@ -35,7 +35,7 @@ def calculate_custom_wastage(doc, method=None):
 		return
 
 	doc.custom_wastage = flt(
-		(produced_qty / consumed_qty) * 100 - 100,
+		abs((produced_qty / consumed_qty) * 100 - 100),
 		frappe.get_precision("Work Order", "custom_wastage") or 2,
 	)
 

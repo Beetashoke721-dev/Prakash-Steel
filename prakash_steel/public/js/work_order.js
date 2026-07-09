@@ -72,7 +72,7 @@ function update_custom_wastage(frm) {
 	set_calculated_value(
 		frm,
 		"custom_wastage",
-		(produced_qty / consumed_qty) * 100 - 100
+		Math.abs((produced_qty / consumed_qty) * 100 - 100)
 	);
 }
 
