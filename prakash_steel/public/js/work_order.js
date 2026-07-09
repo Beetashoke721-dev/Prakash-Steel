@@ -49,12 +49,8 @@ function get_consumed_qty(frm) {
 }
 
 function set_calculated_value(frm, fieldname, value) {
-	if (frm.doc.docstatus > 0) {
-		frm.set_value(fieldname, value, null, true);
-		return;
-	}
-
-	frm.set_value(fieldname, value);
+	frm.doc[fieldname] = value;
+	frm.refresh_field(fieldname);
 }
 
 function update_custom_wastage(frm) {
