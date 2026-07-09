@@ -25,36 +25,36 @@ frappe.query_reports["Rolled Bar Batch Planning"] = {
 	],
 
 	onload(report) {
-		report.page.add_inner_button(__("Debug Item"), () => {
-			const d = new frappe.ui.Dialog({
-				title: __("Debug Item Calculation"),
-				fields: [
-					{
-						fieldname: "item_code",
-						label: __("Item Code"),
-						fieldtype: "Link",
-						options: "Item",
-						reqd: 1,
-						filters: { custom_item_type: ["in", ["RB", "BO", "Traded"]], disabled: 0 },
-					},
-				],
-				primary_action_label: __("Show Breakdown"),
-				primary_action({ item_code }) {
-					d.hide();
-					frappe.call({
-						method: "prakash_steel.prakash_steel.report.rolled_bar_batch_planning.rolled_bar_batch_planning.get_item_debug_info",
-						args: { item_code },
-						freeze: true,
-						freeze_message: __("Calculating…"),
-						callback(r) {
-							if (!r.message) return;
-							show_debug_dialog(item_code, r.message);
-						},
-					});
-				},
-			});
-			d.show();
-		});
+		// report.page.add_inner_button(__("Debug Item"), () => {
+		// 	const d = new frappe.ui.Dialog({
+		// 		title: __("Debug Item Calculation"),
+		// 		fields: [
+		// 			{
+		// 				fieldname: "item_code",
+		// 				label: __("Item Code"),
+		// 				fieldtype: "Link",
+		// 				options: "Item",
+		// 				reqd: 1,
+		// 				filters: { custom_item_type: ["in", ["RB", "BO", "Traded"]], disabled: 0 },
+		// 			},
+		// 		],
+		// 		primary_action_label: __("Show Breakdown"),
+		// 		primary_action({ item_code }) {
+		// 			d.hide();
+		// 			frappe.call({
+		// 				method: "prakash_steel.prakash_steel.report.rolled_bar_batch_planning.rolled_bar_batch_planning.get_item_debug_info",
+		// 				args: { item_code },
+		// 				freeze: true,
+		// 				freeze_message: __("Calculating…"),
+		// 				callback(r) {
+		// 					if (!r.message) return;
+		// 					show_debug_dialog(item_code, r.message);
+		// 				},
+		// 			});
+		// 		},
+		// 	});
+		// 	d.show();
+		// });
 	},
 };
 
