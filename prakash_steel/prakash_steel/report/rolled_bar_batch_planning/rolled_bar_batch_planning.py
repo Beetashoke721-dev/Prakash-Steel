@@ -146,39 +146,26 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 	)
 	sales_map = {r.item_code: float(r.qty or 0) for r in sales_rows}
 
-	# ── Consumption: RB/BO from Bright Bar Production ─────────────────────
+	# ── Consumption: all types from Bright Bar Production ────────────────
+	# An item can appear in either raw_material or material field; check both.
 	bb_rows = frappe.db.sql(
 		"""
-		SELECT bbp.raw_material AS item_code, COALESCE(SUM(bbp.actual_rm_consumption), 0) AS qty
+		SELECT
+			CASE
+				WHEN bbp.raw_material IN %(item_codes)s THEN bbp.raw_material
+				ELSE bbp.material
+			END AS item_code,
+			COALESCE(SUM(bbp.actual_rm_consumption), 0) AS qty
 		FROM `tabBright Bar Production` bbp
-		INNER JOIN `tabItem` i ON i.name = bbp.raw_material
 		WHERE bbp.docstatus = 1
-		  AND LOWER(i.custom_item_type) IN ('rb', 'bo')
-		  AND bbp.raw_material IN %(item_codes)s
+		  AND (bbp.raw_material IN %(item_codes)s OR bbp.material IN %(item_codes)s)
 		  AND bbp.production_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY bbp.raw_material
+		GROUP BY 1
 		""",
 		{"item_codes": item_codes, "from_date": from_date, "to_date": to_date},
 		as_dict=True,
 	)
-	bb_map = {r.item_code: float(r.qty or 0) for r in bb_rows}
-
-	# ── Consumption: Traded from Billet Cutting ───────────────────────────
-	billet_rows = frappe.db.sql(
-		"""
-		SELECT bc.billet_size AS item_code, COALESCE(SUM(bc.billet_weight), 0) AS qty
-		FROM `tabBillet Cutting` bc
-		INNER JOIN `tabItem` i ON i.name = bc.billet_size
-		WHERE bc.docstatus = 1
-		  AND LOWER(i.custom_item_type) = 'traded'
-		  AND bc.billet_size IN %(item_codes)s
-		  AND bc.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY bc.billet_size
-		""",
-		{"item_codes": item_codes, "from_date": from_date, "to_date": to_date},
-		as_dict=True,
-	)
-	billet_map = {r.item_code: float(r.qty or 0) for r in billet_rows}
+	consumption_map = {r.item_code: float(r.qty or 0) for r in bb_rows}
 
 	# ── Finish Weight: last MAX_PROD_COLS records per item + totals ────────
 	# Window function gives us individual weights (newest first) alongside
@@ -228,16 +215,9 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 	data = []
 	for item_code in item_codes:
 		item = item_map[item_code]
-		item_type_lower = (item.item_type or "").lower()
 
 		sales_qty = sales_map.get(item_code, 0.0)
-
-		if item_type_lower in ("rb", "bo"):
-			consumption_qty = bb_map.get(item_code, 0.0)
-		elif item_type_lower == "traded":
-			consumption_qty = billet_map.get(item_code, 0.0)
-		else:
-			consumption_qty = 0.0
+		consumption_qty = consumption_map.get(item_code, 0.0)
 
 		total = sales_qty + consumption_qty
 		projected_qty = round(total * 1.3, 2)
