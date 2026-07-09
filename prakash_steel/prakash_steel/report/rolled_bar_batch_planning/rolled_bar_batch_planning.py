@@ -248,3 +248,105 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 
 	data.sort(key=lambda r: (-r["production_qty"], -r["total"]))
 	return data, max_prod_cols
+
+
+@frappe.whitelist()
+def get_item_debug_info(item_code: str) -> dict:
+	"""Return a full calculation breakdown for a single item — used by the Debug button."""
+	period_months = get_period_months("RB Batch Planning Settings")
+	from_date, to_date = period_date_range(period_months)
+	period_label = f"{from_date.strftime('%d %b %Y')} – {to_date.strftime('%d %b %Y')}"
+
+	item = frappe.db.get_value(
+		"Item",
+		item_code,
+		["item_name", "custom_item_type", "custom_sku_type"],
+		as_dict=True,
+	)
+	if not item:
+		frappe.throw(f"Item {item_code} not found.")
+
+	# Sales records (individual invoices)
+	sales_records = frappe.db.sql(
+		"""
+		SELECT si.name, si.posting_date, sii.qty
+		FROM `tabSales Invoice` si
+		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+		WHERE si.docstatus = 1
+		  AND sii.item_code = %(item_code)s
+		  AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+		ORDER BY si.posting_date
+		""",
+		{"item_code": item_code, "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	sales_qty = sum(float(r.qty or 0) for r in sales_records)
+
+	# Consumption records from Bright Bar Production (raw_material OR material)
+	consumption_records = frappe.db.sql(
+		"""
+		SELECT name, production_date,
+		       actual_rm_consumption,
+		       CASE WHEN raw_material = %(item_code)s THEN 'raw_material' ELSE 'material' END AS matched_field
+		FROM `tabBright Bar Production`
+		WHERE docstatus = 1
+		  AND (raw_material = %(item_code)s OR material = %(item_code)s)
+		  AND production_date BETWEEN %(from_date)s AND %(to_date)s
+		ORDER BY production_date
+		""",
+		{"item_code": item_code, "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+	consumption_qty = sum(float(r.actual_rm_consumption or 0) for r in consumption_records)
+
+	total = sales_qty + consumption_qty
+	projected_qty = round(total * 1.3, 2)
+
+	# Finish Weight records (all in period, newest first for prod columns)
+	fw_records = frappe.db.sql(
+		"""
+		SELECT name, posting_date, finish_weight
+		FROM `tabFinish Weight`
+		WHERE docstatus = 1
+		  AND item_name = %(item_name)s
+		  AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+		ORDER BY posting_date DESC, name DESC
+		""",
+		{"item_name": item.item_name, "from_date": from_date, "to_date": to_date},
+		as_dict=True,
+	)
+
+	production_count = len(fw_records)
+	production_qty = sum(float(r.finish_weight or 0) for r in fw_records)
+	batch_size = round(projected_qty / production_count, 2) if production_count else 0.0
+
+	return {
+		"item_name": item.item_name,
+		"item_type": item.custom_item_type or "",
+		"sku_type": item.custom_sku_type or "",
+		"period_label": period_label,
+		"sales_qty": sales_qty,
+		"sales_records": [
+			{"name": r.name, "date": str(r.posting_date), "qty": float(r.qty or 0)}
+			for r in sales_records
+		],
+		"consumption_qty": consumption_qty,
+		"consumption_records": [
+			{
+				"name": r.name,
+				"date": str(r.production_date),
+				"qty": float(r.actual_rm_consumption or 0),
+				"matched_field": r.matched_field,
+			}
+			for r in consumption_records
+		],
+		"total": total,
+		"projected_qty": projected_qty,
+		"production_count": production_count,
+		"production_qty": production_qty,
+		"batch_size": batch_size,
+		"fw_records": [
+			{"name": r.name, "date": str(r.posting_date), "weight": float(r.finish_weight or 0)}
+			for r in fw_records
+		],
+	}
