@@ -11,7 +11,7 @@ MAX_PROD_COLS = 10
 
 def execute(filters: dict | None = None):
 	filters = filters or {}
-	period_months = get_period_months()
+	period_months = get_period_months("RB Batch Planning Settings")
 	from_date, to_date = period_date_range(period_months)
 
 	data, max_prod_cols = get_data(filters, from_date, to_date)

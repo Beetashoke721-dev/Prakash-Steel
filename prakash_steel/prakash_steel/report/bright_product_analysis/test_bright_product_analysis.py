@@ -2,24 +2,24 @@
 # For license information, please see license.txt
 
 """
-Unit tests for bright_production_analysis report.
+Unit tests for bright_product_analysis report.
 
 Pure logic tests (no DB) use unittest.TestCase with mocked frappe calls.
 Run with:
   bench run-tests --app prakash_steel --module \
-    prakash_steel.prakash_steel.report.bright_production_analysis.test_bright_production_analysis
+    prakash_steel.prakash_steel.report.bright_product_analysis.test_bright_product_analysis
 """
 
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-MOD = "prakash_steel.prakash_steel.report.bright_production_analysis.bright_production_analysis"
+MOD = "prakash_steel.prakash_steel.report.bright_product_analysis.bright_product_analysis"
 _PERIOD = [(2025, 4), (2025, 5), (2025, 6)]
 
 
 def _import():
-	import prakash_steel.prakash_steel.report.bright_production_analysis.bright_production_analysis as m
+	import prakash_steel.prakash_steel.report.bright_product_analysis.bright_product_analysis as m
 
 	return m
 

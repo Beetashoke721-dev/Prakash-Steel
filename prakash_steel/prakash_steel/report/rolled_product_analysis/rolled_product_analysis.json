@@ -14,11 +14,11 @@
  "modified": "2026-07-01 10:01:40.388332",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
- "name": "Rolled Production Analysis",
+ "name": "Rolled Product Analysis",
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Item",
- "report_name": "Rolled Production Analysis",
+ "report_name": "Rolled Product Analysis",
  "report_type": "Script Report",
  "roles": [
   {
