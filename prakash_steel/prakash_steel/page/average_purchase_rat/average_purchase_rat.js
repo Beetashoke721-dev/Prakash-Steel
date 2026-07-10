@@ -82,26 +82,27 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 	let _active_tab = "details";
 
 	function render(data) {
-		// Per-grade average rate
-		const grade_rate_sum = {};
-		const grade_rate_count = {};
-		data.forEach(r => {
-			const key = r.item_grade || "";
-			const n = parseFloat(r.rate) || 0;
-			grade_rate_sum[key] = (grade_rate_sum[key] || 0) + n;
-			grade_rate_count[key] = (grade_rate_count[key] || 0) + 1;
-		});
-		const grade_avg = {};
-		Object.keys(grade_rate_sum).forEach(k => {
-			grade_avg[k] = grade_rate_sum[k] / grade_rate_count[k];
-		});
+		// Fetch grade averages across ALL POs (independent of item/grade filter)
+		frappe.call({
+			method: "prakash_steel.prakash_steel.page.average_purchase_rat.average_purchase_rat.get_grade_wise_avg_rate",
+			args: {
+				from_date: from_date_field.get_value() || undefined,
+				to_date: to_date_field.get_value() || undefined,
+			},
+			callback(r) {
+				const grade_avg = {};
+				(r.message || []).forEach(row => {
+					grade_avg[row.grade] = row.avg_rate;
+				});
 
-		const enriched = data.map(r => ({
-			...r,
-			_item_avg_rate: grade_avg[r.item_grade || ""] ?? null,
-		}));
+				const enriched = data.map(row => ({
+					...row,
+					_item_avg_rate: grade_avg[row.item_grade || ""] ?? null,
+				}));
 
-		render_details(enriched);
+				render_details(enriched);
+			},
+		});
 	}
 
 	function render_details(enriched) {
@@ -197,28 +198,18 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 		});
 
 		$("#apr-details-export-btn").on("click", () => {
-			const csv = [
-				[__("PO Date"), __("Supplier"), __("Item Name"), __("Grade"), __("Rate (₹)"), __("Avg Rate (₹)"), __("Purchase Order")],
-				...enriched.map(r => [
-					r.po_date ? r.po_date.split("-").reverse().join("-") : "",
-					r.party_name || "",
-					r.item_name || "",
-					r.item_grade || "",
-					parseFloat(r.rate || 0).toFixed(2),
-					r._item_avg_rate != null ? parseFloat(r._item_avg_rate).toFixed(2) : "",
-					r.purchase_order_no || "",
-				]),
-			].map(row => row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-
-			const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement("a");
-			a.href = url;
-			a.download = "Average Purchase Rate.csv";
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
+			const url = new URL(frappe.urllib.get_full_url(
+				"/api/method/prakash_steel.prakash_steel.page.average_purchase_rat.average_purchase_rat.export_details_xlsx"
+			));
+			const from_val = from_date_field.get_value();
+			const to_val = to_date_field.get_value();
+			const item_val = item_code_field.get_value();
+			const grade_val = grade_field.get_value();
+			if (from_val) url.searchParams.set("from_date", from_val);
+			if (to_val) url.searchParams.set("to_date", to_val);
+			if (item_val) url.searchParams.set("item_code", item_val);
+			if (grade_val) url.searchParams.set("grade", grade_val);
+			window.open(url.toString());
 		});
 	}
 
@@ -280,20 +271,14 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 				`);
 
 				$("#apr-export-btn").on("click", () => {
-					const csv = [
-						[__("Grade"), __("Avg Rate (₹)")],
-						...rows_data.map(r => [r.grade, parseFloat(r.avg_rate).toFixed(2)]),
-					].map(row => row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-
-					const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-					const url = URL.createObjectURL(blob);
-					const a = document.createElement("a");
-					a.href = url;
-					a.download = "Grade Wise Summary.csv";
-					document.body.appendChild(a);
-					a.click();
-					document.body.removeChild(a);
-					URL.revokeObjectURL(url);
+					const url = new URL(frappe.urllib.get_full_url(
+						"/api/method/prakash_steel.prakash_steel.page.average_purchase_rat.average_purchase_rat.export_grade_wise_xlsx"
+					));
+					const from_val = from_date_field.get_value();
+					const to_val = to_date_field.get_value();
+					if (from_val) url.searchParams.set("from_date", from_val);
+					if (to_val) url.searchParams.set("to_date", to_val);
+					window.open(url.toString());
 				});
 			},
 		});
