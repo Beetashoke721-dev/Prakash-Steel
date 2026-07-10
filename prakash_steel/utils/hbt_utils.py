@@ -65,15 +65,15 @@ METRIC_COL: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def get_period_months() -> list[tuple[int, int]]:
-	"""Read HBT Period Settings and return an ordered list of (year, month) tuples.
+def get_period_months(settings_doctype: str = "HBT Period Settings") -> list[tuple[int, int]]:
+	"""Read a period-settings Single doctype and return an ordered list of (year, month) tuples.
 
 	Months Apr-Dec map to the first calendar year of the fiscal year;
 	Jan-Mar map to the second (e.g. FY 2025-2026: Apr 2025 → Mar 2026).
 
 	Raises ``frappe.ValidationError`` if settings are incomplete or invalid.
 	"""
-	settings = frappe.get_single("HBT Period Settings")
+	settings = frappe.get_single(settings_doctype)
 
 	fiscal_year: str | None = settings.fiscal_year
 	from_month: str | None = settings.from_month
@@ -81,7 +81,7 @@ def get_period_months() -> list[tuple[int, int]]:
 
 	if not fiscal_year or not from_month or not to_month:
 		frappe.throw(
-			_("Please configure Fiscal Year, From Month, and To Month in HBT Period Settings."),
+			_("Please configure Fiscal Year, From Month, and To Month in {0}.").format(settings_doctype),
 			title=_("Incomplete Period Settings"),
 		)
 
@@ -90,7 +90,7 @@ def get_period_months() -> list[tuple[int, int]]:
 
 	if from_num is None or to_num is None:
 		frappe.throw(
-			_("Invalid month value in HBT Period Settings."),
+			_("Invalid month value in {0}.").format(settings_doctype),
 			title=_("Invalid Period Settings"),
 		)
 

@@ -14,11 +14,11 @@
  "modified": "2026-07-01 10:01:31.043335",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
- "name": "Bright Production Analysis",
+ "name": "Bright Product Analysis",
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Item",
- "report_name": "Bright Production Analysis",
+ "report_name": "Bright Product Analysis",
  "report_type": "Script Report",
  "roles": [
   {

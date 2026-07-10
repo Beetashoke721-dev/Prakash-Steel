@@ -109,9 +109,9 @@ def get_sku_type_on_hand_status() -> dict | list:
 			}
 		)
 
-	# Now filter to only the SKU types we want for charts: BBMTA, RBMTA, BOTA, RMTA, PTA
+	# Now filter to only the SKU types we want for charts: BBMTA, RBMTA, BOTA, RMTA, PTA, TRMTA
 	# But handle RM buffer items: they calculate as PTA but should display as RMTA
-	target_sku_types = ["BBMTA", "RBMTA", "BOTA", "RMTA", "PTA"]
+	target_sku_types = ["BBMTA", "RBMTA", "BOTA", "RMTA", "PTA", "TRMTA"]
 
 	# Group items by SKU type and calculate on-hand status
 	sku_type_data = {}
@@ -340,35 +340,59 @@ def get_pending_so_status() -> dict | list:
 	return {"total_items": total_items, "colours": colours}
 
 
-@frappe.whitelist()
-def get_cs_item_on_hand_status() -> dict | list:
+def _get_cs_on_hand_status_for_warehouse(warehouse: str) -> dict:
 	"""
-	CS Item On Hand Status pie chart.
-	Same colour logic as Critical Spare Buffer report:
-	on_hand_status = (on_hand_stock / tog) * 100
-	BLACK=0, RED=0-34, YELLOW=34-67, GREEN=67-100, WHITE=>100
+	Shared logic for Bright/Rolled CS On Hand Status pie charts.
+	Filters CS items that have an entry in CS Tog table for the given warehouse,
+	uses that warehouse's TOG and stock.
 	"""
-	require_permission("Item", "report")
-	from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
-		get_stock_map,
-	)
-
 	items = frappe.db.get_all(
 		"Item",
-		filters={"custom_item_type": "CS", "disabled": 0},
-		fields=["name as item_code", "safety_stock as tog"],
+		filters={"custom_item_type": "CS", "custom_buffer_flag": "Buffer", "disabled": 0},
+		fields=["name as item_code", "min_order_qty as moq"],
 	)
 
 	if not items:
 		return {"total_items": 0, "colours": []}
 
 	item_codes = {d.item_code for d in items}
-	stock_map = get_stock_map(item_codes)
+
+	# Get TOG from CS Tog table for this warehouse
+	tog_rows = frappe.db.get_all(
+		"CS Tog table",
+		filters=[
+			["warehouse", "=", warehouse],
+			["parenttype", "=", "Item"],
+			["parentfield", "=", "custom_cs_tog_table"],
+		],
+		fields=["parent as item_code", "top_of_green"],
+	)
+	cs_tog_map = {row.item_code: flt(row.top_of_green) for row in tog_rows}
+
+	# Only keep items that have this warehouse in their CS Tog table
+	items = [item for item in items if item.item_code in cs_tog_map]
+
+	if not items:
+		return {"total_items": 0, "colours": []}
+
+	# Get stock for this warehouse
+	warehouse_item_codes = {d.item_code for d in items}
+	stock_rows = frappe.db.sql(
+		"""
+		SELECT item_code, SUM(actual_qty) AS stock
+		FROM `tabBin`
+		WHERE item_code IN %s AND warehouse = %s
+		GROUP BY item_code
+		""",
+		(tuple(warehouse_item_codes), warehouse),
+		as_dict=True,
+	)
+	stock_map = {row.item_code: flt(row.stock) for row in stock_rows}
 
 	status_counts = {"BLACK": 0, "RED": 0, "YELLOW": 0, "GREEN": 0, "WHITE": 0}
 
 	for item in items:
-		tog = flt(item.tog)
+		tog = flt(cs_tog_map.get(item.item_code, 0))
 		on_hand_stock = flt(stock_map.get(item.item_code, 0))
 		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
 
@@ -397,6 +421,20 @@ def get_cs_item_on_hand_status() -> dict | list:
 			})
 
 	return {"total_items": total_items, "colours": colours}
+
+
+@frappe.whitelist()
+def get_bright_cs_on_hand_status() -> dict:
+	"""Bright Critical Spares On Hand Status pie chart (Bright Bar Unit - PSPL)."""
+	require_permission("Item", "report")
+	return _get_cs_on_hand_status_for_warehouse("Bright Bar Unit - PSPL")
+
+
+@frappe.whitelist()
+def get_rolled_cs_on_hand_status() -> dict:
+	"""Rolled Critical Spares On Hand Status pie chart (Rolling Mill - PSPL)."""
+	require_permission("Item", "report")
+	return _get_cs_on_hand_status_for_warehouse("Rolling Mill - PSPL")
 
 
 @frappe.whitelist()

@@ -28,6 +28,7 @@ doctype_list_js = {
 }
 
 doctype_js = {
+	"Work Order": "public/js/work_order.js",
 	"Material Request": "public/js/material_request.js",
 	"Sales Order": "public/js/sales_order.js",
 	"Purchase Order": "public/js/purchase_order.js",
@@ -90,6 +91,21 @@ doc_events = {
 		],
 		"on_cancel": "prakash_steel.utils.job_work_order_utils.update_jwo_on_purchase_receipt_submit",
 		"before_cancel": "prakash_steel.utils.purchase_receipt_cancel.validate_cancel_reason",
+	},
+	"Work Order": {
+		"validate": [
+			"prakash_steel.utils.work_order.validate_production_type",
+			"prakash_steel.utils.work_order.calculate_custom_wastage",
+			"prakash_steel.utils.work_order.calculate_cutting_weight_for_rolled_production",
+		],
+	},
+	"Stock Entry": {
+		"on_submit": "prakash_steel.utils.work_order.update_custom_wastage_after_stock_entry",
+		"on_cancel": "prakash_steel.utils.work_order.update_custom_wastage_after_stock_entry",
+	},
+	"Job Card": {
+		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",
+		"validate": "prakash_steel.utils.work_order.lock_production_type_from_work_order",
 	},
 	"Production Plan": {
 		"on_submit": "prakash_steel.prakash_steel.utils.production_plan.on_production_plan_submit",

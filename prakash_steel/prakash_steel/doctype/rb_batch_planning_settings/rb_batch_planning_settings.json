@@ -1,0 +1,72 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "Format: {fiscal_year}",
+ "creation": "2026-07-09 11:13:14.200722",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "fiscal_year",
+  "section_break_xdsn",
+  "from_month",
+  "column_break_txgq",
+  "to_month"
+ ],
+ "fields": [
+  {
+   "fieldname": "fiscal_year",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Fiscal Year",
+   "options": "Fiscal Year",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_xdsn",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "from_month",
+   "fieldtype": "Select",
+   "label": "From Month",
+   "options": "\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nJanuary\nFebruary\nMarch"
+  },
+  {
+   "fieldname": "column_break_txgq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_month",
+   "fieldtype": "Select",
+   "label": "To Month",
+   "options": "\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nJanuary\nFebruary\nMarch"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-07-09 11:15:23.747934",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "RB Batch Planning Settings",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

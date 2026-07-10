@@ -321,7 +321,7 @@ def get_data(filters) -> list[dict]:
 					"custom_decoupled_lead_time": decoupled_lead_time,
 					"custom_buffer_flag": buffer_flag,
 					# Set image path if item is buffer
-					"buffer_img": "/files/toc.jpeg" if is_buffer else "",
+					"buffer_img": "/files/Buffer_image_no_badge (1).png" if is_buffer else "",
 					"has_children": has_children,
 					"level": level,
 					"parent_item": parent_item or "",
