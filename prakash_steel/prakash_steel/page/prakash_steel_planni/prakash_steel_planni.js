@@ -77,42 +77,46 @@ function load_all_charts(page, $chartsContainer) {
 		.then(([skuRes, pendingSoRes, openPoRes, brightCsRes, rolledCsRes]) => {
 			page.clear_indicator();
 
-			// 1) BBMTA, RBMTA, BOTA, TRMTA pies (exact order)
-			if (skuRes && skuRes.message) {
-				const skuData = skuRes.message;
-				const skuTypes = ['BBMTA', 'RBMTA', 'BOTA', 'TRMTA', 'RMTA'];
+			const skuData = (skuRes && skuRes.message) ? skuRes.message : {};
 
-				skuTypes.forEach((sku) => {
-					if (skuData[sku] && skuData[sku].colours && skuData[sku].colours.length) {
-						const $card = createChartCard(sku, skuData[sku], colorMap);
-						$chartsContainer.append($card);
-						renderPieChart(sku, skuData[sku], colorMap);
-					}
-				});
-			}
+			// 1) BBMTA → RBMTA → BOTA → TRMTA
+			['BBMTA', 'RBMTA', 'BOTA', 'TRMTA'].forEach((sku) => {
+				if (skuData[sku] && skuData[sku].colours && skuData[sku].colours.length) {
+					const $card = createChartCard(sku, skuData[sku], colorMap);
+					$chartsContainer.append($card);
+					renderPieChart(sku, skuData[sku], colorMap);
+				}
+			});
 
-			// 2) Bright Critical Spares On Hand Status pie
+			// 2) Bright Critical Spares On Hand Status
 			if (brightCsRes && brightCsRes.message && brightCsRes.message.colours && brightCsRes.message.colours.length) {
 				const $card = createChartCard('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
 				$chartsContainer.append($card);
 				renderPieChart('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
 			}
 
-			// 3) Rolled Critical Spares On Hand Status pie
+			// 3) Rolled Critical Spares On Hand Status
 			if (rolledCsRes && rolledCsRes.message && rolledCsRes.message.colours && rolledCsRes.message.colours.length) {
 				const $card = createChartCard('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
 				$chartsContainer.append($card);
 				renderPieChart('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
 			}
 
-			// 4) Pending SO Status pie (Open SO)
+			// 4) RMTA
+			if (skuData['RMTA'] && skuData['RMTA'].colours && skuData['RMTA'].colours.length) {
+				const $card = createChartCard('RMTA', skuData['RMTA'], colorMap);
+				$chartsContainer.append($card);
+				renderPieChart('RMTA', skuData['RMTA'], colorMap);
+			}
+
+			// 5) Pending SO Status (Open SO)
 			if (pendingSoRes && pendingSoRes.message && pendingSoRes.message.colours && pendingSoRes.message.colours.length) {
 				const $card = createChartCard('Pending SO Status', pendingSoRes.message, colorMap);
 				$chartsContainer.append($card);
 				renderPieChart('Pending SO Status', pendingSoRes.message, colorMap);
 			}
 
-			// 5) Open PO Status pie
+			// 6) Open PO Status
 			if (openPoRes && openPoRes.message) {
 				const $card = createChartCard('Open PO Status', openPoRes.message, colorMap);
 				$chartsContainer.append($card);
@@ -153,9 +157,12 @@ const CARD_NAVIGATION = {
 	BBMTA: () => frappe.set_route('query-report', 'BBMTA'),
 	RBMTA: () => frappe.set_route('query-report', 'RBMTA'),
 	BOTA: () => frappe.set_route('query-report', 'BOTA'),
+	TRMTA: () => frappe.set_route('query-report', 'TRMTA'),
 	RMTA: () => frappe.set_route('query-report', 'PTA'),
-	PTA: () => frappe.set_route('query-report', 'PTA'),
-	'Pending SO Status': () => frappe.set_route('open-so-page'),
+	'Bright Critical Spares On Hand Status': () => frappe.set_route('query-report', 'Bright Critical Spares'),
+	'Rolled Critical Spares On Hand Status': () => frappe.set_route('query-report', 'Rolled Critical Spares'),
+	'Pending SO Status': () => frappe.set_route('query-report', 'Open SO Analysis'),
+	'Open PO Status': () => frappe.set_route('query-report', 'Open PO Analysis'),
 };
 
 function navigate_from_card(key) {

@@ -52,6 +52,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 	});
 
 	page.add_inner_button(__("Refresh"), () => load_data());
+	page.add_inner_button(__("Export to Excel"), () => export_to_xlsx());
 
 	$(`<div id="rbt-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
 
@@ -383,6 +384,34 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		setup_dt_observer("rbt-dt");
 		apply_table_styles("rbt-dt");
 		bind_events();
+	}
+
+	// ── Export ───────────────────────────────────────────────────────────────
+	function export_to_xlsx() {
+		if (!_all_data || !_all_data.length) {
+			frappe.msgprint(__("No data to export."));
+			return;
+		}
+		const form = document.createElement("form");
+		form.method = "POST";
+		form.action = "/api/method/prakash_steel.prakash_steel.page.rb_tog.rb_tog.export_rb_tog_xlsx";
+		form.style.display = "none";
+
+		const add_field = (name, value) => {
+			const input = document.createElement("input");
+			input.type = "hidden";
+			input.name = name;
+			input.value = value;
+			form.appendChild(input);
+		};
+
+		add_field("data", JSON.stringify(_all_data));
+		add_field("filename", "RB_TOG");
+		add_field("csrf_token", frappe.csrf_token);
+
+		document.body.appendChild(form);
+		form.submit();
+		document.body.removeChild(form);
 	}
 
 	// ── Load ──────────────────────────────────────────────────────────────────

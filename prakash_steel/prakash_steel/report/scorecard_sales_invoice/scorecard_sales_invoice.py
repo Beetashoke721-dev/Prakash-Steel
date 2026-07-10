@@ -117,6 +117,12 @@ def get_data(filters) -> list[dict]:
 	if filters.get("place_of_supply"):
 		conditions.append("si.place_of_supply = %(place_of_supply)s")
 
+	if filters.get("from_date"):
+		conditions.append("si.posting_date >= %(from_date)s")
+
+	if filters.get("to_date"):
+		conditions.append("si.posting_date <= %(to_date)s")
+
 	query = f"""
 		SELECT
 			si.posting_date AS invoice_date,
