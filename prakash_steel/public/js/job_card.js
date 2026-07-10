@@ -11,6 +11,10 @@ frappe.ui.form.on("Job Card", {
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
+	total_completed_qty(frm) {
+		calculate_fg_per_pcs_weight(frm);
+	},
+
 	time_logs_add(frm) {
 		calculate_finish_pcs(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
@@ -100,8 +104,26 @@ function calculate_finish_pcs(frm) {
 		total += cint(row.custom_finish_item) || 0;
 	});
 
+	const apply_fg = () => calculate_fg_per_pcs_weight(frm);
+
 	if (cint(frm.doc.custom_finish_pcs) !== total) {
-		frm.set_value("custom_finish_pcs", total);
+		frm.set_value("custom_finish_pcs", total).then(apply_fg);
+	} else {
+		apply_fg();
+	}
+}
+
+function calculate_fg_per_pcs_weight(frm) {
+	const finish_pcs = cint(frm.doc.custom_finish_pcs);
+	const completed_qty = flt(frm.doc.total_completed_qty);
+	let value = 0;
+
+	if (finish_pcs > 0 && completed_qty) {
+		value = Math.round((completed_qty / finish_pcs) * 100) / 100;
+	}
+
+	if (flt(frm.doc.custom_fg_per_pcs_weight) !== value) {
+		frm.set_value("custom_fg_per_pcs_weight", value);
 	}
 }
 
