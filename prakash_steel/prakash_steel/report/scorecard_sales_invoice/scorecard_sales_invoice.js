@@ -46,6 +46,18 @@ frappe.query_reports["Scorecard Sales Invoice"] = {
 	},
 	filters: [
 		{
+			fieldname: "from_date",
+			label: __("From Date"),
+			fieldtype: "Date",
+			reqd: 0,
+		},
+		{
+			fieldname: "to_date",
+			label: __("To Date"),
+			fieldtype: "Date",
+			reqd: 0,
+		},
+		{
 			fieldname: "company",
 			label: __("Company"),
 			fieldtype: "Link",
