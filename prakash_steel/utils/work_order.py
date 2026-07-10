@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 
 def validate_production_type(doc, method=None):
@@ -238,6 +238,11 @@ def calculate_job_card_time_log_billet_cutting(doc, method=None):
 			)
 
 		running_used += row_used
+
+
+def calculate_job_card_finish_pcs(doc, method=None):
+	"""Set custom_finish_pcs as the sum of custom_finish_item across time_logs."""
+	doc.custom_finish_pcs = sum(cint(row.custom_finish_item) for row in (doc.time_logs or []))
 
 
 def validate_job_card_time_log_miss_fields(doc, method=None):

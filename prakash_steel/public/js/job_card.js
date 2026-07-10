@@ -3,6 +3,7 @@ frappe.ui.form.on("Job Card", {
 		(frm.doc.time_logs || []).forEach((row) => {
 			calculate_time_log_total(frm, row.doctype, row.name);
 		});
+		calculate_finish_pcs(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
@@ -11,10 +12,17 @@ frappe.ui.form.on("Job Card", {
 	},
 
 	time_logs_add(frm) {
+		calculate_finish_pcs(frm);
+		refresh_time_log_billet_cutting_remaining(frm);
+	},
+
+	time_logs_remove(frm) {
+		calculate_finish_pcs(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
 	validate(frm) {
+		calculate_finish_pcs(frm);
 		validate_time_log_miss_fields(frm);
 		validate_time_log_billet_cutting_remaining(frm);
 	},
@@ -29,6 +37,7 @@ frappe.ui.form.on("Job Card Time Log", {
 
 	custom_finish_item(frm, cdt, cdn) {
 		calculate_time_log_total(frm, cdt, cdn);
+		calculate_finish_pcs(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
@@ -82,6 +91,17 @@ function calculate_time_log_total(frm, cdt, cdn) {
 
 	if (flt(row.custom_total) !== total) {
 		frappe.model.set_value(cdt, cdn, "custom_total", total);
+	}
+}
+
+function calculate_finish_pcs(frm) {
+	let total = 0;
+	(frm.doc.time_logs || []).forEach((row) => {
+		total += cint(row.custom_finish_item) || 0;
+	});
+
+	if (cint(frm.doc.custom_finish_pcs) !== total) {
+		frm.set_value("custom_finish_pcs", total);
 	}
 }
 
