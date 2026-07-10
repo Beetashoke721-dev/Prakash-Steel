@@ -272,6 +272,28 @@ def set_job_card_colour_code(doc, method=None):
 	)
 
 
+def calculate_job_card_billet_weight(doc, method=None):
+	"""Set custom_billet_weight from linked Work Order miss billet weight + consumed qty."""
+	if not doc.work_order:
+		doc.custom_billet_weight = 0
+		return
+
+	miss_billet_weight = flt(
+		frappe.db.get_value("Work Order", doc.work_order, "custom_miss_billet_weight")
+	)
+	consumed_qty = flt(
+		frappe.db.sql(
+			"""
+			SELECT SUM(IFNULL(consumed_qty, 0))
+			FROM `tabWork Order Item`
+			WHERE parent = %s
+			""",
+			doc.work_order,
+		)[0][0]
+	)
+	doc.custom_billet_weight = cint(miss_billet_weight + consumed_qty)
+
+
 def validate_job_card_time_log_miss_fields(doc, method=None):
 	"""Enforce miss-roll and miss-ingot dependent fields on Job Card time logs."""
 	for index, row in enumerate(doc.time_logs or [], start=1):

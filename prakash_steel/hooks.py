@@ -114,6 +114,7 @@ doc_events = {
 			"prakash_steel.utils.work_order.calculate_job_card_finish_pcs",
 			"prakash_steel.utils.work_order.calculate_job_card_fg_per_pcs_weight",
 			"prakash_steel.utils.work_order.set_job_card_colour_code",
+			"prakash_steel.utils.work_order.calculate_job_card_billet_weight",
 			"prakash_steel.utils.work_order.calculate_job_card_time_log_billet_cutting",
 		],
 	},

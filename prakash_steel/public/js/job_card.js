@@ -5,10 +5,12 @@ frappe.ui.form.on("Job Card", {
 		});
 		calculate_finish_pcs(frm);
 		fetch_colour_code_from_production_item(frm);
+		set_billet_weight_from_work_order(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
 	work_order(frm) {
+		set_billet_weight_from_work_order(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
@@ -161,6 +163,28 @@ function fetch_colour_code_from_production_item(frm) {
 					frm.set_value("custom_colour_code", colour);
 				}
 			});
+	});
+}
+
+function set_billet_weight_from_work_order(frm) {
+	if (!frm.doc.work_order) {
+		if (cint(frm.doc.custom_billet_weight)) {
+			frm.set_value("custom_billet_weight", 0);
+		}
+		return;
+	}
+
+	frappe.db.get_doc("Work Order", frm.doc.work_order).then((wo) => {
+		const miss_billet_weight = flt(wo.custom_miss_billet_weight);
+		const consumed_qty = (wo.required_items || []).reduce(
+			(sum, row) => sum + flt(row.consumed_qty),
+			0
+		);
+		const total = cint(miss_billet_weight + consumed_qty);
+
+		if (cint(frm.doc.custom_billet_weight) !== total) {
+			frm.set_value("custom_billet_weight", total);
+		}
 	});
 }
 
