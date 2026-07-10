@@ -96,8 +96,10 @@ doc_events = {
 	"Work Order": {
 		"validate": [
 			"prakash_steel.utils.work_order.validate_production_type",
+			"prakash_steel.utils.work_order.validate_miss_billet_weight",
 			"prakash_steel.utils.work_order.calculate_custom_wastage",
 			"prakash_steel.utils.work_order.calculate_cutting_weight_for_rolled_production",
+			"prakash_steel.utils.work_order.calculate_total_raw_material_pcs",
 		],
 	},
 	"Stock Entry": {

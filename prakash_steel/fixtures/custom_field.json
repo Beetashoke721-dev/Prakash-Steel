@@ -8766,7 +8766,7 @@
   "label": "Miss Billet Weight",
   "length": 0,
   "link_filters": null,
-  "mandatory_depends_on": null,
+  "mandatory_depends_on": "eval:doc.custom_miss_billet_pcs > 0",
   "modified": "2026-07-10 12:36:29.373553",
   "module": "Prakash Steel",
   "name": "Work Order-custom_miss_billet_weight",

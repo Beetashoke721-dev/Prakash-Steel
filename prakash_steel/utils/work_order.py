@@ -55,6 +55,29 @@ def calculate_cutting_weight_for_rolled_production(doc, method=None):
 	doc.custom_cutting_weight = consumed_qty / total_billet_cutting_pcs
 
 
+def calculate_total_raw_material_pcs(doc, method=None):
+	"""Set custom_total_raw_material_pcs for rolled production work orders."""
+	if not bool(doc.custom_rolled_production):
+		doc.custom_total_raw_material_pcs = None
+		return
+
+	doc.custom_total_raw_material_pcs = (
+		flt(doc.custom_total_billet_cutting_pcs) + flt(doc.custom_miss_billet_pcs)
+	)
+
+
+def validate_miss_billet_weight(doc, method=None):
+	"""Require custom_miss_billet_weight when custom_miss_billet_pcs > 0."""
+	miss_billet_pcs = flt(doc.custom_miss_billet_pcs) or 0
+	miss_billet_weight = flt(doc.custom_miss_billet_weight) or 0
+
+	if miss_billet_pcs > 0 and miss_billet_weight <= 0:
+		frappe.throw(
+			_("Miss Billet Weight is mandatory when Miss Billet Pcs is greater than 0."),
+			title=_("Validation Error"),
+		)
+
+
 def update_custom_wastage_after_stock_entry(doc, method=None):
 	"""Persist custom_wastage after stock entries update Work Order quantities."""
 	if not doc.work_order:

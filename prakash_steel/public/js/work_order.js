@@ -2,6 +2,7 @@ frappe.ui.form.on("Work Order", {
 	refresh(frm) {
 		update_custom_wastage(frm);
 		update_custom_cutting_weight(frm);
+		update_custom_total_raw_material_pcs(frm);
 	},
 
 	produced_qty(frm) {
@@ -19,10 +20,16 @@ frappe.ui.form.on("Work Order", {
 			frm.set_value("custom_bright_production", 0);
 		}
 		update_custom_cutting_weight(frm);
+		update_custom_total_raw_material_pcs(frm);
 	},
 
 	custom_total_billet_cutting_pcs(frm) {
 		update_custom_cutting_weight(frm);
+		update_custom_total_raw_material_pcs(frm);
+	},
+
+	custom_miss_billet_pcs(frm) {
+		update_custom_total_raw_material_pcs(frm);
 	},
 
 	validate(frm) {
@@ -88,4 +95,21 @@ function update_custom_cutting_weight(frm) {
 	}
 
 	set_calculated_value(frm, "custom_cutting_weight", consumed_qty / total_billet_cutting_pcs);
+}
+
+function update_custom_total_raw_material_pcs(frm) {
+	const is_rolled_production = cint(frm.doc.custom_rolled_production) === 1;
+	if (!is_rolled_production) {
+		set_calculated_value(frm, "custom_total_raw_material_pcs", null);
+		return;
+	}
+
+	const total_billet_cutting_pcs = flt(frm.doc.custom_total_billet_cutting_pcs) || 0;
+	const miss_billet_pcs = flt(frm.doc.custom_miss_billet_pcs) || 0;
+
+	set_calculated_value(
+		frm,
+		"custom_total_raw_material_pcs",
+		total_billet_cutting_pcs + miss_billet_pcs
+	);
 }
