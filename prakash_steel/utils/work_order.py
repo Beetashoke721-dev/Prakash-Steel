@@ -114,3 +114,46 @@ def lock_production_type_from_work_order(doc, method=None):
 
 	doc.custom_bright_production = wo.custom_bright_production
 	doc.custom_rolled_production = wo.custom_rolled_production
+
+
+def validate_job_card_time_log_miss_fields(doc, method=None):
+	"""Enforce miss-roll and miss-ingot dependent fields on Job Card time logs."""
+	for index, row in enumerate(doc.time_logs or [], start=1):
+		row.custom_total = (
+			flt(row.custom_finish_item) + flt(row.custom_miss_roll) + flt(row.custom_miss_ingot_or_billet)
+		)
+
+		row_label = _("Row {0}").format(index)
+
+		if flt(row.custom_miss_roll) > 0:
+			if not row.custom_miss_roll_weight:
+				frappe.throw(
+					_("{0}: Miss Roll Weight is mandatory when Miss Roll (Pcs) is greater than 0.").format(
+						row_label
+					)
+				)
+			if not row.custom_summary_remarks:
+				frappe.throw(
+					_("{0}: Summary Remarks is mandatory when Miss Roll (Pcs) is greater than 0.").format(
+						row_label
+					)
+				)
+		else:
+			row.custom_miss_roll_weight = None
+
+		if flt(row.custom_miss_ingot_or_billet) > 0:
+			if not row.custom_miss_ingot_or_billet_weight:
+				frappe.throw(
+					_(
+						"{0}: Miss Ingot / Billet Weight is mandatory when Miss Ingot / Billet (Pcs) is greater than 0."
+					).format(row_label)
+				)
+			if not row.custom_reason_for_miss_ingot_or_billet:
+				frappe.throw(
+					_(
+						"{0}: Reason for Miss Ingot / Billet is mandatory when Miss Ingot / Billet (Pcs) is greater than 0."
+					).format(row_label)
+				)
+		else:
+			row.custom_miss_ingot_or_billet_weight = None
+			row.custom_reason_for_miss_ingot_or_billet = None

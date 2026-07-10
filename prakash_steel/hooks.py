@@ -37,6 +37,7 @@ doctype_js = {
 	"Item": "public/js/item.js",
 	"Stock Entry": "public/js/stock_entry.js",
 	"Purchase Receipt": "public/js/purchase_receipt.js",
+	"Job Card": "public/js/job_card.js",
 	"Sales Invoice": "public/js/sales_invoice.js",
 	"Production Plan": "public/js/production_plan.js",
 	"Salary Slip": "public/js/salary_slip.js",
@@ -105,7 +106,10 @@ doc_events = {
 	},
 	"Job Card": {
 		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",
-		"validate": "prakash_steel.utils.work_order.lock_production_type_from_work_order",
+		"validate": [
+			"prakash_steel.utils.work_order.lock_production_type_from_work_order",
+			"prakash_steel.utils.work_order.validate_job_card_time_log_miss_fields",
+		],
 	},
 	"Production Plan": {
 		"on_submit": "prakash_steel.prakash_steel.utils.production_plan.on_production_plan_submit",
