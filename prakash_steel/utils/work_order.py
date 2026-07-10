@@ -139,12 +139,111 @@ def lock_production_type_from_work_order(doc, method=None):
 	doc.custom_rolled_production = wo.custom_rolled_production
 
 
+def _time_log_used_pcs(row) -> float:
+	return flt(row.custom_finish_item) + flt(row.custom_miss_roll) + flt(row.custom_miss_ingot_or_billet)
+
+
+def get_submitted_job_card_used_pcs(work_order: str, exclude_job_card: str | None = None) -> float:
+	"""Sum used pcs from submitted Job Card time logs for a Work Order."""
+	if not work_order:
+		return 0.0
+
+	conditions = ["jc.work_order = %(work_order)s", "jc.docstatus = 1"]
+	values = {"work_order": work_order}
+
+	if exclude_job_card:
+		conditions.append("jc.name != %(exclude_job_card)s")
+		values["exclude_job_card"] = exclude_job_card
+
+	used = frappe.db.sql(
+		f"""
+		SELECT SUM(
+			IFNULL(tl.custom_finish_item, 0)
+			+ IFNULL(tl.custom_miss_roll, 0)
+			+ IFNULL(tl.custom_miss_ingot_or_billet, 0)
+		)
+		FROM `tabJob Card Time Log` tl
+		INNER JOIN `tabJob Card` jc ON jc.name = tl.parent
+		WHERE {" AND ".join(conditions)}
+		""",
+		values,
+	)
+
+	return flt(used[0][0]) if used and used[0][0] is not None else 0.0
+
+
+@frappe.whitelist()
+def get_job_card_billet_cutting_context(work_order: str, exclude_job_card: str | None = None) -> dict:
+	"""Return Work Order pool and already-used pcs for Job Card remaining calculation."""
+	if not work_order:
+		return {"pool": None, "other_used": 0, "is_rolled": 0}
+
+	wo = frappe.db.get_value(
+		"Work Order",
+		work_order,
+		["custom_rolled_production", "custom_total_raw_material_pcs"],
+		as_dict=True,
+	)
+	if not wo or not wo.custom_rolled_production:
+		return {"pool": None, "other_used": 0, "is_rolled": 0}
+
+	return {
+		"pool": flt(wo.custom_total_raw_material_pcs),
+		"other_used": get_submitted_job_card_used_pcs(work_order, exclude_job_card),
+		"is_rolled": 1,
+	}
+
+
+def calculate_job_card_time_log_billet_cutting(doc, method=None):
+	"""
+	Set custom_total_billet_cutting per time log as remaining pcs before that row.
+
+	remaining = WO.custom_total_raw_material_pcs
+	           - submitted Job Card usage (same WO, excluding this Job Card)
+	           - earlier rows' custom_total on this Job Card
+	"""
+	is_rolled = bool(doc.custom_rolled_production)
+	if not is_rolled and doc.work_order:
+		is_rolled = bool(
+			frappe.db.get_value("Work Order", doc.work_order, "custom_rolled_production")
+		)
+
+	if not doc.work_order or not is_rolled:
+		for row in doc.time_logs or []:
+			row.custom_total_billet_cutting = None
+		return
+
+	pool = flt(
+		frappe.db.get_value("Work Order", doc.work_order, "custom_total_raw_material_pcs")
+	)
+	other_used = get_submitted_job_card_used_pcs(
+		doc.work_order, None if doc.is_new() else doc.name
+	)
+
+	running_used = 0.0
+	for index, row in enumerate(doc.time_logs or [], start=1):
+		row.custom_total = _time_log_used_pcs(row)
+		remaining = pool - other_used - running_used
+		row.custom_total_billet_cutting = remaining
+
+		row_used = flt(row.custom_total)
+		if remaining < 0 or row_used > remaining:
+			over_by = abs(remaining) if remaining < 0 else (row_used - remaining)
+			frappe.throw(
+				_(
+					"Row {0}: No pieces left! You are trying to use {1} more pieces than available. "
+					"Please reduce the quantities."
+				).format(index, flt(over_by, 0)),
+				title=_("Billet Cutting Pcs Exceeded"),
+			)
+
+		running_used += row_used
+
+
 def validate_job_card_time_log_miss_fields(doc, method=None):
 	"""Enforce miss-roll and miss-ingot dependent fields on Job Card time logs."""
 	for index, row in enumerate(doc.time_logs or [], start=1):
-		row.custom_total = (
-			flt(row.custom_finish_item) + flt(row.custom_miss_roll) + flt(row.custom_miss_ingot_or_billet)
-		)
+		row.custom_total = _time_log_used_pcs(row)
 
 		row_label = _("Row {0}").format(index)
 

@@ -111,6 +111,7 @@ doc_events = {
 		"validate": [
 			"prakash_steel.utils.work_order.lock_production_type_from_work_order",
 			"prakash_steel.utils.work_order.validate_job_card_time_log_miss_fields",
+			"prakash_steel.utils.work_order.calculate_job_card_time_log_billet_cutting",
 		],
 	},
 	"Production Plan": {
