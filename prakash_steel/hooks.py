@@ -37,6 +37,7 @@ doctype_js = {
 	"Item": "public/js/item.js",
 	"Stock Entry": "public/js/stock_entry.js",
 	"Purchase Receipt": "public/js/purchase_receipt.js",
+	"Job Card": "public/js/job_card.js",
 	"Sales Invoice": "public/js/sales_invoice.js",
 	"Production Plan": "public/js/production_plan.js",
 	"Salary Slip": "public/js/salary_slip.js",
@@ -95,8 +96,11 @@ doc_events = {
 	"Work Order": {
 		"validate": [
 			"prakash_steel.utils.work_order.validate_production_type",
+			"prakash_steel.utils.work_order.validate_miss_billet_weight",
 			"prakash_steel.utils.work_order.calculate_custom_wastage",
 			"prakash_steel.utils.work_order.calculate_cutting_weight_for_rolled_production",
+			"prakash_steel.utils.work_order.calculate_total_raw_material_pcs",
+			"prakash_steel.utils.work_order.calculate_burning_loss_for_rolled_production",
 		],
 	},
 	"Stock Entry": {
@@ -105,7 +109,15 @@ doc_events = {
 	},
 	"Job Card": {
 		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",
-		"validate": "prakash_steel.utils.work_order.lock_production_type_from_work_order",
+		"validate": [
+			"prakash_steel.utils.work_order.lock_production_type_from_work_order",
+			"prakash_steel.utils.work_order.validate_job_card_time_log_miss_fields",
+			"prakash_steel.utils.work_order.calculate_job_card_finish_pcs",
+			"prakash_steel.utils.work_order.calculate_job_card_fg_per_pcs_weight",
+			"prakash_steel.utils.work_order.set_job_card_colour_code",
+			"prakash_steel.utils.work_order.calculate_job_card_billet_weight",
+			"prakash_steel.utils.work_order.calculate_job_card_time_log_billet_cutting",
+		],
 	},
 	"Production Plan": {
 		"on_submit": "prakash_steel.prakash_steel.utils.production_plan.on_production_plan_submit",
@@ -171,6 +183,10 @@ scheduler_events = {
 		],
 		# Captures Purchase Order Recommendation Snapshot daily at 4:00 PM IST
 		"03 04 * * *": ["prakash_steel.utils.po_rec_snapshot.capture_daily_po_rec_snapshot"],
+		# Captures Bright Machine Load Snapshot daily at 4:30 AM IST
+		"04 04 * * *": [
+			"prakash_steel.po_recommendation_history.doctype.bright_machine_load_snapshot.bright_machine_load_snapshot.capture_daily_snapshot"
+		],
 	},
 	# Recalculate ADU for all items once per day so Item.custom_adu stays in sync
 	"daily": [

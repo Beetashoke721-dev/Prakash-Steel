@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Beetashoke Chakraborty and contributors
 # For license information, please see license.txt
 
+import json
 import math
 from collections import defaultdict
 
@@ -220,3 +221,38 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		})
 
 	return {"data": data, "period_label": period_label}
+
+
+@frappe.whitelist()
+def export_rb_tog_xlsx(data, filename="RB_TOG"):
+	from frappe.utils.xlsxutils import build_xlsx_response
+
+	rows_data = json.loads(data) if isinstance(data, str) else data
+
+	headers = [
+		"Item Code", "SKU Type", "Total Qty", "Contr%", "Cumu%", "HBT",
+		"Frequency", "ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
+		"Head Customer", "Body Customer", "Tail Customer",
+	]
+	rows = [headers] + [
+		[
+			r.get("item_code") or "",
+			r.get("sku_type") or "",
+			r.get("total") or 0,
+			r.get("contr_pct") or 0,
+			r.get("cumu_pct") or 0,
+			r.get("hbt") or "",
+			r.get("frequency") or 0,
+			r.get("adu") or 0,
+			r.get("lt") or 0,
+			r.get("fos") or 0,
+			r.get("tog") or 0,
+			r.get("current_tog") or 0,
+			r.get("change_pct"),
+			r.get("h") or 0,
+			r.get("b") or 0,
+			r.get("t") or 0,
+		]
+		for r in rows_data
+	]
+	build_xlsx_response(rows, filename)

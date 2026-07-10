@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "autoname": "format:BMLSNAP-{snapshot_date}-{###}",
+ "creation": "2026-07-10 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "snapshot_date",
+  "snapshot_time",
+  "trigger",
+  "status",
+  "section_break_items",
+  "row_count",
+  "items"
+ ],
+ "fields": [
+  {
+   "fieldname": "snapshot_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Snapshot Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "snapshot_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Snapshot Time"
+  },
+  {
+   "default": "Scheduled",
+   "fieldname": "trigger",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Trigger",
+   "options": "Scheduled\nManual"
+  },
+  {
+   "default": "Success",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Success\nFailed"
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "label": "Snapshot Data"
+  },
+  {
+   "fieldname": "row_count",
+   "fieldtype": "Int",
+   "label": "Row Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Machine Load Data",
+   "options": "Bright Machine Load Snapshot Item"
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-10 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "PO Recommendation History",
+ "name": "Bright Machine Load Snapshot",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing User",
+   "share": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "snapshot_date",
+ "sort_order": "DESC",
+ "states": []
+}

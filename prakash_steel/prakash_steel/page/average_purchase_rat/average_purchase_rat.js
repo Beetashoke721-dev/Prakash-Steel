@@ -82,26 +82,27 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 	let _active_tab = "details";
 
 	function render(data) {
-		// Per-item average rate
-		const item_rate_sum = {};
-		const item_rate_count = {};
-		data.forEach(r => {
-			const key = r.item_name || r.item_code || "";
-			const n = parseFloat(r.rate) || 0;
-			item_rate_sum[key] = (item_rate_sum[key] || 0) + n;
-			item_rate_count[key] = (item_rate_count[key] || 0) + 1;
-		});
-		const item_avg = {};
-		Object.keys(item_rate_sum).forEach(k => {
-			item_avg[k] = item_rate_sum[k] / item_rate_count[k];
-		});
+		// Fetch grade averages across ALL POs (independent of item/grade filter)
+		frappe.call({
+			method: "prakash_steel.prakash_steel.page.average_purchase_rat.average_purchase_rat.get_grade_wise_avg_rate",
+			args: {
+				from_date: from_date_field.get_value() || undefined,
+				to_date: to_date_field.get_value() || undefined,
+			},
+			callback(r) {
+				const grade_avg = {};
+				(r.message || []).forEach(row => {
+					grade_avg[row.grade] = row.avg_rate;
+				});
 
-		const enriched = data.map(r => ({
-			...r,
-			_item_avg_rate: item_avg[r.item_name || r.item_code || ""] ?? null,
-		}));
+				const enriched = data.map(row => ({
+					...row,
+					_item_avg_rate: grade_avg[row.item_grade || ""] ?? null,
+				}));
 
-		render_details(enriched);
+				render_details(enriched);
+			},
+		});
 	}
 
 	function render_details(enriched) {
@@ -144,7 +145,7 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 				},
 			},
 			{
-				name: "Avg Rate (₹)", id: "_item_avg_rate", width: 130, align: "right", editable: false,
+				name: "Grade Wise Avg Rate (₹)", id: "_item_avg_rate", width: 170, align: "right", editable: false,
 				format: val => {
 					const n = parseFloat(val);
 					if (isNaN(n)) return "—";
@@ -164,7 +165,17 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
-		$("#apr-tab-content").html(`<div id="apr-dt" style="overflow-x:auto;"></div>`);
+		$("#apr-tab-content").html(`
+			<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+				<button id="apr-details-export-btn" style="
+					padding:6px 16px;font-size:12px;font-weight:600;
+					border:1px solid #d0d0d0;border-radius:4px;
+					background:#fff;color:#333;cursor:pointer;">
+					⬇ Export
+				</button>
+			</div>
+			<div id="apr-dt" style="overflow-x:auto;"></div>
+		`);
 
 		_dt = new DataTable(document.getElementById("apr-dt"), {
 			columns: COLS,
@@ -184,6 +195,21 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 		$(document).off("click", ".apr-supplier-link").on("click", ".apr-supplier-link", function () {
 			const po = $(this).data("po");
 			if (po) window.open(`/app/purchase-order/${encodeURIComponent(po)}`, "_blank");
+		});
+
+		$("#apr-details-export-btn").on("click", () => {
+			const url = new URL(frappe.urllib.get_full_url(
+				"/api/method/prakash_steel.prakash_steel.page.average_purchase_rat.average_purchase_rat.export_details_xlsx"
+			));
+			const from_val = from_date_field.get_value();
+			const to_val = to_date_field.get_value();
+			const item_val = item_code_field.get_value();
+			const grade_val = grade_field.get_value();
+			if (from_val) url.searchParams.set("from_date", from_val);
+			if (to_val) url.searchParams.set("to_date", to_val);
+			if (item_val) url.searchParams.set("item_code", item_val);
+			if (grade_val) url.searchParams.set("grade", grade_val);
+			window.open(url.toString());
 		});
 	}
 
@@ -225,6 +251,14 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 						</tr>`).join("");
 
 				$("#apr-tab-content").html(`
+					<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+						<button id="apr-export-btn" style="
+							padding:6px 16px;font-size:12px;font-weight:600;
+							border:1px solid #d0d0d0;border-radius:4px;
+							background:#fff;color:#333;cursor:pointer;">
+							⬇ Export
+						</button>
+					</div>
 					<table style="border-collapse:collapse;width:800px;border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;">
 						<thead>
 							<tr style="background:#f4f5f7;">
@@ -235,6 +269,17 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 						<tbody>${rows}</tbody>
 					</table>
 				`);
+
+				$("#apr-export-btn").on("click", () => {
+					const url = new URL(frappe.urllib.get_full_url(
+						"/api/method/prakash_steel.prakash_steel.page.average_purchase_rat.average_purchase_rat.export_grade_wise_xlsx"
+					));
+					const from_val = from_date_field.get_value();
+					const to_val = to_date_field.get_value();
+					if (from_val) url.searchParams.set("from_date", from_val);
+					if (to_val) url.searchParams.set("to_date", to_val);
+					window.open(url.toString());
+				});
 			},
 		});
 	}
