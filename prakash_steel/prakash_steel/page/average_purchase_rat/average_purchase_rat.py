@@ -86,7 +86,7 @@ def export_details_xlsx(from_date=None, to_date=None, item_code=None, grade=None
 		for r in get_grade_wise_avg_rate(from_date=from_date, to_date=to_date)
 	}
 
-	rows = [["PO Date", "Supplier", "Item Name", "Grade", "Rate (₹)", "Avg Rate (₹)", "Purchase Order"]]
+	rows = [["PO Date", "Supplier", "Item Name", "Grade", "Rate (₹)", "Grade Wise Avg Rate (₹)", "Purchase Order"]]
 	for r in report_data:
 		po_date = r.get("po_date")
 		if po_date:

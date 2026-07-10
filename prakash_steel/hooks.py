@@ -178,6 +178,10 @@ scheduler_events = {
 		],
 		# Captures Purchase Order Recommendation Snapshot daily at 4:00 PM IST
 		"03 04 * * *": ["prakash_steel.utils.po_rec_snapshot.capture_daily_po_rec_snapshot"],
+		# Captures Bright Machine Load Snapshot daily at 4:30 AM IST
+		"04 04 * * *": [
+			"prakash_steel.po_recommendation_history.doctype.bright_machine_load_snapshot.bright_machine_load_snapshot.capture_daily_snapshot"
+		],
 	},
 	# Recalculate ADU for all items once per day so Item.custom_adu stays in sync
 	"daily": [

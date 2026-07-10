@@ -145,7 +145,7 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 				},
 			},
 			{
-				name: "Avg Rate (₹)", id: "_item_avg_rate", width: 130, align: "right", editable: false,
+				name: "Grade Wise Avg Rate (₹)", id: "_item_avg_rate", width: 170, align: "right", editable: false,
 				format: val => {
 					const n = parseFloat(val);
 					if (isNaN(n)) return "—";
