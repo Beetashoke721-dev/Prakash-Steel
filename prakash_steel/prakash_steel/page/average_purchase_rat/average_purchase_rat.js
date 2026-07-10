@@ -82,23 +82,23 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 	let _active_tab = "details";
 
 	function render(data) {
-		// Per-item average rate
-		const item_rate_sum = {};
-		const item_rate_count = {};
+		// Per-grade average rate
+		const grade_rate_sum = {};
+		const grade_rate_count = {};
 		data.forEach(r => {
-			const key = r.item_name || r.item_code || "";
+			const key = r.item_grade || "";
 			const n = parseFloat(r.rate) || 0;
-			item_rate_sum[key] = (item_rate_sum[key] || 0) + n;
-			item_rate_count[key] = (item_rate_count[key] || 0) + 1;
+			grade_rate_sum[key] = (grade_rate_sum[key] || 0) + n;
+			grade_rate_count[key] = (grade_rate_count[key] || 0) + 1;
 		});
-		const item_avg = {};
-		Object.keys(item_rate_sum).forEach(k => {
-			item_avg[k] = item_rate_sum[k] / item_rate_count[k];
+		const grade_avg = {};
+		Object.keys(grade_rate_sum).forEach(k => {
+			grade_avg[k] = grade_rate_sum[k] / grade_rate_count[k];
 		});
 
 		const enriched = data.map(r => ({
 			...r,
-			_item_avg_rate: item_avg[r.item_name || r.item_code || ""] ?? null,
+			_item_avg_rate: grade_avg[r.item_grade || ""] ?? null,
 		}));
 
 		render_details(enriched);
@@ -164,7 +164,17 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
-		$("#apr-tab-content").html(`<div id="apr-dt" style="overflow-x:auto;"></div>`);
+		$("#apr-tab-content").html(`
+			<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+				<button id="apr-details-export-btn" style="
+					padding:6px 16px;font-size:12px;font-weight:600;
+					border:1px solid #d0d0d0;border-radius:4px;
+					background:#fff;color:#333;cursor:pointer;">
+					⬇ Export
+				</button>
+			</div>
+			<div id="apr-dt" style="overflow-x:auto;"></div>
+		`);
 
 		_dt = new DataTable(document.getElementById("apr-dt"), {
 			columns: COLS,
@@ -184,6 +194,31 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 		$(document).off("click", ".apr-supplier-link").on("click", ".apr-supplier-link", function () {
 			const po = $(this).data("po");
 			if (po) window.open(`/app/purchase-order/${encodeURIComponent(po)}`, "_blank");
+		});
+
+		$("#apr-details-export-btn").on("click", () => {
+			const csv = [
+				[__("PO Date"), __("Supplier"), __("Item Name"), __("Grade"), __("Rate (₹)"), __("Avg Rate (₹)"), __("Purchase Order")],
+				...enriched.map(r => [
+					r.po_date ? r.po_date.split("-").reverse().join("-") : "",
+					r.party_name || "",
+					r.item_name || "",
+					r.item_grade || "",
+					parseFloat(r.rate || 0).toFixed(2),
+					r._item_avg_rate != null ? parseFloat(r._item_avg_rate).toFixed(2) : "",
+					r.purchase_order_no || "",
+				]),
+			].map(row => row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+
+			const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = "Average Purchase Rate.csv";
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
 		});
 	}
 
@@ -225,6 +260,14 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 						</tr>`).join("");
 
 				$("#apr-tab-content").html(`
+					<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+						<button id="apr-export-btn" style="
+							padding:6px 16px;font-size:12px;font-weight:600;
+							border:1px solid #d0d0d0;border-radius:4px;
+							background:#fff;color:#333;cursor:pointer;">
+							⬇ Export
+						</button>
+					</div>
 					<table style="border-collapse:collapse;width:800px;border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;">
 						<thead>
 							<tr style="background:#f4f5f7;">
@@ -235,6 +278,23 @@ frappe.pages["average-purchase-rat"].on_page_load = function (wrapper) {
 						<tbody>${rows}</tbody>
 					</table>
 				`);
+
+				$("#apr-export-btn").on("click", () => {
+					const csv = [
+						[__("Grade"), __("Avg Rate (₹)")],
+						...rows_data.map(r => [r.grade, parseFloat(r.avg_rate).toFixed(2)]),
+					].map(row => row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+
+					const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement("a");
+					a.href = url;
+					a.download = "Grade Wise Summary.csv";
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					URL.revokeObjectURL(url);
+				});
 			},
 		});
 	}
