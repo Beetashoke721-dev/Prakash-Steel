@@ -66,6 +66,26 @@ def calculate_total_raw_material_pcs(doc, method=None):
 	)
 
 
+def calculate_burning_loss_for_rolled_production(doc, method=None):
+	"""Set custom_burning_loss for rolled production work orders."""
+	if not bool(doc.custom_rolled_production):
+		doc.custom_burning_loss = None
+		return
+
+	consumed_qty = get_total_consumed_qty(doc)
+	if consumed_qty <= 0:
+		doc.custom_burning_loss = None
+		return
+
+	miss_billet_weight = flt(doc.custom_miss_billet_weight) or 0
+	produced_qty = flt(doc.produced_qty) or 0
+
+	doc.custom_burning_loss = flt(
+		((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100,
+		frappe.get_precision("Work Order", "custom_burning_loss") or 2,
+	)
+
+
 def validate_miss_billet_weight(doc, method=None):
 	"""Require custom_miss_billet_weight when custom_miss_billet_pcs > 0."""
 	miss_billet_pcs = flt(doc.custom_miss_billet_pcs) or 0
@@ -79,17 +99,22 @@ def validate_miss_billet_weight(doc, method=None):
 
 
 def update_custom_wastage_after_stock_entry(doc, method=None):
-	"""Persist custom_wastage after stock entries update Work Order quantities."""
+	"""Persist calculated Work Order fields after stock entries update quantities."""
 	if not doc.work_order:
 		return
 
 	wo = frappe.get_doc("Work Order", doc.work_order)
 	calculate_custom_wastage(wo)
+	calculate_cutting_weight_for_rolled_production(wo)
+	calculate_burning_loss_for_rolled_production(wo)
 	frappe.db.set_value(
 		"Work Order",
 		doc.work_order,
-		"custom_wastage",
-		wo.custom_wastage,
+		{
+			"custom_wastage": wo.custom_wastage,
+			"custom_cutting_weight": wo.custom_cutting_weight,
+			"custom_burning_loss": wo.custom_burning_loss,
+		},
 		update_modified=False,
 	)
 

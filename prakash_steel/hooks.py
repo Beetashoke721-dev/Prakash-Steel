@@ -100,6 +100,7 @@ doc_events = {
 			"prakash_steel.utils.work_order.calculate_custom_wastage",
 			"prakash_steel.utils.work_order.calculate_cutting_weight_for_rolled_production",
 			"prakash_steel.utils.work_order.calculate_total_raw_material_pcs",
+			"prakash_steel.utils.work_order.calculate_burning_loss_for_rolled_production",
 		],
 	},
 	"Stock Entry": {
