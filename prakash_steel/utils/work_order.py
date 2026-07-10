@@ -254,6 +254,24 @@ def calculate_job_card_fg_per_pcs_weight(doc, method=None):
 		doc.custom_fg_per_pcs_weight = 0
 
 
+def set_job_card_colour_code(doc, method=None):
+	"""Set custom_colour_code from production_item grade via Item Grade wise Colour Code."""
+	if not doc.production_item:
+		doc.custom_colour_code = None
+		return
+
+	grade = frappe.db.get_value("Item", doc.production_item, "custom_grade")
+	if not grade:
+		doc.custom_colour_code = None
+		return
+
+	doc.custom_colour_code = frappe.db.get_value(
+		"Item Grade wise Colour Code",
+		{"item_grade": grade},
+		"colour_code",
+	)
+
+
 def validate_job_card_time_log_miss_fields(doc, method=None):
 	"""Enforce miss-roll and miss-ingot dependent fields on Job Card time logs."""
 	for index, row in enumerate(doc.time_logs or [], start=1):

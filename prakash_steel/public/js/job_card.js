@@ -4,11 +4,16 @@ frappe.ui.form.on("Job Card", {
 			calculate_time_log_total(frm, row.doctype, row.name);
 		});
 		calculate_finish_pcs(frm);
+		fetch_colour_code_from_production_item(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
 	work_order(frm) {
 		refresh_time_log_billet_cutting_remaining(frm);
+	},
+
+	production_item(frm) {
+		fetch_colour_code_from_production_item(frm);
 	},
 
 	total_completed_qty(frm) {
@@ -125,6 +130,38 @@ function calculate_fg_per_pcs_weight(frm) {
 	if (flt(frm.doc.custom_fg_per_pcs_weight) !== value) {
 		frm.set_value("custom_fg_per_pcs_weight", value);
 	}
+}
+
+function fetch_colour_code_from_production_item(frm) {
+	if (!frm.doc.production_item) {
+		if (frm.doc.custom_colour_code) {
+			frm.set_value("custom_colour_code", null);
+		}
+		return;
+	}
+
+	frappe.db.get_value("Item", frm.doc.production_item, "custom_grade").then((r) => {
+		const grade = r && r.message ? r.message.custom_grade : null;
+		if (!grade) {
+			if (frm.doc.custom_colour_code) {
+				frm.set_value("custom_colour_code", null);
+			}
+			return;
+		}
+
+		frappe.db
+			.get_list("Item Grade wise Colour Code", {
+				filters: { item_grade: grade },
+				fields: ["colour_code"],
+				limit: 1,
+			})
+			.then((docs) => {
+				const colour = docs && docs.length > 0 ? docs[0].colour_code : null;
+				if (frm.doc.custom_colour_code !== colour) {
+					frm.set_value("custom_colour_code", colour);
+				}
+			});
+	});
 }
 
 function get_time_log_used_pcs(row) {
