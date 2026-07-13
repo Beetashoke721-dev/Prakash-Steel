@@ -1,21 +1,35 @@
 frappe.ui.form.on("Job Card", {
 	refresh(frm) {
+		calculate_total_completed_qty(frm, true);
+
+		if (frm.doc.docstatus === 1) {
+			return;
+		}
+
 		(frm.doc.time_logs || []).forEach((row) => {
-			calculate_time_log_total(frm, row.doctype, row.name);
+			calculate_time_log_total(frm, row.doctype, row.name, true);
 		});
-		calculate_finish_pcs(frm);
-		calculate_miss_pcs(frm);
-		fetch_colour_code_from_production_item(frm);
-		set_billet_weight_from_work_order(frm);
-		refresh_time_log_billet_cutting_remaining(frm);
+		calculate_finish_pcs(frm, true);
+		calculate_miss_pcs(frm, true);
+		fetch_colour_code_from_production_item(frm, true);
+		set_billet_weight_from_work_order(frm, true);
+		refresh_time_log_billet_cutting_remaining(frm, true);
 	},
 
 	work_order(frm) {
+		if (frm.doc.docstatus === 1) {
+			return;
+		}
+
 		set_billet_weight_from_work_order(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
 	production_item(frm) {
+		if (frm.doc.docstatus === 1) {
+			return;
+		}
+
 		fetch_colour_code_from_production_item(frm);
 	},
 
@@ -32,12 +46,15 @@ frappe.ui.form.on("Job Card", {
 	time_logs_remove(frm) {
 		calculate_finish_pcs(frm);
 		calculate_miss_pcs(frm);
+		calculate_total_completed_qty(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
 	validate(frm) {
+		calculate_total_completed_qty(frm);
 		calculate_finish_pcs(frm);
 		calculate_miss_pcs(frm);
+		calculate_fg_per_pcs_weight(frm);
 		validate_time_log_miss_fields(frm);
 		validate_time_log_billet_cutting_remaining(frm);
 	},
@@ -45,9 +62,15 @@ frappe.ui.form.on("Job Card", {
 
 frappe.ui.form.on("Job Card Time Log", {
 	form_render(frm, cdt, cdn) {
-		toggle_time_log_miss_fields(frm, cdt, cdn);
-		calculate_time_log_total(frm, cdt, cdn);
-		refresh_time_log_billet_cutting_remaining(frm);
+		toggle_time_log_miss_fields(frm, cdt, cdn, frm.doc.docstatus !== 1);
+		calculate_time_log_total(frm, cdt, cdn, frm.doc.docstatus !== 1);
+		if (frm.doc.docstatus !== 1) {
+			refresh_time_log_billet_cutting_remaining(frm, true);
+		}
+	},
+
+	completed_qty(frm) {
+		calculate_total_completed_qty(frm);
 	},
 
 	custom_finish_item(frm, cdt, cdn) {
@@ -79,7 +102,43 @@ frappe.ui.form.on("Job Card Time Log", {
 	},
 });
 
-function toggle_time_log_miss_fields(frm, cdt, cdn) {
+function set_form_value(frm, fieldname, value, quiet = false) {
+	if (frm.doc[fieldname] === value) {
+		return Promise.resolve();
+	}
+
+	if (quiet) {
+		frm.doc[fieldname] = value;
+		frm.refresh_field(fieldname);
+		return Promise.resolve();
+	}
+
+	return frm.set_value(fieldname, value);
+}
+
+function set_child_value(cdt, cdn, values, quiet = false) {
+	const row = locals[cdt][cdn];
+	const updates = {};
+
+	Object.entries(values).forEach(([fieldname, value]) => {
+		if (row[fieldname] !== value) {
+			updates[fieldname] = value;
+		}
+	});
+
+	if (!Object.keys(updates).length) {
+		return;
+	}
+
+	if (quiet) {
+		Object.assign(row, updates);
+		return;
+	}
+
+	frappe.model.set_value(cdt, cdn, updates);
+}
+
+function toggle_time_log_miss_fields(frm, cdt, cdn, quiet = false) {
 	const row = locals[cdt][cdn];
 	const grid_row = frm.fields_dict.time_logs?.grid?.get_row(cdn);
 
@@ -95,22 +154,35 @@ function toggle_time_log_miss_fields(frm, cdt, cdn) {
 	grid_row.toggle_reqd("custom_miss_ingot_or_billet_weight", has_miss_ingot);
 	grid_row.toggle_reqd("custom_reason_for_miss_ingot_or_billet", has_miss_ingot);
 
-	if (!has_miss_roll) {
-		frappe.model.set_value(cdt, cdn, {
-			custom_miss_roll_weight: null,
-			custom_reason_for_miss_roll: null,
-		});
+	if (!has_miss_roll && (row.custom_miss_roll_weight || row.custom_reason_for_miss_roll)) {
+		set_child_value(
+			cdt,
+			cdn,
+			{
+				custom_miss_roll_weight: null,
+				custom_reason_for_miss_roll: null,
+			},
+			quiet
+		);
 	}
 
-	if (!has_miss_ingot) {
-		frappe.model.set_value(cdt, cdn, {
-			custom_miss_ingot_or_billet_weight: null,
-			custom_reason_for_miss_ingot_or_billet: null,
-		});
+	if (
+		!has_miss_ingot &&
+		(row.custom_miss_ingot_or_billet_weight || row.custom_reason_for_miss_ingot_or_billet)
+	) {
+		set_child_value(
+			cdt,
+			cdn,
+			{
+				custom_miss_ingot_or_billet_weight: null,
+				custom_reason_for_miss_ingot_or_billet: null,
+			},
+			quiet
+		);
 	}
 }
 
-function calculate_time_log_total(frm, cdt, cdn) {
+function calculate_time_log_total(frm, cdt, cdn, quiet = false) {
 	const row = locals[cdt][cdn];
 	const finish = parseFloat(row.custom_finish_item) || 0;
 	const miss_roll = parseFloat(row.custom_miss_roll) || 0;
@@ -118,26 +190,46 @@ function calculate_time_log_total(frm, cdt, cdn) {
 	const total = finish + miss_roll + miss_ingot;
 
 	if (flt(row.custom_total) !== total) {
-		frappe.model.set_value(cdt, cdn, "custom_total", total);
+		set_child_value(cdt, cdn, { custom_total: total }, quiet);
 	}
 }
 
-function calculate_finish_pcs(frm) {
+function calculate_total_completed_qty(frm, quiet = false) {
+	if (!quiet && frm.events.set_total_completed_qty) {
+		frm.events.set_total_completed_qty(frm);
+		calculate_fg_per_pcs_weight(frm);
+		return;
+	}
+
+	let total = 0;
+	(frm.doc.time_logs || []).forEach((row) => {
+		total += flt(row.completed_qty);
+	});
+
+	if (flt(frm.doc.total_completed_qty) !== total) {
+		frm.doc.total_completed_qty = total;
+		frm.refresh_field("total_completed_qty");
+	}
+
+	calculate_fg_per_pcs_weight(frm, quiet);
+}
+
+function calculate_finish_pcs(frm, quiet = false) {
 	let total = 0;
 	(frm.doc.time_logs || []).forEach((row) => {
 		total += cint(row.custom_finish_item) || 0;
 	});
 
-	const apply_fg = () => calculate_fg_per_pcs_weight(frm);
+	const apply_fg = () => calculate_fg_per_pcs_weight(frm, quiet);
 
 	if (cint(frm.doc.custom_finish_pcs) !== total) {
-		frm.set_value("custom_finish_pcs", total).then(apply_fg);
+		set_form_value(frm, "custom_finish_pcs", total, quiet).then(apply_fg);
 	} else {
 		apply_fg();
 	}
 }
 
-function calculate_miss_pcs(frm) {
+function calculate_miss_pcs(frm, quiet = false) {
 	let total_miss_roll = 0;
 	let total_miss_ingot = 0;
 	let total_miss_roll_weight = 0;
@@ -150,24 +242,13 @@ function calculate_miss_pcs(frm) {
 		total_miss_ingot_weight += cint(row.custom_miss_ingot_or_billet_weight) || 0;
 	});
 
-	if (cint(frm.doc.custom_total_miss_roll) !== total_miss_roll) {
-		frm.set_value("custom_total_miss_roll", total_miss_roll);
-	}
-
-	if (cint(frm.doc.custom_total_miss_ingot_or_billet) !== total_miss_ingot) {
-		frm.set_value("custom_total_miss_ingot_or_billet", total_miss_ingot);
-	}
-
-	if (cint(frm.doc.custom_total_miss_roll_weight) !== total_miss_roll_weight) {
-		frm.set_value("custom_total_miss_roll_weight", total_miss_roll_weight);
-	}
-
-	if (cint(frm.doc.custom_total_miss_ingot_or_billet_weight) !== total_miss_ingot_weight) {
-		frm.set_value("custom_total_miss_ingot_or_billet_weight", total_miss_ingot_weight);
-	}
+	set_form_value(frm, "custom_total_miss_roll", total_miss_roll, quiet);
+	set_form_value(frm, "custom_total_miss_ingot_or_billet", total_miss_ingot, quiet);
+	set_form_value(frm, "custom_total_miss_roll_weight", total_miss_roll_weight, quiet);
+	set_form_value(frm, "custom_total_miss_ingot_or_billet_weight", total_miss_ingot_weight, quiet);
 }
 
-function calculate_fg_per_pcs_weight(frm) {
+function calculate_fg_per_pcs_weight(frm, quiet = false) {
 	const finish_pcs = cint(frm.doc.custom_finish_pcs);
 	const completed_qty = flt(frm.doc.total_completed_qty);
 	let value = 0;
@@ -176,15 +257,13 @@ function calculate_fg_per_pcs_weight(frm) {
 		value = Math.round((completed_qty / finish_pcs) * 100) / 100;
 	}
 
-	if (flt(frm.doc.custom_fg_per_pcs_weight) !== value) {
-		frm.set_value("custom_fg_per_pcs_weight", value);
-	}
+	set_form_value(frm, "custom_fg_per_pcs_weight", value, quiet);
 }
 
-function fetch_colour_code_from_production_item(frm) {
+function fetch_colour_code_from_production_item(frm, quiet = false) {
 	if (!frm.doc.production_item) {
 		if (frm.doc.custom_colour_code) {
-			frm.set_value("custom_colour_code", null);
+			set_form_value(frm, "custom_colour_code", null, quiet);
 		}
 		return;
 	}
@@ -193,7 +272,7 @@ function fetch_colour_code_from_production_item(frm) {
 		const grade = r && r.message ? r.message.custom_grade : null;
 		if (!grade) {
 			if (frm.doc.custom_colour_code) {
-				frm.set_value("custom_colour_code", null);
+				set_form_value(frm, "custom_colour_code", null, quiet);
 			}
 			return;
 		}
@@ -207,20 +286,20 @@ function fetch_colour_code_from_production_item(frm) {
 			.then((docs) => {
 				const colour = docs && docs.length > 0 ? docs[0].colour_code : null;
 				if (frm.doc.custom_colour_code !== colour) {
-					frm.set_value("custom_colour_code", colour);
+					set_form_value(frm, "custom_colour_code", colour, quiet);
 				}
 			});
 	});
 }
 
-function set_billet_weight_from_work_order(frm) {
+function set_billet_weight_from_work_order(frm, quiet = false) {
 	if (frm.doc.docstatus === 1) {
 		return;
 	}
 
 	if (!frm.doc.work_order) {
 		if (cint(frm.doc.custom_billet_weight)) {
-			frm.set_value("custom_billet_weight", 0);
+			set_form_value(frm, "custom_billet_weight", 0, quiet);
 		}
 		return;
 	}
@@ -234,7 +313,7 @@ function set_billet_weight_from_work_order(frm) {
 		const total = cint(miss_billet_weight + consumed_qty);
 
 		if (cint(frm.doc.custom_billet_weight) !== total) {
-			frm.set_value("custom_billet_weight", total);
+			set_form_value(frm, "custom_billet_weight", total, quiet);
 		}
 	});
 }
@@ -247,38 +326,50 @@ function get_time_log_used_pcs(row) {
 	);
 }
 
-function set_time_log_value(row, fieldname, value) {
+function set_time_log_value(row, fieldname, value, quiet = false) {
 	if (value == null) {
 		if (row[fieldname] != null && row[fieldname] !== "") {
-			frappe.model.set_value(row.doctype, row.name, fieldname, null);
+			if (quiet) {
+				row[fieldname] = null;
+			} else {
+				frappe.model.set_value(row.doctype, row.name, fieldname, null);
+			}
 		}
 		return;
 	}
 
 	if (flt(row[fieldname]) !== flt(value)) {
-		frappe.model.set_value(row.doctype, row.name, fieldname, value);
+		if (quiet) {
+			row[fieldname] = value;
+		} else {
+			frappe.model.set_value(row.doctype, row.name, fieldname, value);
+		}
 	}
 }
 
-function clear_time_log_billet_cutting(frm) {
+function clear_time_log_billet_cutting(frm, quiet = false) {
 	(frm.doc.time_logs || []).forEach((row) => {
-		set_time_log_value(row, "custom_total_billet_cutting", null);
+		set_time_log_value(row, "custom_total_billet_cutting", null, quiet);
 	});
 }
 
-function apply_time_log_billet_cutting_remaining(frm, pool, other_used) {
+function apply_time_log_billet_cutting_remaining(frm, pool, other_used, quiet = false) {
 	let running_used = 0;
 
 	(frm.doc.time_logs || []).forEach((row) => {
 		const remaining = pool - other_used - running_used;
-		set_time_log_value(row, "custom_total_billet_cutting", remaining);
+		set_time_log_value(row, "custom_total_billet_cutting", remaining, quiet);
 		running_used += get_time_log_used_pcs(row);
 	});
+
+	if (quiet && frm.fields_dict.time_logs?.grid) {
+		frm.fields_dict.time_logs.grid.refresh();
+	}
 }
 
-function refresh_time_log_billet_cutting_remaining(frm) {
+function refresh_time_log_billet_cutting_remaining(frm, quiet = false) {
 	if (!frm.doc.work_order) {
-		clear_time_log_billet_cutting(frm);
+		clear_time_log_billet_cutting(frm, quiet);
 		return;
 	}
 
@@ -291,11 +382,11 @@ function refresh_time_log_billet_cutting_remaining(frm) {
 		callback(r) {
 			const ctx = r.message || {};
 			if (!cint(ctx.is_rolled) || ctx.pool == null) {
-				clear_time_log_billet_cutting(frm);
+				clear_time_log_billet_cutting(frm, quiet);
 				return;
 			}
 
-			apply_time_log_billet_cutting_remaining(frm, flt(ctx.pool), flt(ctx.other_used));
+			apply_time_log_billet_cutting_remaining(frm, flt(ctx.pool), flt(ctx.other_used), quiet);
 		},
 	});
 }
