@@ -152,6 +152,6 @@ function update_custom_burning_loss(frm) {
 	set_calculated_value(
 		frm,
 		"custom_burning_loss",
-		((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100
+		Math.abs(((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100)
 	);
 }

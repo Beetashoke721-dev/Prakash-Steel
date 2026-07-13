@@ -85,7 +85,7 @@ def calculate_burning_loss_for_rolled_production(doc, method=None):
 	produced_qty = flt(doc.produced_qty) or 0
 
 	doc.custom_burning_loss = flt(
-		((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100,
+		abs(((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100),
 		frappe.get_precision("Work Order", "custom_burning_loss") or 2,
 	)
 
