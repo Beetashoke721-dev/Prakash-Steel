@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Beetashoke Chakraborty and contributors
 // For license information, please see license.txt
 
-frappe.query_reports["Rolled Bar Batch Planning"] = {
+frappe.query_reports["Rolled Bar Batch Recommendation"] = {
 	filters: [
 		{
 			fieldname: "item_code",
@@ -42,7 +42,7 @@ frappe.query_reports["Rolled Bar Batch Planning"] = {
 		// 		primary_action({ item_code }) {
 		// 			d.hide();
 		// 			frappe.call({
-		// 				method: "prakash_steel.prakash_steel.report.rolled_bar_batch_planning.rolled_bar_batch_planning.get_item_debug_info",
+		// 				method: "prakash_steel.prakash_steel.report.rolled_bar_batch_recommendation.rolled_bar_batch_recommendation.get_item_debug_info",
 		// 				args: { item_code },
 		// 				freeze: true,
 		// 				freeze_message: __("Calculating…"),
@@ -142,14 +142,14 @@ function show_debug_dialog(item_code, info) {
 
 				${section_hdr("Totals & Projection", "#fff8e1")}
 				${row("Total",         info.total,        "Sales Qty + Consumption Qty")}
-				${row("Projected Qty", info.projected_qty, "Total × 1.3")}
+				${row("Projected Qty", info.projected_qty, `Total × ${info.projection_factor}`)}
 
 				${section_hdr("Production (Finish Weight)", "#fce8e6")}
 				${row("Production Count", info.production_count,
 					`COUNT(*) — ${info.production_count} Finish Weight record(s) where item_name = "${fmt_str(info.item_name)}" in period`)}
 				${row("Production Qty", info.production_qty,
 					`SUM(finish_weight) across all ${info.production_count} record(s)`)}
-				${row("Batch Size", info.batch_size, "Projected Qty ÷ Production Count")}
+				${row("Recommended Batch Size", info.batch_size, "Projected Qty ÷ Production Count")}
 				${sub_table(
 					["Finish Weight Name", "Date", "Finish Weight"],
 					(info.fw_records||[]).map(r => [r.name, r.date, r.weight])

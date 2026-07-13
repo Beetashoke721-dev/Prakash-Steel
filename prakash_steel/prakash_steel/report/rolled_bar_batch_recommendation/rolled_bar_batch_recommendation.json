@@ -13,11 +13,11 @@
  "modified": "2026-07-08 12:38:07.040464",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
- "name": "Rolled Bar Batch Planning",
+ "name": "Rolled Bar Batch Recommendation",
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Item",
- "report_name": "Rolled Bar Batch Planning",
+ "report_name": "Rolled Bar Batch Recommendation",
  "report_type": "Script Report",
  "roles": [
   {
