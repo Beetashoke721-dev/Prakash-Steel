@@ -26,7 +26,11 @@ def get_total_consumed_qty(doc):
 
 
 def calculate_custom_wastage(doc, method=None):
-	"""Set custom_wastage from produced_qty and total consumed raw material."""
+	"""Set custom_wastage from produced_qty and total consumed raw material (Bright only)."""
+	if not bool(doc.custom_bright_production):
+		doc.custom_wastage = None
+		return
+
 	consumed_qty = get_total_consumed_qty(doc)
 	produced_qty = flt(doc.produced_qty)
 
