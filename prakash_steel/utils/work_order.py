@@ -275,10 +275,16 @@ def calculate_job_card_finish_pcs(doc, method=None):
 
 
 def calculate_job_card_miss_pcs(doc, method=None):
-	"""Set Job Card miss totals from time log miss pcs fields."""
+	"""Set Job Card miss totals from time log miss pcs and weight fields."""
 	doc.custom_total_miss_roll = sum(cint(row.custom_miss_roll) for row in (doc.time_logs or []))
 	doc.custom_total_miss_ingot_or_billet = sum(
 		cint(row.custom_miss_ingot_or_billet) for row in (doc.time_logs or [])
+	)
+	doc.custom_total_miss_roll_weight = sum(
+		cint(row.custom_miss_roll_weight) for row in (doc.time_logs or [])
+	)
+	doc.custom_total_miss_ingot_or_billet_weight = sum(
+		cint(row.custom_miss_ingot_or_billet_weight) for row in (doc.time_logs or [])
 	)
 
 
