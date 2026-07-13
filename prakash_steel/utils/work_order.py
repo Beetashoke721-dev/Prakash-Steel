@@ -111,14 +111,25 @@ def update_custom_wastage_after_stock_entry(doc, method=None):
 	calculate_custom_wastage(wo)
 	calculate_cutting_weight_for_rolled_production(wo)
 	calculate_burning_loss_for_rolled_production(wo)
-	frappe.db.set_value(
-		"Work Order",
-		doc.work_order,
-		{
+
+	# db.set_value writes SQL NULL for None; skip fields that are not yet calculable.
+	update_values = {
+		fieldname: value
+		for fieldname, value in {
 			"custom_wastage": wo.custom_wastage,
 			"custom_cutting_weight": wo.custom_cutting_weight,
 			"custom_burning_loss": wo.custom_burning_loss,
-		},
+		}.items()
+		if value is not None
+	}
+
+	if not update_values:
+		return
+
+	frappe.db.set_value(
+		"Work Order",
+		doc.work_order,
+		update_values,
 		update_modified=False,
 	)
 
