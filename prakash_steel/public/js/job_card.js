@@ -194,6 +194,10 @@ function fetch_colour_code_from_production_item(frm) {
 }
 
 function set_billet_weight_from_work_order(frm) {
+	if (frm.doc.docstatus === 1) {
+		return;
+	}
+
 	if (!frm.doc.work_order) {
 		if (cint(frm.doc.custom_billet_weight)) {
 			frm.set_value("custom_billet_weight", 0);

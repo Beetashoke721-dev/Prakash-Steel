@@ -306,7 +306,13 @@ def set_job_card_colour_code(doc, method=None):
 
 
 def calculate_job_card_billet_weight(doc, method=None):
-	"""Set custom_billet_weight from linked Work Order miss billet weight + consumed qty."""
+	"""Set custom_billet_weight from linked Work Order miss billet weight + consumed qty.
+
+	Skip after submit so WO consumption growth cannot change a locked Job Card field.
+	"""
+	if doc.docstatus == 1:
+		return
+
 	if not doc.work_order:
 		doc.custom_billet_weight = 0
 		return
