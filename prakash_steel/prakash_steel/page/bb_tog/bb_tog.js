@@ -218,10 +218,13 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		{
 			name: "FOS", id: "fos", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) =>
-				`<input type="number" class="bbt-fos-input" data-idx="${d._idx}" min="0" step="1"
-					value="${val !== null && val !== undefined ? val : ""}"
-					style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
-					font-size:12px;width:100%;box-sizing:border-box;text-align:center;background:#fffbe6;">`,
+				`<div style="display:flex;align-items:center;gap:2px;">
+					<input type="number" class="bbt-fos-input" data-idx="${d._idx}" min="0" step="1"
+						value="${val !== null && val !== undefined ? val : ""}"
+						style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
+						font-size:12px;width:calc(100% - 16px);box-sizing:border-box;text-align:center;background:#fffbe6;">
+					<span style="font-size:12px;color:#666;flex-shrink:0;">%</span>
+				</div>`,
 		},
 		{
 			name: "TOG", id: "tog", width: 110, align: "center", editable: false,
@@ -238,6 +241,10 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		{
 			name: "Change%", id: "change_pct", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) => fmt_change_pct(val, d._idx),
+		},
+		{
+			name: "No of Customer", id: "no_of_customer", width: 130, align: "center", editable: false,
+			format: val => val != null ? String(val) : dash(),
 		},
 		{
 			name: "Head Customer", id: "h", width: 150, align: "center", editable: false,
