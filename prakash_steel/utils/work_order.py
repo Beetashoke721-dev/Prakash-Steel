@@ -333,14 +333,15 @@ def validate_job_card_time_log_miss_fields(doc, method=None):
 						row_label
 					)
 				)
-			if not row.custom_summary_remarks:
+			if not row.custom_reason_for_miss_roll:
 				frappe.throw(
-					_("{0}: Summary Remarks is mandatory when Miss Roll (Pcs) is greater than 0.").format(
+					_("{0}: Reason for Miss Roll is mandatory when Miss Roll (Pcs) is greater than 0.").format(
 						row_label
 					)
 				)
 		else:
 			row.custom_miss_roll_weight = None
+			row.custom_reason_for_miss_roll = None
 
 		if flt(row.custom_miss_ingot_or_billet) > 0:
 			if not row.custom_miss_ingot_or_billet_weight:

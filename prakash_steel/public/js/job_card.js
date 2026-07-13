@@ -77,12 +77,15 @@ function toggle_time_log_miss_fields(frm, cdt, cdn) {
 	const has_miss_ingot = cint(row.custom_miss_ingot_or_billet) > 0;
 
 	grid_row.toggle_reqd("custom_miss_roll_weight", has_miss_roll);
-	grid_row.toggle_reqd("custom_summary_remarks", has_miss_roll);
+	grid_row.toggle_reqd("custom_reason_for_miss_roll", has_miss_roll);
 	grid_row.toggle_reqd("custom_miss_ingot_or_billet_weight", has_miss_ingot);
 	grid_row.toggle_reqd("custom_reason_for_miss_ingot_or_billet", has_miss_ingot);
 
 	if (!has_miss_roll) {
-		frappe.model.set_value(cdt, cdn, "custom_miss_roll_weight", null);
+		frappe.model.set_value(cdt, cdn, {
+			custom_miss_roll_weight: null,
+			custom_reason_for_miss_roll: null,
+		});
 	}
 
 	if (!has_miss_ingot) {
@@ -259,9 +262,9 @@ function validate_time_log_miss_fields(frm) {
 					__("{0}: Miss Roll Weight is mandatory when Miss Roll (Pcs) is greater than 0.", [row_label])
 				);
 			}
-			if (!row.custom_summary_remarks) {
+			if (!row.custom_reason_for_miss_roll) {
 				frappe.throw(
-					__("{0}: Summary Remarks is mandatory when Miss Roll (Pcs) is greater than 0.", [row_label])
+					__("{0}: Reason for Miss Roll is mandatory when Miss Roll (Pcs) is greater than 0.", [row_label])
 				);
 			}
 		}
