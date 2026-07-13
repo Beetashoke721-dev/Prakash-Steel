@@ -56,6 +56,11 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 	$(`<div id="bbt-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
 
+	$(`<style>
+		#bbt-dt .dt-row-header .dt-cell__content,
+		#bbt-dt .dt-row-header .content { text-align: left !important; }
+	</style>`).appendTo(document.head);
+
 	// ── HBT colour palette ────────────────────────────────────────────────────
 	const HBT = {
 		H: { bg: "#1a7a3f", fg: "#ffffff", light: "#e8f5ee", label: "H — High" },
@@ -92,6 +97,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 	function esc(v) { return frappe.utils.escape_html(String(v ?? "")); }
 	function dash() { return '<span style="color:#ccc;">—</span>'; }
+	function ceil1000(v) { return Math.ceil(v / 1000) * 1000; }
 
 
 	function fmt_change_pct(val, idx) {
@@ -114,7 +120,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		const fos = get_global_fos();
 		_all_data.forEach(row => {
 			row.fos = fos;
-			row.tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
+			row.tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 			const current_tog = row.current_tog || 0;
 			row.change_pct = current_tog
 				? Math.round((row.tog - current_tog) / current_tog * 1000) / 10
@@ -140,7 +146,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		const _gfos = get_global_fos();
 		_all_data = filtered.map((row, idx) => {
 			const fos = _gfos;
-			const tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
+			const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 			const current_tog = row.current_tog || 0;
 			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
 			return { ...row, _idx: idx, fos, tog, change_pct };
@@ -164,26 +170,26 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 
 	const COLS = [
 		{
-			name: "Item Code", id: "item_code", width: 200, align: "left", editable: false,
-			format: val => val
-				? `<span class="bbt-item-link" data-item="${esc(val)}"
-					style="color:#1a73e8;font-weight:500;cursor:pointer;">${esc(val)}</span>`
-				: dash(),
+			name: "", id: "_idx", width: 55, align: "center", editable: false,
+			format: (_val, _r, _c, d) => `<span style="color:#888;font-size:12px;">${d._idx + 1}</span>`,
 		},
 		{
 			name: "SKU Type", id: "sku_type", width: 110, align: "center", editable: false,
 			format: val => val ? esc(val) : dash(),
 		},
 		{
-			name: "Total Qty", id: "total", width: 130, align: "right", editable: false,
-			format: val => `<span style="font-weight:600;">${fmt_num(val, 0)}</span>`,
+			name: "Item Code", id: "item_code", width: 200, align: "center", editable: false,
+			format: val => val
+				? `<span class="bbt-item-link" data-item="${esc(val)}"
+					style="color:#1a73e8;font-weight:500;cursor:pointer;">${esc(val)}</span>`
+				: dash(),
 		},
 		{
-			name: "Contr%", id: "contr_pct", width: 90, align: "right", editable: false,
+			name: "Contr%", id: "contr_pct", width: 90, align: "center", editable: false,
 			format: val => fmt_pct(val),
 		},
 		{
-			name: "Cumu%", id: "cumu_pct", width: 90, align: "right", editable: false,
+			name: "Cumu%", id: "cumu_pct", width: 90, align: "center", editable: false,
 			format: (val, _r, _c, d) => {
 				const color = (d && HBT[d.hbt]) ? HBT[d.hbt].bg : "#c0152a";
 				return `<span style="font-weight:600;color:${color};">${fmt_pct(val)}</span>`;
@@ -194,54 +200,55 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			format: val => hbt_badge(val),
 		},
 		{
-			name: "Frequency", id: "frequency", width: 100, align: "right", editable: false,
+			name: "Frequency", id: "frequency", width: 100, align: "center", editable: false,
 			format: val => (val !== null && val !== undefined) ? String(val) : dash(),
 		},
 		{
-			name: "ADU", id: "adu", width: 110, align: "right", editable: false,
+			name: "Total Qty", id: "total", width: 130, align: "center", editable: false,
+			format: val => `<span style="font-weight:600;">${fmt_num(val, 0)}</span>`,
+		},
+		{
+			name: "ADU", id: "adu", width: 110, align: "center", editable: false,
 			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
 		},
 		{
-			name: "LT", id: "lt", width: 90, align: "right", editable: false,
+			name: "LT", id: "lt", width: 90, align: "center", editable: false,
 			format: val => val !== null && val !== undefined ? fmt_num(val, 0) : dash(),
 		},
 		{
-			name: "FOS", id: "fos", width: 110, align: "right", editable: false,
+			name: "FOS", id: "fos", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) =>
 				`<input type="number" class="bbt-fos-input" data-idx="${d._idx}" min="0" step="1"
 					value="${val !== null && val !== undefined ? val : ""}"
 					style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
-					font-size:12px;width:80px;text-align:right;background:#fffbe6;">`,
+					font-size:12px;width:100%;box-sizing:border-box;text-align:center;background:#fffbe6;">`,
 		},
 		{
-			name: "TOG", id: "tog", width: 110, align: "right", editable: false,
+			name: "TOG", id: "tog", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) =>
 				`<input type="number" class="bbt-tog-input" data-idx="${d._idx}" min="0" step="1"
 					value="${val !== null && val !== undefined ? val : ""}"
 					style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
-					font-size:12px;width:80px;text-align:right;background:#fffbe6;">`,
+					font-size:12px;width:100%;box-sizing:border-box;text-align:center;background:#fffbe6;">`,
 		},
 		{
-			name: "Current TOG", id: "current_tog", width: 120, align: "right", editable: false,
-			format: val => val !== null && val !== undefined ? `<span style="font-weight:600;">${fmt_num(val, 0)}</span>` : dash(),
+			name: "Current TOG", id: "current_tog", width: 120, align: "center", editable: false,
+			format: val => val ? `<span style="font-weight:600;">${fmt_num(val, 0)}</span>` : dash(),
 		},
 		{
-			name: "Change%", id: "change_pct", width: 110, align: "right", editable: false,
+			name: "Change%", id: "change_pct", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) => fmt_change_pct(val, d._idx),
 		},
 		{
-			name: "Head Customer",
-			id: "h", width: 150, align: "right", editable: false,
+			name: "Head Customer", id: "h", width: 150, align: "center", editable: false,
 			format: val => num_badge(val, "H"),
 		},
 		{
-			name: "Body Customer",
-			id: "b", width: 150, align: "right", editable: false,
+			name: "Body Customer", id: "b", width: 150, align: "center", editable: false,
 			format: val => num_badge(val, "B"),
 		},
 		{
-			name: "Tail Customer",
-			id: "t", width: 150, align: "right", editable: false,
+			name: "Tail Customer", id: "t", width: 150, align: "center", editable: false,
 			format: val => num_badge(val, "T"),
 		},
 	];
@@ -323,7 +330,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		const fos = row.fos !== null && row.fos !== undefined ? row.fos : 25;
 		const adu = row.adu || 0;
 		const lt = row.lt || 0;
-		const tog = Math.ceil(adu * lt * (1 + fos / 100));
+		const tog = ceil1000(adu * lt * (1 + fos / 100));
 		row.tog = tog;
 		$(`.bbt-tog-input[data-idx="${idx}"]`).val(tog);
 		recalc_change_pct(idx);
@@ -355,7 +362,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		const _gfos = get_global_fos();
 		_all_data = data.map((row, idx) => {
 			const fos = _gfos;
-			const tog = Math.ceil((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
+			const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 			const current_tog = row.current_tog || 0;
 			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
 			return { ...row, _idx: idx, fos, tog, change_pct };
