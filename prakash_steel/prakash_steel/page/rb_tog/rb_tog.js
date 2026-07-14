@@ -244,7 +244,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		},
 		{
 			name: "No of Customer", id: "no_of_customer", width: 130, align: "center", editable: false,
-			format: val => val != null ? String(val) : dash(),
+			format: val => val != null ? `<span style="font-weight:600;">${val}</span>` : dash(),
 		},
 		{
 			name: "Head Customer", id: "h", width: 150, align: "center", editable: false,

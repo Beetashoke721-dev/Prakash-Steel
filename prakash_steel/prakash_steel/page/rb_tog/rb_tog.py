@@ -117,9 +117,11 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 	)
 
 	item_hbt_buckets: dict[str, dict[str, float]] = defaultdict(lambda: {"H": 0.0, "B": 0.0, "T": 0.0})
+	item_customer_counts: dict[str, int] = defaultdict(int)
 	for r in item_group_rows:
 		bucket = customer_hbt_map.get(r.group_name, "T")
 		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
+		item_customer_counts[r.item_code] += 1
 
 	assign_hbt_labels(raw_rows)
 
@@ -197,6 +199,7 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		total_usage = sales_qty + consumption
 		adu = math.ceil(total_usage / horizon_days) if horizon_days > 0 and total_usage > 0 else 0
 		lt = float(item_master_map.get(row["item_code"], {}).get("lt") or 0)
+		_buckets = item_hbt_buckets.get(row["item_code"], _empty)
 
 		data.append({
 			"item_code": row["item_code"],
@@ -205,9 +208,10 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"cumu_pct": round(float(row.get("cumu_pct") or 0), 1),
 			"hbt": row["hbt"],
 			"frequency": int(row["frequency"] or 0),
-			"h": item_hbt_buckets.get(row["item_code"], _empty)["H"],
-			"b": item_hbt_buckets.get(row["item_code"], _empty)["B"],
-			"t": item_hbt_buckets.get(row["item_code"], _empty)["T"],
+			"h": _buckets["H"],
+			"b": _buckets["B"],
+			"t": _buckets["T"],
+			"no_of_customer": item_customer_counts.get(row["item_code"], 0),
 			"sku_type": item_master_map.get(row["item_code"], {}).get("sku_type") or "",
 			"adu": adu,
 			"lt": lt,
@@ -230,25 +234,26 @@ def export_rb_tog_xlsx(data, filename="RB_TOG"):
 	rows_data = json.loads(data) if isinstance(data, str) else data
 
 	headers = [
-		"Item Code", "SKU Type", "Total Qty", "Contr%", "Cumu%", "HBT",
-		"Frequency", "ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
-		"Head Customer", "Body Customer", "Tail Customer",
+		"SKU Type", "Item Code", "Contr%", "Cumu%", "HBT", "Frequency", "Total Qty",
+		"ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
+		"No of Customer", "Head Customer", "Body Customer", "Tail Customer",
 	]
 	rows = [headers] + [
 		[
-			r.get("item_code") or "",
 			r.get("sku_type") or "",
-			r.get("total") or 0,
+			r.get("item_code") or "",
 			r.get("contr_pct") or 0,
 			r.get("cumu_pct") or 0,
 			r.get("hbt") or "",
 			r.get("frequency") or 0,
+			r.get("total") or 0,
 			r.get("adu") or 0,
 			r.get("lt") or 0,
 			r.get("fos") or 0,
 			r.get("tog") or 0,
 			r.get("current_tog") or 0,
 			r.get("change_pct"),
+			r.get("no_of_customer") or 0,
 			r.get("h") or 0,
 			r.get("b") or 0,
 			r.get("t") or 0,
