@@ -135,7 +135,8 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			name AS item_code,
 			lead_time_days AS lt,
 			safety_stock AS current_tog,
-			custom_sku_type AS sku_type
+			custom_sku_type AS sku_type,
+			custom_last_saved_tog AS new_tog
 		FROM `tabItem`
 		WHERE name IN %(item_codes)s
 		""",
@@ -172,6 +173,7 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"fos": 25,
 			"tog": math.ceil(adu * lt * 1.25),
 			"current_tog": float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0),
+			"new_tog": item_master_map.get(row["item_code"], {}).get("new_tog") or None,
 			"change_pct": round(
 				(math.ceil(adu * lt * 1.25) - float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0))
 				/ float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) * 100, 1
@@ -179,6 +181,15 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		})
 
 	return {"data": data, "period_label": period_label}
+
+
+@frappe.whitelist()
+def save_tog(items):
+	items = json.loads(items) if isinstance(items, str) else items
+	for item in items:
+		frappe.db.set_value("Item", item["item_code"], "custom_last_saved_tog", item["tog"])
+	frappe.db.commit()
+	return {"saved": len(items)}
 
 
 @frappe.whitelist()

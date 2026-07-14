@@ -148,14 +148,17 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			return true;
 		});
 		const _gfos = get_global_fos();
+		const _new_tog_map = {};
+		_all_data.forEach(r => { _new_tog_map[r.item_code] = r.new_tog; });
 		_all_data = filtered.map((row, idx) => {
 			const fos = _gfos;
 			const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 			const current_tog = row.current_tog || 0;
 			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
-			return { ...row, _idx: idx, fos, tog, change_pct };
+			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.item_code in _new_tog_map ? _new_tog_map[row.item_code] : (row.new_tog ?? null) };
 		});
 		_selected.clear();
+		_all_data.forEach((row, i) => { if (["RBMTA", "BOTA", "TRMTA"].includes(row.sku_type)) _selected.add(i); });
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 		_dt = new DataTable(document.getElementById("rbt-dt"), {
@@ -238,9 +241,14 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 				</div>`,
 		},
 		{
-			name: "TOG", id: "tog", width: 110, align: "center", editable: false,
+			name: "Calc TOG", id: "tog", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) =>
-				`<input type="number" class="rbt-tog-input" data-idx="${d._idx}" min="0" step="1"
+				`<span class="rbt-calc-tog" data-idx="${d._idx}" style="font-weight:600;">${val != null ? val : "—"}</span>`,
+		},
+		{
+			name: "New TOG", id: "new_tog", width: 110, align: "center", editable: false,
+			format: (val, _r, _c, d) =>
+				`<input type="number" class="rbt-new-tog-input" data-idx="${d._idx}" min="0" step="1"
 					value="${val !== null && val !== undefined ? val : ""}"
 					style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
 					font-size:12px;width:100%;box-sizing:border-box;text-align:center;background:#fffbe6;">`,
@@ -340,7 +348,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		}
 		// Fallback for cells already showing an untagged dash from before the fix
 		const col_idx = COLS.findIndex(c => c.id === "change_pct");
-		const $row = $(`.rbt-tog-input[data-idx="${idx}"]`).closest(".dt-row");
+		const $row = $(`.rbt-calc-tog[data-idx="${idx}"]`).closest(".dt-row");
 		if ($row.length && col_idx >= 0) {
 			$row.find(`.dt-cell--col-${col_idx} .dt-cell__content, .dt-cell--col-${col_idx} .content`)
 				.first()
@@ -353,7 +361,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		const fos = row.fos !== null && row.fos !== undefined ? row.fos : 25;
 		const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 		row.tog = tog;
-		$(`.rbt-tog-input[data-idx="${idx}"]`).val(tog);
+		$(`.rbt-calc-tog[data-idx="${idx}"]`).text(tog);
 		recalc_change_pct(idx);
 	}
 
@@ -361,7 +369,34 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		return _all_data.filter((_, i) => _selected.has(i));
 	}
 
-	function save_selected() {}
+	function save_selected() {
+		const selected = _get_selected_rows();
+		if (!selected.length) {
+			frappe.show_alert({ message: __("No rows selected."), indicator: "orange" });
+			return;
+		}
+		const items = selected
+			.filter(r => ["RBMTA", "BOTA", "TRMTA"].includes(r.sku_type))
+			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog }));
+		if (!items.length) {
+			frappe.show_alert({ message: __("No MTA items selected. Only RBMTA, BOTA, and TRMTA items can be saved."), indicator: "orange" });
+			return;
+		}
+		frappe.call({
+			method: "prakash_steel.prakash_steel.page.rb_tog.rb_tog.save_tog",
+			args: { items: JSON.stringify(items) },
+			freeze: true,
+			freeze_message: __("Saving TOG values…"),
+			callback(r) {
+				if (r.message) {
+					frappe.show_alert({
+						message: __(`${r.message.saved} item(s) saved successfully.`),
+						indicator: "green",
+					});
+				}
+			},
+		});
+	}
 	function update_tog_selected() {}
 	function reset_selected() {}
 
@@ -378,11 +413,10 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			recalc_tog(idx);
 		});
 
-		$(document).off("input", ".rbt-tog-input").on("input", ".rbt-tog-input", function () {
+		$(document).off("input", ".rbt-new-tog-input").on("input", ".rbt-new-tog-input", function () {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
-			_all_data[idx].tog = val === "" ? null : parseInt(val);
-			recalc_change_pct(idx);
+			_all_data[idx].new_tog = val === "" ? null : parseInt(val);
 		});
 
 		$(document).off("change", "#rbt-select-all").on("change", "#rbt-select-all", function () {
@@ -390,6 +424,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 				_all_data.forEach((_, i) => _selected.add(i));
 			} else {
 				_selected.clear();
+		_all_data.forEach((row, i) => { if (["RBMTA", "BOTA", "TRMTA"].includes(row.sku_type)) _selected.add(i); });
 			}
 			$(".rbt-row-check").prop("checked", this.checked);
 		});
@@ -413,10 +448,11 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 			const current_tog = row.current_tog || 0;
 			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
-			return { ...row, _idx: idx, fos, tog, change_pct };
+			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.new_tog ?? null };
 		});
 
 		_selected.clear();
+		_all_data.forEach((row, i) => { if (["RBMTA", "BOTA", "TRMTA"].includes(row.sku_type)) _selected.add(i); });
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
