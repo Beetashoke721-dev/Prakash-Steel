@@ -53,6 +53,9 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 
 	page.add_inner_button(__("Refresh"), () => load_data());
 	page.add_inner_button(__("Export to Excel"), () => export_to_xlsx());
+	page.add_inner_button(__("Save"), () => save_selected());
+	page.add_inner_button(__("Update TOG"), () => update_tog_selected());
+	page.add_inner_button(__("Reset"), () => reset_selected());
 
 	$(`<div id="rbt-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
 
@@ -134,6 +137,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 	let _dt_observer = null;
 	let _all_data = [];
 	let _raw_data = [];
+	let _selected = new Set();
 
 	function apply_filter() {
 		const sku = sku_type_field.get_value();
@@ -151,6 +155,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
 			return { ...row, _idx: idx, fos, tog, change_pct };
 		});
+		_selected.clear();
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 		_dt = new DataTable(document.getElementById("rbt-dt"), {
@@ -169,6 +174,12 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 	}
 
 	const COLS = [
+		{
+			name: "", id: "_select", width: 40, align: "center", editable: false,
+			resizable: false, sortable: false,
+			format: (_val, _r, _c, d) =>
+				`<input type="checkbox" class="rbt-row-check" data-idx="${d._idx}" ${_selected.has(d._idx) ? "checked" : ""}>`,
+		},
 		{
 			name: "", id: "_idx", width: 55, align: "center", editable: false,
 			format: (_val, _r, _c, d) => `<span style="color:#888;font-size:12px;">${d._idx + 1}</span>`,
@@ -303,7 +314,12 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		if (!dt_el) return;
 		_dt_observer = new MutationObserver(() => {
 			clearTimeout(_obs_timer);
-			_obs_timer = setTimeout(() => apply_table_styles(root_id), 30);
+			_obs_timer = setTimeout(() => {
+				apply_table_styles(root_id);
+				document.getElementById(root_id).querySelectorAll(".rbt-row-check").forEach(cb => {
+					cb.checked = _selected.has(parseInt(cb.dataset.idx));
+				});
+			}, 30);
 		});
 		_dt_observer.observe(dt_el, { childList: true, subtree: true });
 	}
@@ -341,6 +357,14 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		recalc_change_pct(idx);
 	}
 
+	function _get_selected_rows() {
+		return _all_data.filter((_, i) => _selected.has(i));
+	}
+
+	function save_selected() {}
+	function update_tog_selected() {}
+	function reset_selected() {}
+
 	function bind_events() {
 		$(document).off("click", ".rbt-item-link").on("click", ".rbt-item-link", function () {
 			const item = $(this).data("item");
@@ -360,6 +384,25 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			_all_data[idx].tog = val === "" ? null : parseInt(val);
 			recalc_change_pct(idx);
 		});
+
+		$(document).off("change", "#rbt-select-all").on("change", "#rbt-select-all", function () {
+			if (this.checked) {
+				_all_data.forEach((_, i) => _selected.add(i));
+			} else {
+				_selected.clear();
+			}
+			$(".rbt-row-check").prop("checked", this.checked);
+		});
+
+		$(document).off("change", ".rbt-row-check").on("change", ".rbt-row-check", function () {
+			const idx = parseInt($(this).data("idx"));
+			if (this.checked) _selected.add(idx);
+			else _selected.delete(idx);
+			const total = _all_data.length;
+			$("#rbt-select-all")
+				.prop("indeterminate", _selected.size > 0 && _selected.size < total)
+				.prop("checked", _selected.size === total);
+		});
 	}
 
 	function build_datatable(data, period_label) {
@@ -373,6 +416,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			return { ...row, _idx: idx, fos, tog, change_pct };
 		});
 
+		_selected.clear();
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
@@ -380,6 +424,12 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			<div style="font-size:12px;color:#888;margin-bottom:10px;padding-left:2px;">
 				Period: <strong>${esc(period_label)}</strong>
 				&nbsp;·&nbsp; ${data.length} items
+			</div>
+			<div style="padding:4px 2px 8px;display:flex;align-items:center;gap:8px;">
+				<label style="font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:6px;">
+					<input type="checkbox" id="rbt-select-all">
+					<span>Select All</span>
+				</label>
 			</div>
 			<div id="rbt-dt" style="overflow-x:auto;"></div>
 		`);
