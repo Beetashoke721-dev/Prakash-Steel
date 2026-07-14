@@ -94,16 +94,23 @@ def get_columns(max_prod_cols: int = 0) -> list[dict]:
 			"width": 110,
 		},
 		{
-			"label": _("Production Qty"),
-			"fieldname": "production_qty",
-			"fieldtype": "Int",
-			"width": 120,
-		},
-		{
 			"label": _("Production Count"),
 			"fieldname": "production_count",
 			"fieldtype": "Int",
 			"width": 130,
+		},
+		{
+			"label": _("No of Setup"),
+			"fieldname": "no_of_setup",
+			"fieldtype": "Int",
+			"width": 110,
+			"editable": 1,
+		},
+		{
+			"label": _("Production Qty"),
+			"fieldname": "production_qty",
+			"fieldtype": "Int",
+			"width": 120,
 		},
 	]
 
@@ -258,7 +265,8 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 		production_count = fw.get("production_count", 0)
 		weights = [_ceil(w) for w in fw.get("weights", [])]
 
-		batch_size = _ceil(projected_qty / production_count) if production_count else 0
+		no_of_setup = production_count
+		batch_size = _ceil(production_qty / no_of_setup) if no_of_setup else 0
 
 		row = {
 			"item_code": item_code,
@@ -270,8 +278,9 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 			"total": total,
 			"projected_qty": projected_qty,
 			"batch_size": batch_size,
-			"production_qty": production_qty,
 			"production_count": production_count,
+			"no_of_setup": no_of_setup,
+			"production_qty": production_qty,
 		}
 
 		for i in range(max_prod_cols):

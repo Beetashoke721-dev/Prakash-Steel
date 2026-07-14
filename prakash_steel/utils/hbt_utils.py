@@ -117,6 +117,36 @@ def get_period_months(settings_doctype: str = "HBT Period Settings") -> list[tup
 # ---------------------------------------------------------------------------
 
 
+def get_tog_horizon_range() -> tuple[date, date]:
+	"""Read TOG Horizon Settings and return the configured ``(from_date, to_date)`` range.
+
+	Raises ``frappe.ValidationError`` if the range is incomplete or invalid.
+	"""
+	settings = frappe.get_single("TOG Horizon Settings")
+
+	from_date = settings.from_month
+	to_date = settings.to_month
+
+	if not from_date or not to_date:
+		frappe.throw(
+			_("Please configure From Month and To Month in TOG Horizon Settings."),
+			title=_("Incomplete TOG Horizon Settings"),
+		)
+
+	from_date = getdate(from_date)
+	to_date = getdate(to_date)
+
+	if from_date > to_date:
+		frappe.throw(
+			_("From Month ({0}) must come before To Month ({1}) in TOG Horizon Settings.").format(
+				from_date, to_date
+			),
+			title=_("Invalid Period Range"),
+		)
+
+	return from_date, to_date
+
+
 def month_key(year: int, month: int) -> str:
 	"""Fieldname-safe key for a year/month pair, e.g. ``m_2025_06``."""
 	return f"m_{year}_{month:02d}"

@@ -24,23 +24,18 @@ class IntegrationTestTOGHorizonSettings(IntegrationTestCase):
     def test_required_fields_exist(self):
         meta = self._load_json()
         fieldnames = {f["fieldname"] for f in meta.get("fields", []) if not f["fieldtype"].endswith("Break")}
-        for field in ("fiscal_year", "from_month", "to_month"):
+        for field in ("from_month", "to_month"):
             self.assertIn(field, fieldnames, f"Missing field: {field}")
 
-    def test_fiscal_year_is_link(self):
+    def test_from_month_is_date(self):
         meta = self._load_json()
         field_map = {f["fieldname"]: f for f in meta.get("fields", [])}
-        self.assertEqual(field_map["fiscal_year"]["fieldtype"], "Link")
+        self.assertEqual(field_map["from_month"]["fieldtype"], "Date")
 
-    def test_from_month_is_select(self):
+    def test_to_month_is_date(self):
         meta = self._load_json()
         field_map = {f["fieldname"]: f for f in meta.get("fields", [])}
-        self.assertEqual(field_map["from_month"]["fieldtype"], "Select")
-
-    def test_to_month_is_select(self):
-        meta = self._load_json()
-        field_map = {f["fieldname"]: f for f in meta.get("fields", [])}
-        self.assertEqual(field_map["to_month"]["fieldtype"], "Select")
+        self.assertEqual(field_map["to_month"]["fieldtype"], "Date")
 
     def test_doctype_name(self):
         meta = self._load_json()

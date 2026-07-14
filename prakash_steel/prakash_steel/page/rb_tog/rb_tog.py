@@ -9,49 +9,13 @@ import frappe
 
 from prakash_steel.utils.hbt_utils import (
 	METRIC_COL as _METRIC_COL_MAP,
-	MONTH_TO_NUM,
-	FISCAL_MONTH_ORDER,
 	assign_hbt_labels,
 	get_customer_hbt_map,
-	period_date_range,
+	get_tog_horizon_range,
 )
 from prakash_steel.utils.whitelist_permissions import require_permission
-from frappe.utils import getdate
 
 ITEM_TYPES = ("RB", "BO", "Traded")
-
-
-def _get_tog_period_months() -> list[tuple[int, int]]:
-	"""Same logic as bb_tog — reads from TOG Horizon Settings."""
-	settings = frappe.get_single("TOG Horizon Settings")
-
-	fiscal_year = settings.fiscal_year
-	from_month = settings.from_month
-	to_month = settings.to_month
-
-	if not fiscal_year or not from_month or not to_month:
-		frappe.throw(
-			"Please configure Fiscal Year, From Month, and To Month in TOG Horizon Settings.",
-			title="Incomplete TOG Horizon Settings",
-		)
-
-	from_num = MONTH_TO_NUM[from_month]
-	to_num = MONTH_TO_NUM[to_month]
-
-	from_idx = FISCAL_MONTH_ORDER.index(from_num)
-	to_idx = FISCAL_MONTH_ORDER.index(to_num)
-
-	if from_idx > to_idx:
-		frappe.throw(
-			f"From Month ({from_month}) must come before To Month ({to_month}) in TOG Horizon Settings.",
-			title="Invalid Period Range",
-		)
-
-	fy_doc = frappe.get_doc("Fiscal Year", fiscal_year)
-	start_year = getdate(fy_doc.year_start_date).year
-	end_year = getdate(fy_doc.year_end_date).year
-
-	return [(start_year if m >= 4 else end_year, m) for m in FISCAL_MONTH_ORDER[from_idx: to_idx + 1]]
 
 
 @frappe.whitelist()
@@ -62,11 +26,7 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		view_by = "Sale Quantity"
 	metric_col = _METRIC_COL_MAP[view_by]
 
-	period_months = _get_tog_period_months()
-	if not period_months:
-		return {"data": [], "period_label": ""}
-
-	from_date, to_date = period_date_range(period_months)
+	from_date, to_date = get_tog_horizon_range()
 	period_label = f"{from_date.strftime('%b %Y')} – {to_date.strftime('%b %Y')}"
 
 	raw_rows: list[dict] = frappe.db.sql(
