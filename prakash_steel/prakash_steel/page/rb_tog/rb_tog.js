@@ -397,7 +397,34 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			},
 		});
 	}
-	function update_tog_selected() {}
+	function update_tog_selected() {
+		const selected = _get_selected_rows();
+		if (!selected.length) {
+			frappe.show_alert({ message: __("No rows selected."), indicator: "orange" });
+			return;
+		}
+		const items = selected
+			.filter(r => ["RBMTA", "BOTA", "TRMTA"].includes(r.sku_type))
+			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog }));
+		if (!items.length) {
+			frappe.show_alert({ message: __("No MTA items selected. Only RBMTA, BOTA, and TRMTA items can be updated."), indicator: "orange" });
+			return;
+		}
+		frappe.call({
+			method: "prakash_steel.prakash_steel.page.rb_tog.rb_tog.update_tog",
+			args: { items: JSON.stringify(items) },
+			freeze: true,
+			freeze_message: __("Updating TOG…"),
+			callback(r) {
+				if (r.message) {
+					frappe.show_alert({
+						message: __(`${r.message.updated} item(s) updated successfully.`),
+						indicator: "green",
+					});
+				}
+			},
+		});
+	}
 	function reset_selected() {
 		_all_data.forEach(row => {
 			row.new_tog = row.tog;

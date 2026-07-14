@@ -193,6 +193,20 @@ def save_tog(items):
 
 
 @frappe.whitelist()
+def update_tog(items):
+	items = json.loads(items) if isinstance(items, str) else items
+	for item in items:
+		tog = float(item["tog"] or 0)
+		frappe.db.set_value("Item", item["item_code"], {
+			"safety_stock": tog,
+			"custom_top_of_yellow": math.ceil((2 / 3) * tog),
+			"custom_top_of_red": math.ceil((1 / 3) * tog),
+		})
+	frappe.db.commit()
+	return {"updated": len(items)}
+
+
+@frappe.whitelist()
 def export_bb_tog_xlsx(data, filename="BB_TOG"):
 	from frappe.utils.xlsxutils import build_xlsx_response
 
