@@ -15,6 +15,7 @@ from .calculations import (
 	_STATUS_PRIORITY,
 	_compute_order_status,
 	_non_buffer_priority,
+	apply_spike_threshold,
 	build_calculation_breakdown_po_report,
 	calculate_final_order_recommendation,
 	calculate_initial_order_recommendation,
@@ -34,10 +35,13 @@ from .data_fetchers import (
 	get_wip_map,
 )
 from .bom_traversal import (
+	propagate_priority_through_bom_tree,
+	soft_allocate_child_requirements,
 	traverse_bom_for_parent_demand,
 	traverse_bom_for_parent_demand_simple,
 	traverse_bom_for_po,
 )
+from .columns import get_columns
 
 
 
@@ -113,342 +117,6 @@ def save_daily_on_hand_colour() -> None:
 		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(title="PO Recommendation daily colour (save)", message=frappe.get_traceback())
-
-
-def get_columns(filters: dict | None = None) -> list[dict]:
-	if not filters:
-		filters = {}
-
-	sell = filters.get("sell", 0)
-	if isinstance(sell, str):
-		sell = 1 if sell in ("1", "true", "True") else 0
-	sell = int(sell) if sell else 0
-
-	buffer_flag = filters.get("buffer_flag", 0)
-	if isinstance(buffer_flag, str):
-		buffer_flag = 1 if buffer_flag in ("1", "true", "True") else 0
-	buffer_flag = int(buffer_flag) if buffer_flag else 0
-
-	columns = [
-		{
-			"label": _("Item Code"),
-			"fieldname": "item_code",
-			"fieldtype": "Link",
-			"options": "Item",
-			"width": 120,
-		},
-		{
-			"label": _("SKU Type"),
-			"fieldname": "sku_type",
-			"fieldtype": "Data",
-			"width": 100,
-		},
-	]
-
-	if not buffer_flag:
-		columns.append(
-			{
-				"label": _("Priority"),
-				"fieldname": "priority",
-				"fieldtype": "Data",
-				"width": 120,
-			}
-		)
-
-	if not buffer_flag:
-		columns.append(
-			{
-				"label": _("Requirement"),
-				"fieldname": "requirement",
-				"fieldtype": "Int",
-				"width": 120,
-			}
-		)
-
-	if buffer_flag:
-		columns.extend(
-			[
-				{
-					"label": _("TOG"),
-					"fieldname": "tog",
-					"fieldtype": "Int",
-					"width": 100,
-				},
-				{
-					"label": _("TOY"),
-					"fieldname": "toy",
-					"fieldtype": "Int",
-					"width": 100,
-				},
-				{
-					"label": _("TOR"),
-					"fieldname": "tor",
-					"fieldtype": "Int",
-					"width": 100,
-				},
-			]
-		)
-
-	if buffer_flag:
-		columns.extend(
-			[
-				{
-					"label": _("Open SO"),
-					"fieldname": "open_so",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("Total SO"),
-					"fieldname": "total_so",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("On Hand Stock"),
-					"fieldname": "on_hand_stock",
-					"fieldtype": "Int",
-					"width": 130,
-				},
-				{
-					"label": _("WIP"),
-					"fieldname": "wip",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("Open PO"),
-					"fieldname": "open_po",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("Open Subcon PO"),
-					"fieldname": "open_subcon_po",
-					"fieldtype": "Int",
-					"width": 130,
-				},
-				{
-					"label": _("Additional Demand"),
-					"fieldname": "additional_demand",
-					"fieldtype": "Int",
-					"width": 130,
-				},
-				{
-					"label": _("Qualified Demand"),
-					"fieldname": "qualify_demand",
-					"fieldtype": "Int",
-					"width": 130,
-				},
-				{
-					"label": _("On Hand Status"),
-					"fieldname": "on_hand_status",
-					"fieldtype": "Data",
-					"width": 130,
-				},
-				{
-					"label": _("On Hand Colour"),
-					"fieldname": "on_hand_colour",
-					"fieldtype": "Data",
-					"width": 130,
-				},
-				{
-					"label": _("Net Flow"),
-					"fieldname": "net_flow",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-			]
-		)
-	else:
-		columns.extend(
-			[
-				{
-					"label": _("Total SO"),
-					"fieldname": "total_so",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("Open SO"),
-					"fieldname": "open_so_qualified",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("On Hand Stock"),
-					"fieldname": "on_hand_stock",
-					"fieldtype": "Int",
-					"width": 130,
-				},
-				{
-					"label": _("WIP"),
-					"fieldname": "wip",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("Open PO"),
-					"fieldname": "open_po",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("Open Subcon PO"),
-					"fieldname": "open_subcon_po",
-					"fieldtype": "Int",
-					"width": 130,
-				},
-				{
-					"label": _("Additional Demand"),
-					"fieldname": "additional_demand",
-					"fieldtype": "Int",
-					"width": 130,
-					"hidden": 1,
-				},
-				{
-					"label": _("Qualified Demand"),
-					"fieldname": "qualify_demand",
-					"fieldtype": "Int",
-					"width": 130,
-					"hidden": 1,
-				},
-			]
-		)
-
-	columns.extend(
-		[
-			{
-				"label": _("Order Recommendation"),
-				"fieldname": "order_recommendation",
-				"fieldtype": "Int",
-				"width": 180,
-			},
-			{
-				"label": _("MRQ"),
-				"fieldname": "mrq",
-				"fieldtype": "Int",
-				"width": 120,
-			},
-			{
-				"label": _("Balance Order Recommendation"),
-				"fieldname": "net_po_recommendation",
-				"fieldtype": "Int",
-				"width": 180,
-			},
-			{
-				"label": _("Net Order Recommendation"),
-				"fieldname": "or_with_moq_batch_size",
-				"fieldtype": "Int",
-				"width": 180,
-			},
-			{
-				"label": _("MOQ"),
-				"fieldname": "moq",
-				"fieldtype": "Int",
-				"width": 120,
-			},
-			{
-				"label": _("Order Multiple Qty"),
-				"fieldname": "batch_size",
-				"fieldtype": "Int",
-				"width": 120,
-			},
-		]
-	)
-
-	if sell:
-		columns.extend(
-			[
-				{
-					"label": _("Production qty based on child stock"),
-					"fieldname": "production_qty_based_on_child_stock",
-					"fieldtype": "Int",
-					"width": 220,
-				},
-				{
-					"label": _("Child Stock Full-Kit Status"),
-					"fieldname": "child_full_kit_status",
-					"fieldtype": "Data",
-					"width": 160,
-				},
-				{
-					"label": _("Production qty based on child stock+WIP/Open PO"),
-					"fieldname": "production_qty_based_on_child_stock_wip_open_po",
-					"fieldtype": "Int",
-					"width": 280,
-				},
-				{
-					"label": _("Child Stock + WIP/Open PO Full-Kit Status"),
-					"fieldname": "child_wip_open_po_full_kit_status",
-					"fieldtype": "Data",
-					"width": 160,
-				},
-				{
-					"label": _("Child Item Code"),
-					"fieldname": "child_item_code",
-					"fieldtype": "Link",
-					"options": "Item",
-					"width": 150,
-				},
-				{
-					"label": _("Child Item Type"),
-					"fieldname": "child_item_type",
-					"fieldtype": "Data",
-					"width": 130,
-				},
-				{
-					"label": _("Child SKU Type"),
-					"fieldname": "child_sku_type",
-					"fieldtype": "Data",
-					"width": 130,
-				},
-				{
-					"label": _("Child Requirement"),
-					"fieldname": "child_requirement",
-					"fieldtype": "Int",
-					"width": 150,
-				},
-				{
-					"label": _("Child stock"),
-					"fieldname": "child_stock",
-					"fieldtype": "Int",
-					"width": 120,
-				},
-				{
-					"label": _("Child Stock soft Allocation qty"),
-					"fieldname": "child_stock_soft_allocation_qty",
-					"fieldtype": "Int",
-					"width": 200,
-				},
-				{
-					"label": _("Child Stock shortage"),
-					"fieldname": "child_stock_shortage",
-					"fieldtype": "Int",
-					"width": 160,
-				},
-				{
-					"label": _("Child WIP/Open PO"),
-					"fieldname": "child_wip_open_po",
-					"fieldtype": "Int",
-					"width": 150,
-				},
-				{
-					"label": _("Child WIP/Open PO soft allocation qty"),
-					"fieldname": "child_wip_open_po_soft_allocation_qty",
-					"fieldtype": "Int",
-					"width": 250,
-				},
-				{
-					"label": _("Child WIP/Open PO Shortage"),
-					"fieldname": "child_wip_open_po_shortage",
-					"fieldtype": "Int",
-					"width": 200,
-				},
-			]
-		)
-
-	return columns
 
 
 def get_data(filters: dict | None = None) -> list[dict]:
@@ -626,9 +294,6 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			till_today_map,
 			spike_map,
 			item_buffer_map_all,
-			item_tog_map_all,
-			item_type_map_all,
-			spike_master_map,
 		)
 		qualified_demand_map[item_code] = qualified_demand
 
@@ -688,6 +353,8 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			open_po_map,
 			mrq_map,
 			parent_demand_map,
+			item_type_map_all,
+			spike_master_map,
 		)
 		final_order_recommendations[item_code] = order_rec
 
@@ -714,12 +381,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 	)
 	if _buf_rows:
 		_buf_codes = [r.item_code for r in _buf_rows]
-		_buf_stock_rows = frappe.db.sql(
-			"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
-			(tuple(_buf_codes) if len(_buf_codes) > 1 else (_buf_codes[0],),),
-			as_dict=True,
-		)
-		_buf_stock_map = {r.item_code: flt(r.stock) for r in _buf_stock_rows}
+		_buf_stock_map = get_stock_map(_buf_codes)
 
 		for _br in _buf_rows:
 			_bic = _br.item_code
@@ -733,10 +395,21 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			_bmoq = flt(_br.moq or 0)
 			_bbatch = flt(_br.batch_size or 0)
 
-			if _bsku in ["BOTA", "PTA"]:
-				_bbase = max(0, _btog + _bqd - _bstock - _bwip - _bpo - _bmrq)
-			else:
-				_bbase = max(0, _btog + _bqd - _bstock - _bwip - _bmrq)
+			_bbase = calculate_final_order_recommendation(
+				_bic,
+				item_buffer_map={_bic: _br.buffer_flag or "Buffer"},
+				item_tog_map={_bic: _btog},
+				item_sku_type_map={_bic: _bsku},
+				stock_map={_bic: _bstock},
+				wip_map={_bic: _bwip},
+				open_so_map={},
+				qualified_demand_map={_bic: _bqd},
+				open_po_map={_bic: _bpo},
+				mrq_map={_bic: _bmrq},
+				parent_demand_map={},
+				item_type_map={_bic: _br.item_type},
+				spike_master_map=spike_master_map,
+			)
 
 			_bnet = calculate_net_order_recommendation(_bbase, _bmoq, _bbatch)
 
@@ -766,12 +439,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			_nonbuf_codes = [r.item_code for r in _nonbuf_rows]
 			_nonbuf_tuple = tuple(_nonbuf_codes) if len(_nonbuf_codes) > 1 else (_nonbuf_codes[0],)
 
-			_nonbuf_stock_rows = frappe.db.sql(
-				"SELECT item_code, SUM(actual_qty) AS stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
-				(_nonbuf_tuple,),
-				as_dict=True,
-			)
-			_nonbuf_stock_map = {r.item_code: flt(r.stock) for r in _nonbuf_stock_rows}
+			_nonbuf_stock_map = get_stock_map(_nonbuf_codes)
 
 			_nonbuf_so_rows = frappe.db.sql(
 				"""
@@ -800,10 +468,17 @@ def get_data(filters: dict | None = None) -> list[dict]:
 				_nmoq = flt(_nr.moq or 0)
 				_nbatch = flt(_nr.batch_size or 0)
 
-				if _nsku in ["BOTO", "PTO", "TRMTO"]:
-					_nbase = max(0, _nso - _nstock - _nwip - _npo)
-				else:
-					_nbase = max(0, _nso - _nstock - _nwip)
+				_nbase = calculate_initial_order_recommendation(
+					_nic,
+					item_buffer_map={_nic: "Non-Buffer"},
+					item_tog_map={},
+					item_sku_type_map={_nic: _nsku},
+					stock_map={_nic: _nstock},
+					wip_map={_nic: _nwip},
+					open_so_map={_nic: _nso},
+					qualified_demand_map={},
+					open_po_map={_nic: _npo},
+				)
 
 				_nnet = calculate_net_order_recommendation(_nbase, _nmoq, _nbatch)
 
@@ -833,7 +508,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 				parent_demand_details,
 				global_visited_items,
 				item_groups_cache,
-				so_qty_map,  # all-time open SO (used for non-buffer children; buffer children use qualified_demand_map via is_child_buffer branch)
+				so_qty_map,  # all-time open SO (used for non-buffer children only)
 				initial_stock_map,
 				wip_map,
 				open_po_map,
@@ -844,6 +519,9 @@ def get_data(filters: dict | None = None) -> list[dict]:
 				item_sku_type_map_all,
 				item_tog_map_all,
 				lambda item_code: None,
+				qualified_demand_map=qualified_demand_map,  # till_today + spike (raw) for buffer children
+				item_type_map=item_type_map_all,
+				spike_master_map=spike_master_map,
 				level=0,
 			)
 
@@ -863,6 +541,8 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			open_po_map,
 			mrq_map,
 			parent_demand_map_net,
+			item_type_map_all,
+			spike_master_map,
 		)
 		final_order_recommendations_updated[item_code] = order_rec
 
@@ -989,18 +669,8 @@ def get_data(filters: dict | None = None) -> list[dict]:
 				"buffer_flag": _ci.buffer_flag or "Non-Buffer",
 				"sku_type": calculate_sku_type(_ci.buffer_flag or "Non-Buffer", _ci.item_type),
 			}
-		_child_stock_rows = frappe.db.sql(
-			"""
-			SELECT item_code, SUM(actual_qty) AS stock
-			FROM `tabBin`
-			WHERE item_code IN %s
-			GROUP BY item_code
-			""",
-			(_child_tuple,),
-			as_dict=True,
-		)
-		for _csr in _child_stock_rows:
-			child_stock_map[_csr.item_code] = math.ceil(flt(_csr.stock))
+		for _child_code, _child_stock_val in get_stock_map(_all_child_codes).items():
+			child_stock_map[_child_code] = math.ceil(flt(_child_stock_val))
 	# ─────────────────────────────────────────────────────────────────────────
 
 	data = []
@@ -1029,9 +699,6 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			till_today_map,
 			spike_map,
 			item_buffer_map_all,
-			item_tog_map_all,
-			item_type_map_all,
-			spike_master_map,
 		)
 		qualify_demand = flt(qualify_demand)
 
@@ -1066,9 +733,16 @@ def get_data(filters: dict | None = None) -> list[dict]:
 		parent_demand = flt(parent_demand_map.get(item_code, 0))
 		parent_demand_details_list = parent_demand_details.get(item_code, [])
 
+		# Spike threshold is evaluated against the combined total (own qualified
+		# demand + parent demand pushed down via BOM), not qualify_demand alone.
+		total_demand = (
+			apply_spike_threshold(qualify_demand + parent_demand, tog, item_type, spike_master_map)
+			if is_item_buffer
+			else None
+		)
+
 		if is_item_buffer:
-			total_demand_for_status = qualify_demand + parent_demand
-			denominator = flt(tog) + flt(total_demand_for_status)
+			denominator = flt(tog) + flt(total_demand)
 			if denominator > 0:
 				on_hand_status_value = (flt(on_hand_stock) / denominator) * 100
 			else:
@@ -1101,34 +775,41 @@ def get_data(filters: dict | None = None) -> list[dict]:
 		open_subcon_po = 0
 
 		# Calculate Net Flow: on_hand_stock + wip + open_po + open_subcon_po - qualified_demand
-		# Use actual qualified_demand (not including parent_demand)
-		net_flow = on_hand_stock + wip + open_po + open_subcon_po - qualify_demand
+		# Use actual qualified_demand (not including parent_demand), still subject to the
+		# spike threshold on its own (parent_demand=0 for this check).
+		net_flow_qualified_demand = (
+			apply_spike_threshold(qualify_demand, tog, item_type, spike_master_map)
+			if is_item_buffer
+			else qualify_demand
+		)
+		net_flow = on_hand_stock + wip + open_po + open_subcon_po - net_flow_qualified_demand
 
-		# Base row with parent item data
-		is_item_buffer = item_buffer_flag == "Buffer"
-
-		wip_open_po_combined = wip + open_po + open_subcon_po
-
+		# Base row with parent item data.
+		# The formula is now identical regardless of sku_type (open_po is always
+		# subtracted alongside wip) — see calculations.calculate_final_order_recommendation,
+		# which is the single source of truth for the post-MRQ value below.
 		if is_item_buffer:
-			# Buffer: TOG + (Qualified Demand + Parent Demand) - Stock - (WIP + Open PO + Open Subcon PO) - MRQ
-			total_demand = qualify_demand + parent_demand
-			if sku_type in ["BOTA", "PTA"]:
-				# For BOTA/PTA: subtract open_po separately (existing logic)
-				base_order_rec = tog + total_demand - on_hand_stock - wip - open_po
-			else:
-				# For others: use combined value
-				base_order_rec = tog + total_demand - on_hand_stock - wip_open_po_combined
-			final_order_rec = max(0, base_order_rec - mrq)
+			base_order_rec = tog + total_demand - on_hand_stock - wip - open_po
 		else:
 			open_so_for_calc = open_so  # Use all-time open SO (so_qty_map) for non-buffer
 			requirement = open_so_for_calc + parent_demand
-			if sku_type in ["PTO", "BOTO"]:
-				# For PTO/BOTO: subtract open_po separately (existing logic)
-				base_order_rec = requirement - on_hand_stock - wip - open_po
-			else:
-				# For others: use combined value
-				base_order_rec = requirement - on_hand_stock - wip_open_po_combined
-			final_order_rec = max(0, base_order_rec - mrq)
+			base_order_rec = requirement - on_hand_stock - wip - open_po
+
+		final_order_rec = calculate_final_order_recommendation(
+			item_code,
+			item_buffer_map={item_code: item_buffer_flag},
+			item_tog_map={item_code: tog},
+			item_sku_type_map={item_code: sku_type},
+			stock_map={item_code: on_hand_stock},
+			wip_map={item_code: wip},
+			open_so_map={item_code: open_so},
+			qualified_demand_map={item_code: qualify_demand},
+			open_po_map={item_code: open_po},
+			mrq_map={item_code: mrq},
+			parent_demand_map={item_code: parent_demand},
+			item_type_map={item_code: item_type},
+			spike_master_map=spike_master_map,
+		)
 
 		# Order Recommendation = before MRQ subtraction (capped at 0)
 		# Balance Order Recommendation = after MRQ subtraction
@@ -1161,7 +842,6 @@ def get_data(filters: dict | None = None) -> list[dict]:
 		)
 
 		if is_item_buffer:
-			total_demand_for_display = qualify_demand + parent_demand
 			base_row = {
 				"item_code": item_code,
 				"item_name": item_name,
@@ -1180,8 +860,8 @@ def get_data(filters: dict | None = None) -> list[dict]:
 					flt(additional_demand)
 				),  # till_today + spike (value compared with spike threshold)
 				"qualify_demand": math.ceil(
-					flt(total_demand_for_display)
-				),  # Show total demand (qualified + parent)
+					flt(total_demand)
+				),  # Show total demand (qualified + parent), thresholded as a whole
 			}
 		else:
 			base_row = {
@@ -1284,18 +964,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 					child_sku_type = calculate_sku_type(child_buffer_flag, child_item_type)
 
 					if child_item_code not in child_stock_map:
-						stock_data = frappe.db.sql(
-							"""
-							SELECT SUM(actual_qty) as stock
-							FROM `tabBin`
-							WHERE item_code = %s
-							""",
-							(child_item_code,),
-							as_dict=True,
-						)
-						total_stock = math.ceil(
-							flt(stock_data[0].stock if stock_data and stock_data[0].stock else 0)
-						)
+						total_stock = math.ceil(flt(get_stock_map([child_item_code]).get(child_item_code, 0)))
 						child_stock_map[child_item_code] = total_stock
 
 					# Use total stock for display
@@ -1331,96 +1000,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			data.append(base_row)
 
 	# ── Priority propagation through BOM tree (N-level) ───────────────────────
-	# Phase 1: build own FIFO priority map for all report items
-	_item_priority_map = {}
-	for _row in data:
-		_ic = _row.get("item_code")
-		if _ic and _ic not in _item_priority_map:
-			_item_priority_map[_ic] = _row.get("priority") or ""
-
-	_report_item_set = set(_item_priority_map.keys())
-	if _report_item_set:
-		# Phase 2: BFS upward — collect ALL ancestors (any depth) and
-		# build the complete child→parents map in one pass per BFS level.
-		_child_to_parents = defaultdict(set)
-		_all_items = set(_report_item_set)
-		_frontier = set(_report_item_set)
-		while _frontier:
-			_f_tuple = tuple(_frontier)
-			_up_rows = frappe.db.sql(
-				"""
-				SELECT b.item AS parent_item, bi.item_code AS child_item
-				FROM `tabBOM` b
-				INNER JOIN `tabBOM Item` bi ON bi.parent = b.name
-				WHERE bi.item_code IN %s
-				  AND b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1
-				""",
-				(_f_tuple,),
-				as_dict=True,
-			)
-			_new_parents = set()
-			for _br in _up_rows:
-				_child_to_parents[_br.child_item].add(_br.parent_item)
-				if _br.parent_item not in _all_items:
-					_new_parents.add(_br.parent_item)
-			_all_items.update(_new_parents)
-			_frontier = _new_parents  # advance to next BFS level
-
-		# Phase 3: compute own FIFO priority for ancestors not already in the report
-		_external_items = _all_items - _report_item_set
-		if _external_items:
-			_ext_tuple = tuple(_external_items)
-			_ext_so_map = get_open_so_map_for_priority(list(_external_items))
-			_ext_item_rows = frappe.db.sql(
-				"SELECT item_code, custom_buffer_flag, custom_item_type FROM `tabItem` WHERE item_code IN %s",
-				(_ext_tuple,),
-				as_dict=True,
-			)
-			_ext_stock_rows = frappe.db.sql(
-				"SELECT item_code, SUM(actual_qty) as stock FROM `tabBin` WHERE item_code IN %s GROUP BY item_code",
-				(_ext_tuple,),
-				as_dict=True,
-			)
-			_ext_stock_map = {r.item_code: flt(r.stock) for r in _ext_stock_rows}
-			for _ei in _ext_item_rows:
-				_eic = _ei.item_code
-				_esku = calculate_sku_type(_ei.custom_buffer_flag or "Non-Buffer", _ei.custom_item_type) or ""
-				_estock = _ext_stock_map.get(_eic, 0)
-				_ewip = 0 if _esku in ["RBMTA", "RBMTO"] else flt(wip_map.get(_eic, 0))
-				_epo = flt(open_po_map.get(_eic, 0))
-				_elevel = (_estock + _epo) if _esku in ["BOTO", "PTO", "TRMTO"] else (_estock + _ewip)
-				_item_priority_map[_eic] = _non_buffer_priority(_eic, _elevel, _ext_so_map)
-
-		# Phase 4: BFS downward — propagate worst parent priority through the full tree
-		# Roots = items that have no parents in the complete ancestor set
-		_resolved = _all_items - set(_child_to_parents.keys())
-		_changed = True
-		while _changed:
-			_changed = False
-			for _child, _parents in _child_to_parents.items():
-				if _child in _resolved:
-					continue
-				if not _parents.issubset(_resolved):
-					continue
-				_worst = 0
-				for _parent in _parents:
-					_pc = _item_priority_map.get(_parent, "")
-					if _pc:
-						_pv = _STATUS_PRIORITY.get(_pc.upper(), 0)
-						if _pv > _worst:
-							_worst = _pv
-				# If all parents have empty priority, keep child's own FIFO priority
-				_item_priority_map[_child] = (
-					_PRIORITY_TO_COLOUR.get(_worst, "") if _worst > 0 else _item_priority_map.get(_child, "")
-				)
-				_resolved.add(_child)
-				_changed = True
-
-		# Write propagated priorities back to all data rows
-		for _row in data:
-			_ic = _row.get("item_code")
-			if _ic and _row.get("buffer_flag") != "Buffer":
-				_row["priority"] = _item_priority_map.get(_ic, "")
+	propagate_priority_through_bom_tree(data, wip_map, open_po_map)
 
 	# Apply filters
 	filtered_data = []
@@ -1476,106 +1056,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 
 	filtered_data.sort(key=get_on_hand_status_value)
 
-	remaining_child_stock_fifo = {}
-	# Re-initialize remaining_child_wip_open_po for FIFO allocation
-	remaining_child_wip_open_po_fifo = {}
-
-	for row in filtered_data:
-		child_item_code = row.get("child_item_code")
-		if child_item_code:
-			# Initialize remaining stock if not already done
-			if child_item_code not in remaining_child_stock_fifo:
-				# Get total stock for this child item
-				if child_item_code in child_stock_map:
-					remaining_child_stock_fifo[child_item_code] = child_stock_map[child_item_code]
-				else:
-					# Fetch stock if not in map
-					try:
-						stock_data = frappe.db.sql(
-							"""
-							SELECT SUM(actual_qty) as stock
-							FROM `tabBin`
-							WHERE item_code = %s
-							""",
-							(child_item_code,),
-							as_dict=True,
-						)
-						total_stock = int(
-							flt(stock_data[0].stock if stock_data and stock_data[0].stock else 0)
-						)
-						child_stock_map[child_item_code] = total_stock
-						remaining_child_stock_fifo[child_item_code] = total_stock
-					except Exception:
-						remaining_child_stock_fifo[child_item_code] = 0
-
-			# Initialize remaining WIP/Open PO if not already done
-			if child_item_code not in remaining_child_wip_open_po_fifo:
-				# Get total WIP/Open PO for this child item
-				if child_item_code in child_wip_open_po_map:
-					remaining_child_wip_open_po_fifo[child_item_code] = flt(
-						child_wip_open_po_map[child_item_code]
-					)
-				else:
-					remaining_child_wip_open_po_fifo[child_item_code] = flt(row.get("child_wip_open_po", 0))
-			child_requirement = flt(row.get("child_requirement", 0))
-			available_stock = flt(remaining_child_stock_fifo.get(child_item_code, 0))
-			stock_allocated = min(child_requirement, available_stock)
-			stock_shortage = child_requirement - stock_allocated
-
-			row["child_stock_soft_allocation_qty"] = math.ceil(stock_allocated)
-			row["child_stock_shortage"] = math.ceil(stock_shortage)
-
-			child_bom_qty = flt(row.get("child_bom_qty", 0))
-			child_bom_quantity = flt(row.get("child_bom_quantity", 1.0)) or 1.0
-			parent_per_child_factor = (child_bom_quantity / child_bom_qty) if child_bom_quantity else 0
-
-			net_order_recommendation = flt(row.get("or_with_moq_batch_size", 0))
-
-			production_qty_based_on_child_stock = math.ceil(flt(stock_allocated) * parent_per_child_factor)
-			# Cap at net order recommendation — can't produce more than what's actually needed
-			production_qty_based_on_child_stock = min(production_qty_based_on_child_stock, math.ceil(net_order_recommendation))
-			row["production_qty_based_on_child_stock"] = production_qty_based_on_child_stock
-
-			remaining_requirement_after_stock = stock_shortage
-			available_wip_open_po = flt(remaining_child_wip_open_po_fifo.get(child_item_code, 0))
-			wip_open_po_allocated = min(remaining_requirement_after_stock, available_wip_open_po)
-			wip_open_po_shortage = remaining_requirement_after_stock - wip_open_po_allocated
-
-			row["child_wip_open_po_soft_allocation_qty"] = math.ceil(wip_open_po_allocated)
-			row["child_wip_open_po_shortage"] = math.ceil(wip_open_po_shortage)
-
-			if flt(net_order_recommendation) == 0:
-				row["child_wip_open_po_full_kit_status"] = None
-			elif flt(wip_open_po_shortage) == 0:
-				row["child_wip_open_po_full_kit_status"] = "Full-kit"
-			elif flt(wip_open_po_allocated) == 0:
-				row["child_wip_open_po_full_kit_status"] = "Pending"
-			else:
-				row["child_wip_open_po_full_kit_status"] = "Partial"
-
-			total_allocated = flt(stock_allocated) + flt(wip_open_po_allocated)
-			production_qty_based_on_child_stock_wip_open_po = math.ceil(
-				total_allocated * parent_per_child_factor
-			)
-			# Cap at net order recommendation — can't produce more than what's actually needed
-			production_qty_based_on_child_stock_wip_open_po = min(production_qty_based_on_child_stock_wip_open_po, math.ceil(net_order_recommendation))
-			row["production_qty_based_on_child_stock_wip_open_po"] = (
-				production_qty_based_on_child_stock_wip_open_po
-			)
-
-			order_recommendation = flt(row.get("order_recommendation", 0))
-
-			if flt(order_recommendation) == 0:
-				row["child_full_kit_status"] = None
-			elif flt(stock_shortage) == 0:
-				row["child_full_kit_status"] = "Full-kit"
-			elif flt(stock_allocated) == 0:
-				row["child_full_kit_status"] = "Pending"
-			else:
-				row["child_full_kit_status"] = "Partial"
-
-			remaining_child_stock_fifo[child_item_code] = available_stock - stock_allocated
-			remaining_child_wip_open_po_fifo[child_item_code] = available_wip_open_po - wip_open_po_allocated
+	soft_allocate_child_requirements(filtered_data, child_stock_map, child_wip_open_po_map)
 
 	return filtered_data
 

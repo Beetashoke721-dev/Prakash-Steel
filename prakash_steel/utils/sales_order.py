@@ -3,7 +3,7 @@ from frappe import _
 
 
 @frappe.whitelist()
-def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False) -> object:
+def make_sales_invoice(source_name, target_doc=None) -> object:
 	from erpnext.selling.doctype.sales_order.sales_order import (
 		make_sales_invoice as _make_sales_invoice,
 	)
@@ -11,7 +11,7 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False) -
 	doc = _make_sales_invoice(
 		source_name,
 		target_doc,
-		ignore_permissions=ignore_permissions,
+		ignore_permissions=False,
 	)
 
 	if not (doc and doc.items):

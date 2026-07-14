@@ -128,34 +128,10 @@ class TestGetQualifiedDemandForItem(unittest.TestCase):
 		self.assertEqual(till_today, 50.0)
 		self.assertEqual(qd, 70.0)
 
-	def test_buffer_below_threshold_zeroed(self):
-		# tog=100, threshold=50% → threshold_qty=50; qd=40 < 50 → zeroed
-		qd, _, _ = self._fn(
-			"ITEM",
-			{"ITEM": 40.0},
-			{"ITEM": 0.0},
-			{"ITEM": "Buffer"},
-			item_tog_map={"ITEM": 100.0},
-			item_type_map={"ITEM": "RM"},
-			spike_master_map={"RM": {"spike_threshold": 50.0}},
-		)
-		self.assertEqual(qd, 0.0)
-
-	def test_buffer_above_threshold_unchanged(self):
-		# tog=100, threshold=50% → threshold_qty=50; qd=60 >= 50 → unchanged
-		qd, _, _ = self._fn(
-			"ITEM",
-			{"ITEM": 60.0},
-			{"ITEM": 0.0},
-			{"ITEM": "Buffer"},
-			item_tog_map={"ITEM": 100.0},
-			item_type_map={"ITEM": "RM"},
-			spike_master_map={"RM": {"spike_threshold": 50.0}},
-		)
-		self.assertEqual(qd, 60.0)
-
-	def test_buffer_no_spike_master_no_threshold(self):
-		# No spike_master_map provided → threshold not applied
+	def test_buffer_no_threshold_applied_here_anymore(self):
+		# get_qualified_demand_for_item always returns the RAW till_today+spike —
+		# the spike threshold is applied downstream (once parent_demand is known)
+		# via apply_spike_threshold / calculate_total_demand, not here.
 		qd, _, _ = self._fn(
 			"ITEM",
 			{"ITEM": 10.0},
@@ -174,6 +150,86 @@ class TestGetQualifiedDemandForItem(unittest.TestCase):
 		self.assertEqual(qd, 0.0)
 		self.assertEqual(till_today, 0.0)
 		self.assertEqual(spike, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# apply_spike_threshold
+# ---------------------------------------------------------------------------
+
+
+class TestApplySpikeThreshold(unittest.TestCase):
+	def setUp(self):
+		self._fn = _import().apply_spike_threshold
+
+	def test_below_threshold_zeroed(self):
+		# tog=100, threshold=50% → threshold_qty=50; total=40 < 50 → zeroed
+		result = self._fn(40.0, 100.0, "RM", {"RM": {"spike_threshold": 50.0}})
+		self.assertEqual(result, 0.0)
+
+	def test_above_threshold_unchanged(self):
+		# tog=100, threshold=50% → threshold_qty=50; total=60 >= 50 → unchanged
+		result = self._fn(60.0, 100.0, "RM", {"RM": {"spike_threshold": 50.0}})
+		self.assertEqual(result, 60.0)
+
+	def test_no_spike_master_map_no_threshold(self):
+		self.assertEqual(self._fn(10.0, 100.0, "RM", None), 10.0)
+
+	def test_no_item_type_no_threshold(self):
+		self.assertEqual(self._fn(10.0, 100.0, None, {"RM": {"spike_threshold": 50.0}}), 10.0)
+
+	def test_zero_tog_no_threshold(self):
+		self.assertEqual(self._fn(10.0, 0.0, "RM", {"RM": {"spike_threshold": 50.0}}), 10.0)
+
+	def test_no_matching_spike_config_no_threshold(self):
+		self.assertEqual(self._fn(10.0, 100.0, "BB", {"RM": {"spike_threshold": 50.0}}), 10.0)
+
+
+# ---------------------------------------------------------------------------
+# calculate_total_demand
+# ---------------------------------------------------------------------------
+
+
+class TestCalculateTotalDemand(unittest.TestCase):
+	def setUp(self):
+		self._fn = _import().calculate_total_demand
+
+	def test_combines_qualified_and_parent_demand(self):
+		result = self._fn(
+			"ITEM", True, {"ITEM": 30.0}, {"ITEM": 20.0},
+		)
+		self.assertEqual(result, 50.0)
+
+	def test_threshold_uses_combined_total_not_qualified_demand_alone(self):
+		# Own qualified demand (30) alone would be below a 50 threshold_qty,
+		# but qualified_demand + parent_demand (30 + 20 = 50) clears it.
+		result = self._fn(
+			"ITEM", True, {"ITEM": 30.0}, {"ITEM": 20.0},
+			item_tog_map={"ITEM": 100.0},
+			item_type_map={"ITEM": "RM"},
+			spike_master_map={"RM": {"spike_threshold": 50.0}},
+		)
+		self.assertEqual(result, 50.0)
+
+	def test_combined_total_still_below_threshold_zeroed(self):
+		# qualified_demand(30) + parent_demand(20) = 50 < threshold_qty(80)
+		result = self._fn(
+			"ITEM", True, {"ITEM": 30.0}, {"ITEM": 20.0},
+			item_tog_map={"ITEM": 100.0},
+			item_type_map={"ITEM": "RM"},
+			spike_master_map={"RM": {"spike_threshold": 80.0}},
+		)
+		self.assertEqual(result, 0.0)
+
+	def test_non_buffer_never_thresholded(self):
+		# Even with a spike_master_map/tog that would zero a buffer item,
+		# non-buffer items are never subject to the threshold.
+		result = self._fn(
+			"ITEM", False, {"ITEM": 5.0}, {"ITEM": 5.0},
+			item_tog_map={"ITEM": 100.0},
+			item_type_map={"ITEM": "RM"},
+			spike_master_map={"RM": {"spike_threshold": 80.0}},
+		)
+		self.assertEqual(result, 10.0)
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +254,8 @@ class TestCalculateFinalOrderRecommendation(unittest.TestCase):
 		open_po=0,
 		mrq=0,
 		parent_demand=0,
+		item_type=None,
+		spike_master_map=None,
 	):
 		return self._fn(
 			item_code=item,
@@ -211,12 +269,14 @@ class TestCalculateFinalOrderRecommendation(unittest.TestCase):
 			open_po_map={item: open_po},
 			mrq_map={item: mrq},
 			parent_demand_map={item: parent_demand},
+			item_type_map={item: item_type},
+			spike_master_map=spike_master_map,
 		)
 
 	# Buffer paths
-	def test_buffer_bbmta_excludes_open_po(self):
-		# tog + (qd + parent) - stock - wip = 100 + 30 - 20 - 5 = 105
-		self.assertEqual(self._call(), 105.0)
+	def test_buffer_bbmta_includes_open_po(self):
+		# "else" sku types combine open_po with wip: 100 + 30 - 20 - 5 - 10 = 95
+		self.assertEqual(self._call(open_po=10), 95.0)
 
 	def test_buffer_bota_includes_open_po(self):
 		# 100 + 30 - 20 - 5 - 10 = 95
@@ -233,6 +293,26 @@ class TestCalculateFinalOrderRecommendation(unittest.TestCase):
 		# 100 + (30 + 20) - 20 - 5 = 125
 		self.assertEqual(self._call(parent_demand=20), 125.0)
 
+	def test_buffer_threshold_uses_qualified_demand_plus_parent_demand(self):
+		# qd(30) alone is below threshold_qty(40), but qd + parent_demand(20) = 50 clears it
+		# → 100 + 50 - 20 - 5 = 125 (not zeroed)
+		result = self._call(
+			parent_demand=20,
+			item_type="RM",
+			spike_master_map={"RM": {"spike_threshold": 40.0}},  # threshold_qty = 100*40/100 = 40
+		)
+		self.assertEqual(result, 125.0)
+
+	def test_buffer_threshold_zeroes_combined_total(self):
+		# qd(30) + parent_demand(20) = 50 < threshold_qty(60) → total_demand zeroed
+		# → 100 + 0 - 20 - 5 = 75
+		result = self._call(
+			parent_demand=20,
+			item_type="RM",
+			spike_master_map={"RM": {"spike_threshold": 60.0}},  # threshold_qty = 100*60/100 = 60
+		)
+		self.assertEqual(result, 75.0)
+
 	def test_buffer_negative_clamped_to_zero(self):
 		self.assertEqual(self._call(stock=500), 0.0)
 
@@ -241,9 +321,17 @@ class TestCalculateFinalOrderRecommendation(unittest.TestCase):
 		self.assertEqual(self._call(stock=300, mrq=100), 0.0)
 
 	# Non-buffer paths
-	def test_non_buffer_bbmto_excludes_open_po(self):
-		# open_so - stock - wip = 50 - 10 - 5 = 35
-		self.assertEqual(self._call(is_buffer=False, sku_type="BBMTO", open_so=50, stock=10, wip=5), 35.0)
+	def test_non_buffer_bbmto_includes_open_po(self):
+		# "else" sku types combine open_po with wip: 50 - 10 - 5 - 10 = 25
+		self.assertEqual(
+			self._call(is_buffer=False, sku_type="BBMTO", open_so=50, stock=10, wip=5, open_po=10), 25.0
+		)
+
+	def test_non_buffer_trmto_includes_open_po(self):
+		# TRMTO now grouped with PTO/BOTO: 50 - 10 - 5 - 10 = 25
+		self.assertEqual(
+			self._call(is_buffer=False, sku_type="TRMTO", open_so=50, stock=10, wip=5, open_po=10), 25.0
+		)
 
 	def test_non_buffer_boto_includes_open_po(self):
 		# open_so - stock - wip - open_po = 50 - 10 - 5 - 10 = 25
