@@ -73,10 +73,13 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 			letter-spacing:.3px;">${esc(val)}</span>`;
 	}
 
-	function batch_size_badge(val) {
-		if (val === null || val === undefined || val === "") return dash();
-		return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;
-			background:#fff3e0;color:#c0700a;font-weight:700;font-size:13px;">${fmt_num(val)}</span>`;
+	function batch_size_badge(val, _r, _c, d) {
+		const idx = d ? d._idx : "";
+		if (val === null || val === undefined || val === "") {
+			return `<span class="rbbr-batch-size" data-idx="${idx}" style="color:#ccc;">—</span>`;
+		}
+		return `<span class="rbbr-batch-size" data-idx="${idx}" style="display:inline-block;padding:2px 10px;
+			border-radius:4px;background:#fff3e0;color:#c0700a;font-weight:700;font-size:13px;">${fmt_num(val)}</span>`;
 	}
 
 	function projected_qty_badge(val) {
@@ -97,6 +100,13 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 			style="color:#1a73e8;font-weight:500;cursor:pointer;">${esc(val)}</span>`;
 	}
 
+	function no_of_setup_input(val, _r, _c, d) {
+		return `<input type="number" class="rbbr-no-of-setup-input" data-idx="${d._idx}" min="0" step="1"
+			value="${val !== null && val !== undefined ? val : ""}"
+			style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
+			font-size:12px;width:100%;box-sizing:border-box;text-align:center;background:#fffbe6;">`;
+	}
+
 	// ── Column builders keyed by fieldname ──────────────────────────────────
 	const FORMATTERS = {
 		item_code: item_link,
@@ -108,8 +118,9 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 		total: val => `<span style="font-weight:600;">${fmt_num(val)}</span>`,
 		projected_qty: projected_qty_badge,
 		batch_size: batch_size_badge,
-		production_qty: fmt_num,
 		production_count: fmt_num,
+		no_of_setup: no_of_setup_input,
+		production_qty: fmt_num,
 	};
 
 	function build_columns(backend_columns) {
@@ -157,11 +168,38 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 
 	let _dt = null;
 	let _dt_observer = null;
+	let _all_data = [];
+
+	function recalc_batch_size(idx) {
+		const row = _all_data[idx];
+		if (!row) return;
+		const no_of_setup = row.no_of_setup;
+		const production_qty = row.production_qty || 0;
+		const batch_size = (no_of_setup && no_of_setup > 0) ? Math.ceil(production_qty / no_of_setup) : 0;
+		row.batch_size = batch_size;
+		const html = batch_size_badge(batch_size, null, null, { _idx: idx });
+		const $el = $(`.rbbr-batch-size[data-idx="${idx}"]`);
+		if ($el.length) $el.replaceWith(html);
+	}
 
 	function bind_events() {
 		$(document).off("click", ".rbbr-item-link").on("click", ".rbbr-item-link", function () {
 			const item = $(this).data("item");
 			if (item) window.open(`/app/item/${encodeURIComponent(item)}`, "_blank");
+		});
+
+		$(document).off("input", ".rbbr-no-of-setup-input").on("input", ".rbbr-no-of-setup-input", function () {
+			const idx = parseInt($(this).data("idx"));
+			const raw = $(this).val();
+			let num = raw === "" ? null : parseInt(raw, 10);
+			if (num !== null && (isNaN(num) || num < 0)) {
+				num = 0;
+				$(this).val(0);
+			}
+			if (_all_data[idx]) {
+				_all_data[idx].no_of_setup = num;
+				recalc_batch_size(idx);
+			}
 		});
 	}
 
@@ -183,10 +221,11 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 		`);
 
 		const columns = build_columns(backend_columns);
+		_all_data = data.map((row, idx) => ({ ...row, _idx: idx }));
 
 		_dt = new DataTable(document.getElementById("rbbr-dt"), {
 			columns,
-			data,
+			data: _all_data,
 			serialNoColumn: true,
 			checkboxColumn: false,
 			inlineFilters: true,
@@ -195,8 +234,8 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 			layout: "fixed",
 		});
 
-		_dt_observer = setup_dt_observer("rbbr-dt", data);
-		apply_row_colors("rbbr-dt", data);
+		_dt_observer = setup_dt_observer("rbbr-dt", _all_data);
+		apply_row_colors("rbbr-dt", _all_data);
 		bind_events();
 	}
 
