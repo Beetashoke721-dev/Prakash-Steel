@@ -218,7 +218,15 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			format: val => (val !== null && val !== undefined) ? String(val) : dash(),
 		},
 		{
-			name: "Total Qty", id: "total", width: 130, align: "center", editable: false,
+			name: "Sale Qty", id: "sale_qty", width: 120, align: "center", editable: false,
+			format: val => `<span style="font-weight:600;">${fmt_num(val, 0)}</span>`,
+		},
+		{
+			name: "Consumption", id: "consumption", width: 130, align: "center", editable: false,
+			format: val => `<span style="font-weight:600;">${fmt_num(val, 0)}</span>`,
+		},
+		{
+			name: "Total Value", id: "total", width: 120, align: "center", editable: false,
 			format: val => `<span style="font-weight:600;">${fmt_num(val, 0)}</span>`,
 		},
 		{

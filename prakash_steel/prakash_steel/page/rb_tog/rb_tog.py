@@ -123,8 +123,6 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
 		item_customer_counts[r.item_code] += 1
 
-	assign_hbt_labels(raw_rows)
-
 	# ADU horizon = full period from TOG Horizon Settings
 	horizon_days = (to_date - from_date).days + 1
 
@@ -148,22 +146,34 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 	)
 	item_master_map = {r.item_code: r for r in item_master_rows}
 
-	# Consumption for RB/BO items from Bright Bar Production
+	# Consumption from Bright Bar Production (both material and raw_material fields)
 	bb_consumption_rows = frappe.db.sql(
 		"""
-		SELECT bbp.raw_material AS item_code, COALESCE(SUM(bbp.actual_rm_consumption), 0) AS qty
-		FROM `tabBright Bar Production` bbp
-		INNER JOIN `tabItem` i ON i.name = bbp.raw_material
-		WHERE bbp.docstatus = 1
-			AND LOWER(i.custom_item_type) IN ('rb', 'bo')
-			AND bbp.raw_material IN %(item_codes)s
-			AND bbp.production_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY bbp.raw_material
+		SELECT material AS item_code, SUM(actual_rm_consumption) AS qty
+		FROM `tabBright Bar Production`
+		WHERE docstatus = 1
+			AND NULLIF(material, '') IS NOT NULL
+			AND material IN %(item_codes)s
+			AND production_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY material
+
+		UNION ALL
+
+		SELECT raw_material AS item_code, SUM(actual_rm_consumption) AS qty
+		FROM `tabBright Bar Production`
+		WHERE docstatus = 1
+			AND NULLIF(raw_material, '') IS NOT NULL
+			AND raw_material IN %(item_codes)s
+			AND production_date BETWEEN %(from_date)s AND %(to_date)s
+		GROUP BY raw_material
 		""",
 		{"item_codes": item_codes, "from_date": from_date, "to_date": to_date},
 		as_dict=True,
 	)
-	bb_consumption_map = {r.item_code: float(r.qty or 0) for r in bb_consumption_rows}
+	bb_consumption_map: dict[str, float] = {}
+	for r in bb_consumption_rows:
+		if r.item_code:
+			bb_consumption_map[r.item_code] = bb_consumption_map.get(r.item_code, 0.0) + float(r.qty or 0)
 
 	# Consumption for Traded items from Billet Cutting
 	billet_consumption_rows = frappe.db.sql(
@@ -182,29 +192,39 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 	)
 	billet_consumption_map = {r.item_code: float(r.qty or 0) for r in billet_consumption_rows}
 
+	# Build consumption map per item and compute total_value = sale_qty + consumption
 	sales_map = {row["item_code"]: float(row["total"] or 0) for row in raw_rows}
-
-	_empty = {"H": 0.0, "B": 0.0, "T": 0.0}
-	data = []
 	for row in raw_rows:
 		item_type = (item_master_map.get(row["item_code"], {}).get("item_type") or "").lower()
-		sales_qty = sales_map.get(row["item_code"], 0.0)
-
+		sale_qty = sales_map.get(row["item_code"], 0.0)
 		if item_type in ("rb", "bo"):
 			consumption = bb_consumption_map.get(row["item_code"], 0.0)
 		elif item_type == "traded":
 			consumption = billet_consumption_map.get(row["item_code"], 0.0)
 		else:
 			consumption = 0.0
+		row["consumption"] = consumption
+		row["total_value"] = sale_qty + consumption
 
-		total_usage = sales_qty + consumption
-		adu = math.ceil(total_usage / horizon_days) if horizon_days > 0 and total_usage > 0 else 0
+	# Sort and rank by total_value (sale + consumption) — same as Rolled Product HBT report
+	raw_rows.sort(key=lambda r: r["total_value"], reverse=True)
+	assign_hbt_labels(raw_rows, total_key="total_value")
+
+	_empty = {"H": 0.0, "B": 0.0, "T": 0.0}
+	data = []
+	for row in raw_rows:
+		sale_qty = float(row["total"] or 0)
+		consumption = float(row.get("consumption", 0))
+		total_value = float(row.get("total_value", sale_qty))
+		adu = math.ceil(total_value / horizon_days) if horizon_days > 0 and total_value > 0 else 0
 		lt = float(item_master_map.get(row["item_code"], {}).get("lt") or 0)
 		_buckets = item_hbt_buckets.get(row["item_code"], _empty)
 
 		data.append({
 			"item_code": row["item_code"],
-			"total": float(row["total"] or 0),
+			"sale_qty": sale_qty,
+			"consumption": consumption,
+			"total": total_value,
 			"contr_pct": round(float(row.get("contr_pct") or 0), 1),
 			"cumu_pct": round(float(row.get("cumu_pct") or 0), 1),
 			"hbt": row["hbt"],
