@@ -400,7 +400,17 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		});
 	}
 	function update_tog_selected() {}
-	function reset_selected() {}
+	function reset_selected() {
+		_all_data.forEach(row => {
+			row.new_tog = row.tog;
+		});
+		document.querySelectorAll(".bbt-new-tog-input").forEach(input => {
+			const idx = parseInt(input.dataset.idx);
+			const row = _all_data[idx];
+			if (row) input.value = row.tog != null ? row.tog : "";
+		});
+		frappe.show_alert({ message: __("New TOG reset to Calc TOG for all rows."), indicator: "blue" });
+	}
 
 	function bind_events() {
 		$(document).off("click", ".bbt-item-link").on("click", ".bbt-item-link", function () {
