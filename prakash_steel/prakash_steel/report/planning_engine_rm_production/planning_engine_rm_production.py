@@ -97,7 +97,7 @@ def get_data(filters) -> list[dict]:
 		LEFT JOIN `tabProduction Plan` pp ON pp.name = fw.production_plan
 		LEFT JOIN `tabProduction Planning` pln ON pln.name = fw.production_planning
 		WHERE {" AND ".join(conditions)}
-		ORDER BY fw.posting_date DESC, fw.name DESC
+		ORDER BY fw.posting_date ASC, fw.name ASC
 	"""
 
 	return frappe.db.sql(query, filters, as_dict=True)
