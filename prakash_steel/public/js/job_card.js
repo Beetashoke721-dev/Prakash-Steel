@@ -56,6 +56,7 @@ frappe.ui.form.on("Job Card", {
 		calculate_finish_pcs(frm);
 		calculate_miss_pcs(frm);
 		calculate_fg_per_pcs_weight(frm);
+		set_billet_weight_from_work_order(frm);
 		validate_time_log_miss_fields(frm);
 		validate_time_log_billet_cutting_remaining(frm);
 	},
@@ -312,7 +313,7 @@ function set_billet_weight_from_work_order(frm, quiet = false) {
 	}
 
 	if (!frm.doc.work_order) {
-		if (cint(frm.doc.custom_billet_weight)) {
+		if (flt(frm.doc.custom_billet_weight)) {
 			set_form_value(frm, "custom_billet_weight", 0, quiet);
 		}
 		return;
@@ -324,9 +325,9 @@ function set_billet_weight_from_work_order(frm, quiet = false) {
 			(sum, row) => sum + flt(row.consumed_qty),
 			0
 		);
-		const total = cint(miss_billet_weight + consumed_qty);
+		const total = flt(miss_billet_weight + consumed_qty);
 
-		if (cint(frm.doc.custom_billet_weight) !== total) {
+		if (flt(frm.doc.custom_billet_weight) !== total) {
 			set_form_value(frm, "custom_billet_weight", total, quiet);
 		}
 	});

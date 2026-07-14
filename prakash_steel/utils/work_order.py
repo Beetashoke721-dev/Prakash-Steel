@@ -103,7 +103,7 @@ def validate_miss_billet_weight(doc, method=None):
 
 
 def update_custom_wastage_after_stock_entry(doc, method=None):
-	"""Persist calculated Work Order fields after stock entries update quantities."""
+	"""Persist calculated Work Order / Job Card fields after stock entries update quantities."""
 	if not doc.work_order:
 		return
 
@@ -123,15 +123,16 @@ def update_custom_wastage_after_stock_entry(doc, method=None):
 		if value is not None
 	}
 
-	if not update_values:
-		return
+	if update_values:
+		frappe.db.set_value(
+			"Work Order",
+			doc.work_order,
+			update_values,
+			update_modified=False,
+		)
 
-	frappe.db.set_value(
-		"Work Order",
-		doc.work_order,
-		update_values,
-		update_modified=False,
-	)
+	# Consumed qty on Required Items updates with Stock Entry; refresh linked Job Cards.
+	update_job_cards_billet_weight(doc.work_order)
 
 
 def copy_production_type_to_job_card(doc, method=None):
@@ -372,20 +373,13 @@ def set_job_card_colour_code(doc, method=None):
 	)
 
 
-def calculate_job_card_billet_weight(doc, method=None):
-	"""Set custom_billet_weight from linked Work Order miss billet weight + consumed qty.
-
-	Skip after submit so WO consumption growth cannot change a locked Job Card field.
-	"""
-	if doc.docstatus == 1:
-		return
-
-	if not doc.work_order:
-		doc.custom_billet_weight = 0
-		return
+def get_work_order_billet_weight(work_order: str) -> float:
+	"""miss_billet_weight + sum(required_items.consumed_qty) for a Work Order."""
+	if not work_order:
+		return 0.0
 
 	miss_billet_weight = flt(
-		frappe.db.get_value("Work Order", doc.work_order, "custom_miss_billet_weight")
+		frappe.db.get_value("Work Order", work_order, "custom_miss_billet_weight")
 	)
 	consumed_qty = flt(
 		frappe.db.sql(
@@ -394,10 +388,47 @@ def calculate_job_card_billet_weight(doc, method=None):
 			FROM `tabWork Order Item`
 			WHERE parent = %s
 			""",
-			doc.work_order,
+			work_order,
 		)[0][0]
 	)
-	doc.custom_billet_weight = cint(miss_billet_weight + consumed_qty)
+	return flt(miss_billet_weight + consumed_qty)
+
+
+def calculate_job_card_billet_weight(doc, method=None):
+	"""Set custom_billet_weight from linked Work Order miss billet weight + consumed qty.
+
+	Skip form validate after submit to avoid allow_on_submit errors. Submitted Job Cards
+	are refreshed from Stock Entry via update_job_cards_billet_weight.
+	"""
+	if doc.docstatus == 1:
+		return
+
+	if not doc.work_order:
+		doc.custom_billet_weight = 0
+		return
+
+	doc.custom_billet_weight = get_work_order_billet_weight(doc.work_order)
+
+
+def update_job_cards_billet_weight(work_order: str):
+	"""Sync custom_billet_weight on Job Cards when Work Order consumption changes."""
+	if not work_order:
+		return
+
+	billet_weight = get_work_order_billet_weight(work_order)
+	job_cards = frappe.get_all(
+		"Job Card",
+		filters={"work_order": work_order, "docstatus": ("<", 2)},
+		pluck="name",
+	)
+	for name in job_cards:
+		frappe.db.set_value(
+			"Job Card",
+			name,
+			"custom_billet_weight",
+			billet_weight,
+			update_modified=False,
+		)
 
 
 def validate_job_card_time_log_miss_fields(doc, method=None):
