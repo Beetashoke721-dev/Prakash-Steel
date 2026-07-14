@@ -280,6 +280,52 @@ def calculate_job_card_time_log_billet_cutting(doc, method=None):
 		running_used += row_used
 
 
+def _job_card_completed_qty_total(doc) -> float:
+	"""Sum completed_qty from Job Card time logs (skip when sub-operations drive totals)."""
+	if doc.sub_operations:
+		return flt(doc.total_completed_qty)
+
+	return sum(flt(row.completed_qty) for row in (doc.time_logs or []))
+
+
+def prepare_job_card_completed_qty(doc, method=None):
+	"""Back-fill time log completed_qty before ERPNext validates submit totals."""
+	if cint(doc.docstatus) != 1 or doc.sub_operations:
+		return
+
+	if _job_card_completed_qty_total(doc) > 0 or not flt(doc.for_quantity) or not doc.time_logs:
+		return
+
+	remaining_qty = (
+		flt(doc.for_quantity) - flt(doc.pending_qty) - flt(doc.process_loss_qty)
+	)
+	if remaining_qty <= 0:
+		return
+
+	target_row = None
+	for row in reversed(doc.time_logs):
+		if row.to_time:
+			target_row = row
+			break
+
+	if not target_row and len(doc.time_logs) == 1:
+		target_row = doc.time_logs[0]
+
+	if target_row:
+		target_row.completed_qty = remaining_qty
+
+
+def calculate_job_card_total_completed_qty(doc, method=None):
+	"""Keep total_completed_qty aligned with time log completed_qty rows."""
+	if doc.sub_operations:
+		return
+
+	doc.total_completed_qty = flt(
+		_job_card_completed_qty_total(doc),
+		frappe.get_precision("Job Card", "total_completed_qty") or 2,
+	)
+
+
 def calculate_job_card_finish_pcs(doc, method=None):
 	"""Set custom_finish_pcs as the sum of custom_finish_item across time_logs."""
 	doc.custom_finish_pcs = sum(cint(row.custom_finish_item) for row in (doc.time_logs or []))

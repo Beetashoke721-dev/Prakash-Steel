@@ -51,6 +51,7 @@ frappe.ui.form.on("Job Card", {
 	},
 
 	validate(frm) {
+		flush_time_logs_grid(frm);
 		calculate_total_completed_qty(frm);
 		calculate_finish_pcs(frm);
 		calculate_miss_pcs(frm);
@@ -194,23 +195,36 @@ function calculate_time_log_total(frm, cdt, cdn, quiet = false) {
 	}
 }
 
-function calculate_total_completed_qty(frm, quiet = false) {
-	if (!quiet && frm.events.set_total_completed_qty) {
-		frm.events.set_total_completed_qty(frm);
-		calculate_fg_per_pcs_weight(frm);
+function flush_time_logs_grid(frm) {
+	const grid = frm.fields_dict.time_logs?.grid;
+	if (!grid) {
 		return;
 	}
 
+	const editable_row = frappe.ui.form.editable_row;
+	if (editable_row?.on_grid_fields) {
+		editable_row.on_grid_fields.forEach((field) => {
+			field.parse_validate_and_set_in_model?.(field.get_value());
+		});
+	}
+
+	const open_form = frappe.ui.form.get_open_grid_form?.();
+	if (open_form?.layout?.fields) {
+		open_form.layout.fields.forEach((field) => {
+			field.parse_validate_and_set_in_model?.(field.get_value());
+		});
+	}
+
+	frappe.ui.form.close_grid_form?.();
+}
+
+function calculate_total_completed_qty(frm, quiet = false) {
 	let total = 0;
 	(frm.doc.time_logs || []).forEach((row) => {
 		total += flt(row.completed_qty);
 	});
 
-	if (flt(frm.doc.total_completed_qty) !== total) {
-		frm.doc.total_completed_qty = total;
-		frm.refresh_field("total_completed_qty");
-	}
-
+	set_form_value(frm, "total_completed_qty", total, quiet);
 	calculate_fg_per_pcs_weight(frm, quiet);
 }
 

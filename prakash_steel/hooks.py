@@ -109,9 +109,11 @@ doc_events = {
 	},
 	"Job Card": {
 		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",
+		"before_validate": "prakash_steel.utils.work_order.prepare_job_card_completed_qty",
 		"validate": [
 			"prakash_steel.utils.work_order.lock_production_type_from_work_order",
 			"prakash_steel.utils.work_order.validate_job_card_time_log_miss_fields",
+			"prakash_steel.utils.work_order.calculate_job_card_total_completed_qty",
 			"prakash_steel.utils.work_order.calculate_job_card_finish_pcs",
 			"prakash_steel.utils.work_order.calculate_job_card_miss_pcs",
 			"prakash_steel.utils.work_order.calculate_job_card_fg_per_pcs_weight",
