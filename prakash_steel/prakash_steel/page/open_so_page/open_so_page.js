@@ -67,6 +67,12 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				box-shadow: 0 3px 12px rgba(0,0,0,.1); background: #fff;
 				overflow: hidden;
 			}
+			/* frappe-datatable inline-styles overflow-y:hidden on .dt-scrollable whenever
+			   it measures the vertical overflow as smaller than the scrollbar width — a
+			   "no scrollbar needed" heuristic that misfires and permanently hides the
+			   scrollbar for tabs whose row count leaves only a small overflow, even though
+			   rows remain cut off below the fold. Force the scrollbar back on. */
+			.so-table-wrap .dt-scrollable { overflow-y: auto !important; }
 			.so-table-wrap .dt-wrapper { font-size: 12px; font-family: inherit; border: none; }
 			.so-table-wrap .dt-cell--header { background: linear-gradient(135deg,#dce8f5,#c5d9ee); }
 			.so-table-wrap .dt-cell--header .content { font-weight: 700; color: #000; font-size: 12px; }
