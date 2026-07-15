@@ -208,14 +208,12 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
 		const fos_pct = (parseFloat(fos || 0) * 100).toFixed(0);
-		const projection_factor = (1 + parseFloat(fos || 0)).toFixed(2);
 
 		$("#rbbr-root").html(`
 			<div style="font-size:12px;color:#888;margin-bottom:10px;padding-left:2px;">
 				Period: <strong>${esc(period_label)}</strong>
 				&nbsp;·&nbsp; ${data.length} items
 				&nbsp;·&nbsp; FOS: <strong style="color:#c0700a;">${fos_pct}%</strong>
-				<span style="color:#aaa;">(Projection Factor ×${projection_factor})</span>
 			</div>
 			<div id="rbbr-dt" style="overflow-x:auto;"></div>
 		`);
