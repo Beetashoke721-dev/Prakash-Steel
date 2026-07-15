@@ -18,6 +18,7 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 	get_sales_order_qty_map,
 	get_qualified_demand_for_item,
 	get_qualified_demand_map,
+	apply_spike_threshold,
 	get_stock_map,
 	get_wip_map,
 )
@@ -88,9 +89,13 @@ def get_item_breakdown(item_code) -> list[dict]:
 	mrq = flt(mrq_map.get(item_code, 0))
 
 	qualified_demand, _till_today, _spike = get_qualified_demand_for_item(
-		item_code, till_today_map, spike_map, item_buffer_map, item_tog_map, item_type_map, spike_master_map
+		item_code, till_today_map, spike_map, item_buffer_map
 	)
 	qualified_demand = flt(qualified_demand)
+	if is_buffer:
+		qualified_demand = apply_spike_threshold(
+			qualified_demand, tog, item_type_map.get(item_code), spike_master_map
+		)
 
 	item_open_so = flt(open_so_qty_map.get(item_code, 0))
 	if is_buffer:
@@ -496,11 +501,12 @@ def get_data(filters=None) -> list[dict]:
 			till_today_map,
 			spike_map,
 			item_buffer_map,
-			item_tog_map,
-			item_type_map,
-			spike_master_map,
 		)
 		qualified_demand = flt(qualified_demand)
+		if is_buffer:
+			qualified_demand = apply_spike_threshold(
+				qualified_demand, tog, item_type_map.get(item_code), spike_master_map
+			)
 		item_open_so = flt(open_so_qty_map.get(item_code, 0))
 
 		# Calculate order recommendation
