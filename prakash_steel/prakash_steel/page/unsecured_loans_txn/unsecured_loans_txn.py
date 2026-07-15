@@ -35,7 +35,7 @@ def _run_report(filters: dict) -> list[dict]:
 
 
 def _build_month_wise_summary(rows: list[dict]) -> list[dict]:
-	"""Aggregate TDS and Total Amount by calendar month (fiscal-year order)."""
+	"""Aggregate Interest Amount, TDS and Total Amount by month (fiscal-year order)."""
 	totals: dict[str, dict] = {}
 
 	for row in rows:
@@ -47,38 +47,40 @@ def _build_month_wise_summary(rows: list[dict]) -> list[dict]:
 			continue
 
 		if month not in totals:
-			totals[month] = {"month": month, "tds_10": 0.0, "total_amount": 0.0}
+			totals[month] = {
+				"month": month,
+				"interest_amount": 0.0,
+				"tds_10": 0.0,
+				"total_amount": 0.0,
+			}
 
+		totals[month]["interest_amount"] += float(row.get("interest_amount") or 0)
 		totals[month]["tds_10"] += float(row.get("tds_10") or 0)
 		totals[month]["total_amount"] += float(row.get("total_amount") or 0)
+
+	def _entry(entry: dict) -> dict:
+		return {
+			"month": entry["month"],
+			"interest_amount": round(entry["interest_amount"], 2),
+			"tds_10": round(entry["tds_10"], 2),
+			"total_amount": round(entry["total_amount"], 2),
+		}
 
 	summary = []
 	for month in FISCAL_MONTH_ORDER:
 		if month in totals:
-			entry = totals[month]
-			summary.append(
-				{
-					"month": entry["month"],
-					"tds_10": round(entry["tds_10"], 2),
-					"total_amount": round(entry["total_amount"], 2),
-				}
-			)
+			summary.append(_entry(totals[month]))
 
 	# Append any unexpected month labels in discovery order
 	for month, entry in totals.items():
 		if month not in FISCAL_MONTH_ORDER:
-			summary.append(
-				{
-					"month": entry["month"],
-					"tds_10": round(entry["tds_10"], 2),
-					"total_amount": round(entry["total_amount"], 2),
-				}
-			)
+			summary.append(_entry(entry))
 
 	if summary:
 		summary.append(
 			{
 				"month": "Total",
+				"interest_amount": round(sum(r["interest_amount"] for r in summary), 2),
 				"tds_10": round(sum(r["tds_10"] for r in summary), 2),
 				"total_amount": round(sum(r["total_amount"] for r in summary), 2),
 			}
@@ -113,9 +115,16 @@ def export_month_wise_xlsx(financial_year=None, month=None, account_head=None):
 		account_head=account_head,
 	)
 
-	rows = [["Month", "TDS (10%)", "Total Amount"]]
+	rows = [["Month", "Interest Amount", "TDS (10%)", "Total Amount"]]
 	for r in data:
-		rows.append([r.get("month", ""), r.get("tds_10", 0), r.get("total_amount", 0)])
+		rows.append(
+			[
+				r.get("month", ""),
+				r.get("interest_amount", 0),
+				r.get("tds_10", 0),
+				r.get("total_amount", 0),
+			]
+		)
 
 	xlsx_file = make_xlsx(rows, "Month-wise Summary")
 	frappe.response["filename"] = "Unsecured Loans Month-wise Summary.xlsx"

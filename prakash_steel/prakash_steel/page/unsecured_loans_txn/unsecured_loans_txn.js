@@ -243,6 +243,17 @@ frappe.pages["unsecured-loans-txn"].on_page_load = function (wrapper) {
 							: `<span>${esc(val)}</span>`,
 				},
 				{
+					name: __("Interest Amount"),
+					id: "interest_amount",
+					width: 160,
+					align: "right",
+					editable: false,
+					format: (val, _r, _c, d) =>
+						d._is_total
+							? `<strong>${fmt_currency(val)}</strong>`
+							: fmt_currency(val),
+				},
+				{
 					name: __("TDS (10%)"),
 					id: "tds_10",
 					width: 160,
