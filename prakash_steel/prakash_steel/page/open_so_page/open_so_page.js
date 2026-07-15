@@ -228,6 +228,18 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	// active tab tracking
 	let active_tab = "analysis";
 
+	// frappe-datatable measures its scroll container's real height at build time.
+	// Tables built while their tab panel is `display:none` measure a height of 0,
+	// which makes it wrongly conclude there's nothing to scroll and pins
+	// overflow-y to "hidden" on .dt-scrollable — so once the tab is shown again
+	// the vertical scrollbar never appears. Re-measure now that the panel is visible.
+	function fix_dt_dimensions(tab_key) {
+		let dt = dt_instances[tab_key];
+		if (!dt || !dt.bodyScrollable) return;
+		dt.bodyScrollable.style.overflowY = "";
+		dt.setDimensions();
+	}
+
 	$tab_bar.on("click", ".so-tab", function () {
 		let tab = $(this).data("tab");
 		if (tab === active_tab) return;
@@ -237,6 +249,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		$wrap.find(".so-tab-panel").removeClass("active");
 		$wrap.find(`.so-tab-panel[data-panel="${tab}"]`).addClass("active");
 		$(line_fullkit_field.wrapper).toggle(tab === "dispatch");
+		fix_dt_dimensions(tab);
 	});
 
 	// ── shared state ──────────────────────────────────────────────────────────

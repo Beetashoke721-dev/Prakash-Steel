@@ -281,8 +281,7 @@ def get_columns(filters: dict | None = None) -> list[dict]:
 				{
 					"label": _("Child Item Code"),
 					"fieldname": "child_item_code",
-					"fieldtype": "Link",
-					"options": "Item",
+					"fieldtype": "Data",
 					"width": 150,
 				},
 				{
