@@ -85,7 +85,7 @@ def get_rm_tog_data(view_by: str = "Sale Quantity") -> dict:
 		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
 		item_customer_counts[r.item_code] += 1
 
-	# ADU horizon = full period from TOG Horizon Settings
+	# ADU horizon = full period from TOG Horizon Setting
 	horizon_days = (to_date - from_date).days + 1
 
 	item_codes = [row["item_code"] for row in raw_rows]

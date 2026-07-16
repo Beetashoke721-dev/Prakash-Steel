@@ -84,7 +84,7 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 
 	assign_hbt_labels(raw_rows)
 
-	# ADU horizon = full period from TOG Horizon Settings (not ADU Horizon doctype)
+	# ADU horizon = full period from TOG Horizon Setting (not ADU Horizon doctype)
 	horizon_days = (to_date - from_date).days + 1
 
 	# Fetch Lead Time, safety_stock (current_tog), sku_type from Item master
