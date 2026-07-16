@@ -99,7 +99,8 @@ def get_rm_tog_data(view_by: str = "Sale Quantity") -> dict:
 			safety_stock AS current_tog,
 			custom_sku_type AS sku_type,
 			custom_item_type AS item_type,
-			custom_last_saved_tog AS new_tog
+			custom_last_saved_tog AS new_tog,
+			custom_buffer_flag AS buffer_flag
 		FROM `tabItem`
 		WHERE name IN %(item_codes)s
 		""",
@@ -202,6 +203,7 @@ def get_rm_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"tog": math.ceil(adu * lt * 1.25),
 			"current_tog": float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0),
 			"new_tog": item_master_map.get(row["item_code"], {}).get("new_tog") or None,
+			"buffer_flag": item_master_map.get(row["item_code"], {}).get("buffer_flag") or "Non-Buffer",
 			"change_pct": round(
 				(math.ceil(adu * lt * 1.25) - float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0))
 				/ float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) * 100, 1

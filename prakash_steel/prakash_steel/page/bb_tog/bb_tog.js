@@ -246,6 +246,18 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 				`<span class="bbt-calc-tog" data-idx="${d._idx}" style="font-weight:600;">${val != null ? val : "—"}</span>`,
 		},
 		{
+			name: "Buffer Flag", id: "buffer_flag", width: 130, align: "center", editable: false,
+			format: (val, _r, _c, d) => {
+				const v = val || "Non-Buffer";
+				return `<select class="bbt-buffer-flag-select" data-idx="${d._idx}"
+					style="border:1px solid #d1d8e0;border-radius:3px;padding:2px 4px;font-size:12px;
+					width:100%;box-sizing:border-box;background:${v === "Buffer" ? "#e8f5e9" : "#fff8e1"};">
+					<option value="Buffer"${v === "Buffer" ? " selected" : ""}>Buffer</option>
+					<option value="Non-Buffer"${v !== "Buffer" ? " selected" : ""}>Non-Buffer</option>
+				</select>`;
+			},
+		},
+		{
 			name: "New TOG", id: "new_tog", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) =>
 				`<input type="number" class="bbt-new-tog-input" data-idx="${d._idx}" min="0" step="1"
@@ -456,6 +468,12 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
 			_all_data[idx].new_tog = val === "" ? null : parseInt(val);
+		});
+
+		$(document).off("change", ".bbt-buffer-flag-select").on("change", ".bbt-buffer-flag-select", function () {
+			const idx = parseInt($(this).data("idx"));
+			_all_data[idx].buffer_flag = $(this).val();
+			$(this).css("background", $(this).val() === "Buffer" ? "#e8f5e9" : "#fff8e1");
 		});
 
 		$(document).off("change", "#bbt-select-all").on("change", "#bbt-select-all", function () {
