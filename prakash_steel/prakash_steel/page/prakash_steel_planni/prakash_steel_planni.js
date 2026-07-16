@@ -79,8 +79,8 @@ function load_all_charts(page, $chartsContainer) {
 
 			const skuData = (skuRes && skuRes.message) ? skuRes.message : {};
 
-			// 1) BBMTA → RBMTA → BOTA → TRMTA
-			['BBMTA', 'RBMTA', 'BOTA', 'TRMTA'].forEach((sku) => {
+			// 1) BBMTA → RBMTA → BOTA → RMTA → TRMTA
+			['BBMTA', 'RBMTA', 'BOTA', 'RMTA', 'TRMTA'].forEach((sku) => {
 				if (skuData[sku] && skuData[sku].colours && skuData[sku].colours.length) {
 					const $card = createChartCard(sku, skuData[sku], colorMap);
 					$chartsContainer.append($card);
@@ -88,35 +88,28 @@ function load_all_charts(page, $chartsContainer) {
 				}
 			});
 
-			// 2) Bright Critical Spares On Hand Status
-			if (brightCsRes && brightCsRes.message && brightCsRes.message.colours && brightCsRes.message.colours.length) {
-				const $card = createChartCard('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
-				$chartsContainer.append($card);
-				renderPieChart('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
-			}
-
-			// 3) Rolled Critical Spares On Hand Status
-			if (rolledCsRes && rolledCsRes.message && rolledCsRes.message.colours && rolledCsRes.message.colours.length) {
-				const $card = createChartCard('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
-				$chartsContainer.append($card);
-				renderPieChart('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
-			}
-
-			// 4) RMTA
-			if (skuData['RMTA'] && skuData['RMTA'].colours && skuData['RMTA'].colours.length) {
-				const $card = createChartCard('RMTA', skuData['RMTA'], colorMap);
-				$chartsContainer.append($card);
-				renderPieChart('RMTA', skuData['RMTA'], colorMap);
-			}
-
-			// 5) Pending SO Status (Open SO)
+			// 2) Pending SO Status (Open SO)
 			if (pendingSoRes && pendingSoRes.message && pendingSoRes.message.colours && pendingSoRes.message.colours.length) {
 				const $card = createChartCard('Pending SO Status', pendingSoRes.message, colorMap);
 				$chartsContainer.append($card);
 				renderPieChart('Pending SO Status', pendingSoRes.message, colorMap);
 			}
 
-			// 6) Open PO Status
+			// 3) Bright Critical Spares On Hand Status
+			if (brightCsRes && brightCsRes.message && brightCsRes.message.colours && brightCsRes.message.colours.length) {
+				const $card = createChartCard('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
+				$chartsContainer.append($card);
+				renderPieChart('Bright Critical Spares On Hand Status', brightCsRes.message, colorMap);
+			}
+
+			// 4) Rolled Critical Spares On Hand Status
+			if (rolledCsRes && rolledCsRes.message && rolledCsRes.message.colours && rolledCsRes.message.colours.length) {
+				const $card = createChartCard('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
+				$chartsContainer.append($card);
+				renderPieChart('Rolled Critical Spares On Hand Status', rolledCsRes.message, colorMap);
+			}
+
+			// 5) Open PO Status
 			if (openPoRes && openPoRes.message) {
 				const $card = createChartCard('Open PO Status', openPoRes.message, colorMap);
 				$chartsContainer.append($card);

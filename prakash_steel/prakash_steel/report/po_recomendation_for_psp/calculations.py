@@ -155,16 +155,16 @@ def calculate_initial_order_recommendation(
 		if sku_type in ["BOTA", "PTA"]:
 			order_rec = max(0, tog + qualified_demand - stock - wip - open_po)
 		else:
-			order_rec = max(0, tog + qualified_demand - stock - wip)
+			order_rec = max(0, tog + qualified_demand - stock - wip - open_po)
 	else:
 		qualified_demand = flt(open_so_map.get(item_code, 0))  # all-time open SO for non-buffer
 		sku_type = item_sku_type_map.get(item_code)
 		open_po = flt(open_po_map.get(item_code, 0))
 
-		if sku_type in ["PTO", "BOTO"]:
+		if sku_type in ["PTO", "BOTO", "TRMTO"]:
 			order_rec = max(0, qualified_demand - stock - wip - open_po)
 		else:
-			order_rec = max(0, qualified_demand - stock - wip)
+			order_rec = max(0, qualified_demand - stock - wip - open_po)
 
 	return order_rec
 
@@ -181,6 +181,8 @@ def calculate_final_order_recommendation(
 	open_po_map: dict[str, float],
 	mrq_map: dict[str, float],
 	parent_demand_map: dict[str, float],
+	item_type_map: dict[str, str] | None = None,
+	spike_master_map: dict[str, dict] | None = None,
 ) -> float:
 	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
 	is_buffer = buffer_flag == "Buffer"
@@ -191,16 +193,22 @@ def calculate_final_order_recommendation(
 
 	if is_buffer:
 		tog = flt(item_tog_map.get(item_code, 0))
-		qualified_demand = flt(qualified_demand_map.get(item_code, 0))
-		parent_demand = flt(parent_demand_map.get(item_code, 0))
-		total_demand = qualified_demand + parent_demand
+		total_demand = calculate_total_demand(
+			item_code,
+			True,
+			qualified_demand_map,
+			parent_demand_map,
+			item_tog_map,
+			item_type_map,
+			spike_master_map,
+		)
 		sku_type = item_sku_type_map.get(item_code)
 		open_po = flt(open_po_map.get(item_code, 0))
 
 		if sku_type in ["BOTA", "PTA"]:
 			base_order_rec = tog + total_demand - stock - wip - open_po
 		else:
-			base_order_rec = tog + total_demand - stock - wip
+			base_order_rec = tog + total_demand - stock - wip - open_po
 
 		order_rec = max(0, base_order_rec - mrq)
 	else:
@@ -210,10 +218,10 @@ def calculate_final_order_recommendation(
 		sku_type = item_sku_type_map.get(item_code)
 		open_po = flt(open_po_map.get(item_code, 0))
 
-		if sku_type in ["PTO", "BOTO"]:
+		if sku_type in ["PTO", "BOTO", "TRMTO"]:
 			base_order_rec = requirement - stock - wip - open_po
 		else:
-			base_order_rec = requirement - stock - wip
+			base_order_rec = requirement - stock - wip - open_po
 
 		order_rec = max(0, base_order_rec - mrq)
 
@@ -230,37 +238,75 @@ def get_qualified_demand_for_item(
 	till_today_map: dict[str, float],
 	spike_map: dict[str, float],
 	item_buffer_map: dict[str, str],
-	item_tog_map: dict[str, float] | None = None,
-	item_type_map: dict[str, str] | None = None,
-	spike_master_map: dict[str, dict] | None = None,
 ) -> tuple[float, float, float]:
+	"""Returns an item's raw (un-thresholded) qualified demand: till_today + spike.
+
+	The spike threshold can only be evaluated once parent demand (pushed down
+	via BOM explosion) is known, so it is NOT applied here — see
+	`calculate_total_demand` / `apply_spike_threshold`, which combine this raw
+	value with parent demand before thresholding.
+	"""
 	till_today = flt(till_today_map.get(item_code, 0))
 
 	# Spike logic ONLY applies to buffer items
 	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
 	if buffer_flag != "Buffer":
 		spike = 0.0
-		qualified_demand = till_today + spike
-		return qualified_demand, till_today, spike
 	else:
 		spike = flt(spike_map.get(item_code, 0))
-		qualified_demand = till_today + spike
 
-		# Additional threshold check for buffer items only
-		if item_tog_map and item_type_map and spike_master_map:
-			tog = flt(item_tog_map.get(item_code, 0))
-			item_type = item_type_map.get(item_code)
+	qualified_demand = till_today + spike
+	return qualified_demand, till_today, spike
 
-			if tog > 0 and item_type:
-				spike_config = spike_master_map.get(item_type)
-				if spike_config:
-					spike_threshold_pct = flt(spike_config.get("spike_threshold", 0))
-					spike_threshold_qty = tog * spike_threshold_pct / 100
 
-					if qualified_demand < spike_threshold_qty:
-						qualified_demand = 0.0
+def apply_spike_threshold(
+	total_demand: float,
+	tog: float,
+	item_type: str | None,
+	spike_master_map: dict[str, dict] | None,
+) -> float:
+	"""Zero out a buffer item's total demand (own qualified demand + parent
+	demand) when it doesn't clear TOG x spike_threshold% for its item_type.
+	"""
+	if not spike_master_map or not item_type or tog <= 0:
+		return total_demand
 
-		return qualified_demand, till_today, spike
+	spike_config = spike_master_map.get(item_type)
+	if not spike_config:
+		return total_demand
+
+	spike_threshold_pct = flt(spike_config.get("spike_threshold", 0))
+	spike_threshold_qty = tog * spike_threshold_pct / 100
+
+	if spike_threshold_qty > 0 and total_demand < spike_threshold_qty:
+		return 0.0
+
+	return total_demand
+
+
+def calculate_total_demand(
+	item_code: str,
+	is_buffer: bool,
+	qualified_demand_map: dict[str, float],
+	parent_demand_map: dict[str, float],
+	item_tog_map: dict[str, float] | None = None,
+	item_type_map: dict[str, str] | None = None,
+	spike_master_map: dict[str, dict] | None = None,
+) -> float:
+	"""Combine an item's own qualified demand with parent demand pushed down
+	via BOM explosion, then (buffer items only) apply the spike threshold to
+	the combined total — not to the qualified-demand component alone.
+	"""
+	qualified_demand = flt(qualified_demand_map.get(item_code, 0))
+	parent_demand = flt(parent_demand_map.get(item_code, 0))
+	total_demand = qualified_demand + parent_demand
+
+	if is_buffer:
+		tog = flt((item_tog_map or {}).get(item_code, 0))
+		item_type = (item_type_map or {}).get(item_code)
+		total_demand = apply_spike_threshold(total_demand, tog, item_type, spike_master_map)
+
+	return total_demand
 
 
 # ---------------------------------------------------------------------------

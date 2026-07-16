@@ -67,6 +67,12 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 				box-shadow: 0 3px 12px rgba(0,0,0,.1); background: #fff;
 				overflow: hidden;
 			}
+			/* frappe-datatable inline-styles overflow-y:hidden on .dt-scrollable whenever
+			   it measures the vertical overflow as smaller than the scrollbar width — a
+			   "no scrollbar needed" heuristic that misfires and permanently hides the
+			   scrollbar for tabs whose row count leaves only a small overflow, even though
+			   rows remain cut off below the fold. Force the scrollbar back on. */
+			.so-table-wrap .dt-scrollable { overflow-y: auto !important; }
 			.so-table-wrap .dt-wrapper { font-size: 12px; font-family: inherit; border: none; }
 			.so-table-wrap .dt-cell--header { background: linear-gradient(135deg,#dce8f5,#c5d9ee); }
 			.so-table-wrap .dt-cell--header .content { font-weight: 700; color: #000; font-size: 12px; }
@@ -228,6 +234,18 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	// active tab tracking
 	let active_tab = "analysis";
 
+	// frappe-datatable measures its scroll container's real height at build time.
+	// Tables built while their tab panel is `display:none` measure a height of 0,
+	// which makes it wrongly conclude there's nothing to scroll and pins
+	// overflow-y to "hidden" on .dt-scrollable — so once the tab is shown again
+	// the vertical scrollbar never appears. Re-measure now that the panel is visible.
+	function fix_dt_dimensions(tab_key) {
+		let dt = dt_instances[tab_key];
+		if (!dt || !dt.bodyScrollable) return;
+		dt.bodyScrollable.style.overflowY = "";
+		dt.setDimensions();
+	}
+
 	$tab_bar.on("click", ".so-tab", function () {
 		let tab = $(this).data("tab");
 		if (tab === active_tab) return;
@@ -237,6 +255,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		$wrap.find(".so-tab-panel").removeClass("active");
 		$wrap.find(`.so-tab-panel[data-panel="${tab}"]`).addClass("active");
 		$(line_fullkit_field.wrapper).toggle(tab === "dispatch");
+		fix_dt_dimensions(tab);
 	});
 
 	// ── shared state ──────────────────────────────────────────────────────────

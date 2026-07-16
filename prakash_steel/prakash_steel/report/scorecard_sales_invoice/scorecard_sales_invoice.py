@@ -141,7 +141,7 @@ def get_data(filters) -> list[dict]:
 		LEFT JOIN `tabCustomer` cust ON cust.name = si.customer
 		LEFT JOIN `tabItem` i ON i.name = sii.item_code
 		WHERE {" AND ".join(conditions)}
-		ORDER BY si.posting_date DESC, si.name DESC, sii.idx ASC
+		ORDER BY si.posting_date ASC, si.name ASC, sii.idx ASC
 	"""
 
 	return frappe.db.sql(query, filters, as_dict=True)

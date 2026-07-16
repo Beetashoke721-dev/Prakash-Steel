@@ -1,0 +1,44 @@
+{
+ "content": null,
+ "creation": "2026-07-13 15:22:42.741675",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-07-13 15:22:42.741675",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "rolled-bar-batch-rec",
+ "owner": "Administrator",
+ "page_name": "rolled-bar-batch-rec",
+ "roles": [
+  {
+   "role": "Administrator"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Rolled Bar Batch Recommendation"
+}

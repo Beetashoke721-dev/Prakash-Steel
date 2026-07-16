@@ -15,12 +15,17 @@ frappe.ui.form.on("Work Order", {
 		if (frm.doc.custom_bright_production) {
 			frm.set_value("custom_rolled_production", 0);
 		}
+		update_custom_wastage(frm);
+		update_custom_cutting_weight(frm);
+		update_custom_total_raw_material_pcs(frm);
+		update_custom_burning_loss(frm);
 	},
 
 	custom_rolled_production(frm) {
 		if (frm.doc.custom_rolled_production) {
 			frm.set_value("custom_bright_production", 0);
 		}
+		update_custom_wastage(frm);
 		update_custom_cutting_weight(frm);
 		update_custom_total_raw_material_pcs(frm);
 		update_custom_burning_loss(frm);
@@ -69,6 +74,12 @@ function set_calculated_value(frm, fieldname, value) {
 }
 
 function update_custom_wastage(frm) {
+	const is_bright_production = cint(frm.doc.custom_bright_production) === 1;
+	if (!is_bright_production) {
+		set_calculated_value(frm, "custom_wastage", null);
+		return;
+	}
+
 	const produced_qty = flt(frm.doc.produced_qty) || 0;
 	const consumed_qty = get_consumed_qty(frm);
 
@@ -141,6 +152,6 @@ function update_custom_burning_loss(frm) {
 	set_calculated_value(
 		frm,
 		"custom_burning_loss",
-		((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100
+		Math.abs(((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100)
 	);
 }

@@ -10,7 +10,9 @@
   "section_break_xdsn",
   "from_month",
   "column_break_txgq",
-  "to_month"
+  "to_month",
+  "section_break_ykgb",
+  "fos"
  ],
  "fields": [
   {
@@ -40,13 +42,22 @@
    "fieldtype": "Select",
    "label": "To Month",
    "options": "\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nJanuary\nFebruary\nMarch"
+  },
+  {
+   "fieldname": "section_break_ykgb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "fos",
+   "fieldtype": "Float",
+   "label": "FOS %"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-09 11:15:23.747934",
+ "modified": "2026-07-15 15:31:17.637500",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "RB Batch Planning Settings",

@@ -26,7 +26,11 @@ def get_total_consumed_qty(doc):
 
 
 def calculate_custom_wastage(doc, method=None):
-	"""Set custom_wastage from produced_qty and total consumed raw material."""
+	"""Set custom_wastage from produced_qty and total consumed raw material (Bright only)."""
+	if not bool(doc.custom_bright_production):
+		doc.custom_wastage = None
+		return
+
 	consumed_qty = get_total_consumed_qty(doc)
 	produced_qty = flt(doc.produced_qty)
 
@@ -81,7 +85,7 @@ def calculate_burning_loss_for_rolled_production(doc, method=None):
 	produced_qty = flt(doc.produced_qty) or 0
 
 	doc.custom_burning_loss = flt(
-		((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100,
+		abs(((consumed_qty - miss_billet_weight - produced_qty) / consumed_qty) * 100),
 		frappe.get_precision("Work Order", "custom_burning_loss") or 2,
 	)
 
@@ -99,7 +103,7 @@ def validate_miss_billet_weight(doc, method=None):
 
 
 def update_custom_wastage_after_stock_entry(doc, method=None):
-	"""Persist calculated Work Order fields after stock entries update quantities."""
+	"""Persist calculated Work Order / Job Card fields after stock entries update quantities."""
 	if not doc.work_order:
 		return
 
@@ -107,16 +111,28 @@ def update_custom_wastage_after_stock_entry(doc, method=None):
 	calculate_custom_wastage(wo)
 	calculate_cutting_weight_for_rolled_production(wo)
 	calculate_burning_loss_for_rolled_production(wo)
-	frappe.db.set_value(
-		"Work Order",
-		doc.work_order,
-		{
+
+	# db.set_value writes SQL NULL for None; skip fields that are not yet calculable.
+	update_values = {
+		fieldname: value
+		for fieldname, value in {
 			"custom_wastage": wo.custom_wastage,
 			"custom_cutting_weight": wo.custom_cutting_weight,
 			"custom_burning_loss": wo.custom_burning_loss,
-		},
-		update_modified=False,
-	)
+		}.items()
+		if value is not None
+	}
+
+	if update_values:
+		frappe.db.set_value(
+			"Work Order",
+			doc.work_order,
+			update_values,
+			update_modified=False,
+		)
+
+	# Consumed qty on Required Items updates with Stock Entry; refresh linked Job Cards.
+	update_job_cards_billet_weight(doc.work_order)
 
 
 def copy_production_type_to_job_card(doc, method=None):
@@ -265,9 +281,69 @@ def calculate_job_card_time_log_billet_cutting(doc, method=None):
 		running_used += row_used
 
 
+def _job_card_completed_qty_total(doc) -> float:
+	"""Sum completed_qty from Job Card time logs (skip when sub-operations drive totals)."""
+	if doc.sub_operations:
+		return flt(doc.total_completed_qty)
+
+	return sum(flt(row.completed_qty) for row in (doc.time_logs or []))
+
+
+def prepare_job_card_completed_qty(doc, method=None):
+	"""Back-fill time log completed_qty before ERPNext validates submit totals."""
+	if cint(doc.docstatus) != 1 or doc.sub_operations:
+		return
+
+	if _job_card_completed_qty_total(doc) > 0 or not flt(doc.for_quantity) or not doc.time_logs:
+		return
+
+	remaining_qty = (
+		flt(doc.for_quantity) - flt(doc.pending_qty) - flt(doc.process_loss_qty)
+	)
+	if remaining_qty <= 0:
+		return
+
+	target_row = None
+	for row in reversed(doc.time_logs):
+		if row.to_time:
+			target_row = row
+			break
+
+	if not target_row and len(doc.time_logs) == 1:
+		target_row = doc.time_logs[0]
+
+	if target_row:
+		target_row.completed_qty = remaining_qty
+
+
+def calculate_job_card_total_completed_qty(doc, method=None):
+	"""Keep total_completed_qty aligned with time log completed_qty rows."""
+	if doc.sub_operations:
+		return
+
+	doc.total_completed_qty = flt(
+		_job_card_completed_qty_total(doc),
+		frappe.get_precision("Job Card", "total_completed_qty") or 2,
+	)
+
+
 def calculate_job_card_finish_pcs(doc, method=None):
 	"""Set custom_finish_pcs as the sum of custom_finish_item across time_logs."""
 	doc.custom_finish_pcs = sum(cint(row.custom_finish_item) for row in (doc.time_logs or []))
+
+
+def calculate_job_card_miss_pcs(doc, method=None):
+	"""Set Job Card miss totals from time log miss pcs and weight fields."""
+	doc.custom_total_miss_roll = sum(cint(row.custom_miss_roll) for row in (doc.time_logs or []))
+	doc.custom_total_miss_ingot_or_billet = sum(
+		cint(row.custom_miss_ingot_or_billet) for row in (doc.time_logs or [])
+	)
+	doc.custom_total_miss_roll_weight = sum(
+		cint(row.custom_miss_roll_weight) for row in (doc.time_logs or [])
+	)
+	doc.custom_total_miss_ingot_or_billet_weight = sum(
+		cint(row.custom_miss_ingot_or_billet_weight) for row in (doc.time_logs or [])
+	)
 
 
 def calculate_job_card_fg_per_pcs_weight(doc, method=None):
@@ -297,14 +373,13 @@ def set_job_card_colour_code(doc, method=None):
 	)
 
 
-def calculate_job_card_billet_weight(doc, method=None):
-	"""Set custom_billet_weight from linked Work Order miss billet weight + consumed qty."""
-	if not doc.work_order:
-		doc.custom_billet_weight = 0
-		return
+def get_work_order_billet_weight(work_order: str) -> float:
+	"""miss_billet_weight + sum(required_items.consumed_qty) for a Work Order."""
+	if not work_order:
+		return 0.0
 
 	miss_billet_weight = flt(
-		frappe.db.get_value("Work Order", doc.work_order, "custom_miss_billet_weight")
+		frappe.db.get_value("Work Order", work_order, "custom_miss_billet_weight")
 	)
 	consumed_qty = flt(
 		frappe.db.sql(
@@ -313,10 +388,47 @@ def calculate_job_card_billet_weight(doc, method=None):
 			FROM `tabWork Order Item`
 			WHERE parent = %s
 			""",
-			doc.work_order,
+			work_order,
 		)[0][0]
 	)
-	doc.custom_billet_weight = cint(miss_billet_weight + consumed_qty)
+	return flt(miss_billet_weight + consumed_qty)
+
+
+def calculate_job_card_billet_weight(doc, method=None):
+	"""Set custom_billet_weight from linked Work Order miss billet weight + consumed qty.
+
+	Skip form validate after submit to avoid allow_on_submit errors. Submitted Job Cards
+	are refreshed from Stock Entry via update_job_cards_billet_weight.
+	"""
+	if doc.docstatus == 1:
+		return
+
+	if not doc.work_order:
+		doc.custom_billet_weight = 0
+		return
+
+	doc.custom_billet_weight = get_work_order_billet_weight(doc.work_order)
+
+
+def update_job_cards_billet_weight(work_order: str):
+	"""Sync custom_billet_weight on Job Cards when Work Order consumption changes."""
+	if not work_order:
+		return
+
+	billet_weight = get_work_order_billet_weight(work_order)
+	job_cards = frappe.get_all(
+		"Job Card",
+		filters={"work_order": work_order, "docstatus": ("<", 2)},
+		pluck="name",
+	)
+	for name in job_cards:
+		frappe.db.set_value(
+			"Job Card",
+			name,
+			"custom_billet_weight",
+			billet_weight,
+			update_modified=False,
+		)
 
 
 def validate_job_card_time_log_miss_fields(doc, method=None):
@@ -333,14 +445,15 @@ def validate_job_card_time_log_miss_fields(doc, method=None):
 						row_label
 					)
 				)
-			if not row.custom_summary_remarks:
+			if not row.custom_reason_for_miss_roll:
 				frappe.throw(
-					_("{0}: Summary Remarks is mandatory when Miss Roll (Pcs) is greater than 0.").format(
+					_("{0}: Reason for Miss Roll is mandatory when Miss Roll (Pcs) is greater than 0.").format(
 						row_label
 					)
 				)
 		else:
 			row.custom_miss_roll_weight = None
+			row.custom_reason_for_miss_roll = None
 
 		if flt(row.custom_miss_ingot_or_billet) > 0:
 			if not row.custom_miss_ingot_or_billet_weight:

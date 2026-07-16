@@ -1,0 +1,33 @@
+# Copyright (c) 2026, Beetashoke Chakraborty and contributors
+# For license information, please see license.txt
+
+import frappe
+
+from prakash_steel.prakash_steel.report.rolled_bar_batch_recommendation.rolled_bar_batch_recommendation import (
+	execute as _execute_report,
+)
+from prakash_steel.utils.hbt_utils import get_period_months, period_date_range
+from prakash_steel.utils.whitelist_permissions import require_permission
+
+
+@frappe.whitelist()
+def get_rolled_bar_batch_rec_data(item_code: str | None = None, item_type: str | None = None, sku_type: str | None = None) -> dict:
+	require_permission("Item", "read")
+
+	filters = {}
+	if item_code:
+		filters["item_code"] = item_code
+	if item_type:
+		filters["item_type"] = item_type
+	if sku_type:
+		filters["sku_type"] = sku_type
+
+	columns, data = _execute_report(filters)
+
+	period_months = get_period_months("RB Batch Planning Settings")
+	from_date, to_date = period_date_range(period_months)
+	period_label = f"{from_date.strftime('%d %b %Y')} – {to_date.strftime('%d %b %Y')}"
+
+	fos = frappe.db.get_single_value("RB Batch Planning Settings", "fos") or 0
+
+	return {"columns": columns, "data": data, "period_label": period_label, "fos": fos}
