@@ -9,6 +9,7 @@ from prakash_steel.utils.whitelist_permissions import require_permission
 
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
 	_non_buffer_priority,
+	apply_spike_threshold,
 	calculate_net_order_recommendation,
 	calculate_sku_type,
 	calculate_spike_map,
@@ -799,10 +800,15 @@ def get_data(filters=None) -> list[dict]:
 			till_today_map,
 			spike_map_base,
 			item_buffer_map,
-			item_tog_map,
-			item_type_map,
-			spike_master_map,
 		)
+		qualified_demand = flt(qualified_demand)
+		if item_buffer_map.get(item_code) == "Buffer":
+			qualified_demand = apply_spike_threshold(
+				qualified_demand,
+				item_tog_map.get(item_code, 0),
+				item_type_map.get(item_code),
+				spike_master_map,
+			)
 		qualified_demand_map[item_code] = qualified_demand
 
 	# Build RBMTO colour data — own SO FIFO + parent BOM FIFO
@@ -878,11 +884,10 @@ def get_data(filters=None) -> list[dict]:
 					till_today_map,
 					parent_spike_map,
 					p_buffer_map,
-					p_tog_map,
-					p_type_map,
-					spike_master_map,
 				)
 				qd_p = flt(qd_p)
+				if is_buf:
+					qd_p = apply_spike_threshold(qd_p, tog_p, p_type_map.get(ic), spike_master_map)
 				open_so_p = flt(parent_open_so_qty_map.get(ic, 0)) if not is_buf else 0.0
 
 				if is_buf:
@@ -1650,11 +1655,10 @@ def get_item_colour_breakdown(item_code) -> dict | list:
 		till_today_map,
 		spike_map_base,
 		item_buffer_map,
-		item_tog_map,
-		item_type_map,
-		spike_master_map,
 	)
 	qualified_demand = flt(qualified_demand)
+	if is_buffer:
+		qualified_demand = apply_spike_threshold(qualified_demand, tog, item_type, spike_master_map)
 
 	result = {
 		"item_code": item_code,
@@ -1780,11 +1784,10 @@ def get_item_colour_breakdown(item_code) -> dict | list:
 					till_today_map,
 					parent_spike_map,
 					p_buffer_map,
-					p_tog_map,
-					p_type_map,
-					spike_master_map,
 				)
 				qd_p = flt(qd_p)
+				if is_buf:
+					qd_p = apply_spike_threshold(qd_p, tog_p, p_type_map.get(ic), spike_master_map)
 				open_so_p = flt(p_open_so_qty_map.get(ic, 0)) if not is_buf else 0.0
 
 				if is_buf:

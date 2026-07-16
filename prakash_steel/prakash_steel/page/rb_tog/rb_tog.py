@@ -15,7 +15,7 @@ from prakash_steel.utils.hbt_utils import (
 )
 from prakash_steel.utils.whitelist_permissions import require_permission
 
-ITEM_TYPES = ("RB", "BO", "Traded")
+ITEM_TYPES = ("RB",)
 
 
 @frappe.whitelist()
@@ -40,7 +40,8 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		INNER JOIN `tabItem` i ON i.name = sii.item_code
 		WHERE
 			si.docstatus = 1
-			AND i.custom_item_type IN ('RB', 'BO', 'Traded')
+			AND i.custom_item_type = 'RB'
+			AND i.custom_sku_type IN ('RBMTA', 'RBMTO')
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY sii.item_code
 		ORDER BY total DESC
@@ -66,7 +67,8 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		INNER JOIN `tabCustomer` cust ON cust.name = si.customer
 		WHERE
 			si.docstatus = 1
-			AND i.custom_item_type IN ('RB', 'BO', 'Traded')
+			AND i.custom_item_type = 'RB'
+			AND i.custom_sku_type IN ('RBMTA', 'RBMTO')
 			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		GROUP BY
 			sii.item_code,

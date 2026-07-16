@@ -22,7 +22,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		fieldname: "sku_type",
 		label: __("SKU Type"),
 		fieldtype: "Select",
-		options: ["", "RBMTA", "RBMTO", "BOTA", "BOTO", "TRMTA", "TRMTO"],
+		options: ["", "RBMTA", "RBMTO"],
 		default: "",
 		change() { apply_filter(); },
 	});
@@ -35,7 +35,8 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		get_query() {
 			return {
 				filters: {
-					custom_item_type: ["in", ["RB", "BO", "Traded"]],
+					custom_item_type: "RB",
+					custom_sku_type: ["in", ["RBMTA", "RBMTO"]],
 					disabled: 0,
 				},
 			};
@@ -158,7 +159,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.item_code in _new_tog_map ? _new_tog_map[row.item_code] : (row.new_tog ?? null) };
 		});
 		_selected.clear();
-		_all_data.forEach((row, i) => { if (["RBMTA", "BOTA", "TRMTA"].includes(row.sku_type)) _selected.add(i); });
+		_all_data.forEach((row, i) => { if (row.sku_type === "RBMTA") _selected.add(i); });
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 		_dt = new DataTable(document.getElementById("rbt-dt"), {
@@ -384,10 +385,10 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			return;
 		}
 		const items = selected
-			.filter(r => ["RBMTA", "BOTA", "TRMTA"].includes(r.sku_type))
+			.filter(r => r.sku_type === "RBMTA")
 			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog }));
 		if (!items.length) {
-			frappe.show_alert({ message: __("No MTA items selected. Only RBMTA, BOTA, and TRMTA items can be saved."), indicator: "orange" });
+			frappe.show_alert({ message: __("No MTA items selected. Only RBMTA items can be saved."), indicator: "orange" });
 			return;
 		}
 		frappe.call({
@@ -412,10 +413,10 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 			return;
 		}
 		const items = selected
-			.filter(r => ["RBMTA", "BOTA", "TRMTA"].includes(r.sku_type))
+			.filter(r => r.sku_type === "RBMTA")
 			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog }));
 		if (!items.length) {
-			frappe.show_alert({ message: __("No MTA items selected. Only RBMTA, BOTA, and TRMTA items can be updated."), indicator: "orange" });
+			frappe.show_alert({ message: __("No MTA items selected. Only RBMTA items can be updated."), indicator: "orange" });
 			return;
 		}
 		frappe.call({
@@ -469,7 +470,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 				_all_data.forEach((_, i) => _selected.add(i));
 			} else {
 				_selected.clear();
-		_all_data.forEach((row, i) => { if (["RBMTA", "BOTA", "TRMTA"].includes(row.sku_type)) _selected.add(i); });
+		_all_data.forEach((row, i) => { if (row.sku_type === "RBMTA") _selected.add(i); });
 			}
 			$(".rbt-row-check").prop("checked", this.checked);
 		});
@@ -497,7 +498,7 @@ frappe.pages["rb-tog"].on_page_load = function (wrapper) {
 		});
 
 		_selected.clear();
-		_all_data.forEach((row, i) => { if (["RBMTA", "BOTA", "TRMTA"].includes(row.sku_type)) _selected.add(i); });
+		_all_data.forEach((row, i) => { if (row.sku_type === "RBMTA") _selected.add(i); });
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
