@@ -227,11 +227,21 @@ def update_tog(items):
 	items = json.loads(items) if isinstance(items, str) else items
 	for item in items:
 		tog = float(item["tog"] or 0)
-		frappe.db.set_value("Item", item["item_code"], {
-			"safety_stock": tog,
-			"custom_top_of_yellow": math.ceil((2 / 3) * tog),
-			"custom_top_of_red": math.ceil((1 / 3) * tog),
-		})
+		buffer_flag = item.get("buffer_flag") or "Non-Buffer"
+		if buffer_flag == "Buffer":
+			frappe.db.set_value("Item", item["item_code"], {
+				"custom_buffer_flag": buffer_flag,
+				"safety_stock": tog,
+				"custom_top_of_yellow": math.ceil((2 / 3) * tog),
+				"custom_top_of_red": math.ceil((1 / 3) * tog),
+			})
+		else:
+			frappe.db.set_value("Item", item["item_code"], {
+				"custom_buffer_flag": buffer_flag,
+				"safety_stock": 0,
+				"custom_top_of_yellow": 0,
+				"custom_top_of_red": 0,
+			})
 	frappe.db.commit()
 	return {"updated": len(items)}
 
@@ -245,7 +255,7 @@ def export_traded_tog_xlsx(data, filename="TRADED_TOG"):
 	headers = [
 		"SKU Type", "Item Code", "Contr%", "Cumu%", "HBT", "Frequency", "Total Qty",
 		"ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
-		"No of Customer", "Head Customer", "Body Customer", "Tail Customer",
+		"No of Customers", "Head Customer", "Body Customer", "Tail Customer",
 	]
 	rows = [headers] + [
 		[

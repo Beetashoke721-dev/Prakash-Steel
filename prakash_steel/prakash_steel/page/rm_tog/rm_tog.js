@@ -55,7 +55,7 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 	page.add_inner_button(__("Refresh"), () => load_data());
 	page.add_inner_button(__("Export to Excel"), () => export_to_xlsx());
 	page.add_inner_button(__("Save"), () => save_selected());
-	page.add_inner_button(__("Update TOG"), () => update_tog_selected());
+	page.add_inner_button(__("Update Buffer & TOG"), () => update_tog_selected());
 	page.add_inner_button(__("Reset"), () => reset_selected());
 
 	$(`<div id="rmt-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
@@ -102,6 +102,13 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 	function esc(v) { return frappe.utils.escape_html(String(v ?? "")); }
 	function dash() { return '<span style="color:#ccc;">—</span>'; }
 	function ceil1000(v) { return Math.ceil(v / 1000) * 1000; }
+	function new_tog_color(new_tog_val, calc_tog) {
+		if (new_tog_val === null || new_tog_val === undefined || new_tog_val === "") return "inherit";
+		const nt = parseInt(new_tog_val), ct = parseInt(calc_tog) || 0;
+		if (ct > nt) return "#c62828";
+		if (nt > ct) return "#2e7d32";
+		return "inherit";
+	}
 
 
 	function fmt_change_pct(val, idx) {
@@ -156,7 +163,7 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 			const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 			const current_tog = row.current_tog || 0;
 			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
-			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.item_code in _new_tog_map ? _new_tog_map[row.item_code] : (row.new_tog ?? null) };
+			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.item_code in _new_tog_map ? _new_tog_map[row.item_code] : (row.new_tog ?? ((row.buffer_flag || "Non-Buffer") === "Buffer" ? tog : null)) };
 		});
 		_selected.clear();
 		_all_data.forEach((row, i) => { if (row.sku_type === "PTA") _selected.add(i); });
@@ -268,22 +275,32 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 		},
 		{
 			name: "New TOG", id: "new_tog", width: 110, align: "center", editable: false,
-			format: (val, _r, _c, d) =>
-				`<input type="number" class="rmt-new-tog-input" data-idx="${d._idx}" min="0" step="1"
+			format: (val, _r, _c, d) => {
+				const is_buffer = (d.buffer_flag || "Non-Buffer") === "Buffer";
+				if (!is_buffer) {
+					return `<input type="number" class="rmt-new-tog-input" data-idx="${d._idx}" min="0" step="1"
+						value="" disabled
+						style="border:1px solid #e0e0e0;border-radius:3px;padding:3px 6px;
+						font-size:12px;width:100%;box-sizing:border-box;text-align:center;
+						background:#f5f5f5;color:#aaa;font-weight:600;cursor:not-allowed;">`;
+				}
+				return `<input type="number" class="rmt-new-tog-input" data-idx="${d._idx}" min="0" step="1"
 					value="${val !== null && val !== undefined ? val : ""}"
 					style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
-					font-size:12px;width:100%;box-sizing:border-box;text-align:center;background:#fffbe6;">`,
+					font-size:12px;width:100%;box-sizing:border-box;text-align:center;
+					background:#fff;color:${new_tog_color(val, d.tog)};font-weight:600;">`;
+			},
 		},
 		{
 			name: "Current TOG", id: "current_tog", width: 120, align: "center", editable: false,
-			format: val => val ? `<span style="font-weight:600;">${fmt_num(val, 0)}</span>` : dash(),
+			format: (val, _r, _c, d) => (d.buffer_flag || "Non-Buffer") !== "Buffer" ? dash() : (val ? `<span style="font-weight:600;">${fmt_num(val, 0)}</span>` : dash()),
 		},
 		{
 			name: "Change%", id: "change_pct", width: 110, align: "center", editable: false,
 			format: (val, _r, _c, d) => fmt_change_pct(val, d._idx),
 		},
 		{
-			name: "No of Customer", id: "no_of_customer", width: 130, align: "center", editable: false,
+			name: "No of Customers", id: "no_of_customer", width: 130, align: "center", editable: false,
 			format: val => val != null ? `<span style="font-weight:600;">${val}</span>` : dash(),
 		},
 		{
@@ -383,6 +400,8 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 		const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 		row.tog = tog;
 		$(`.rmt-calc-tog[data-idx="${idx}"]`).text(tog);
+		const $nt = $(`.rmt-new-tog-input[data-idx="${idx}"]`);
+		if ($nt.length) $nt.css({"color": new_tog_color($nt.val(), tog), "font-weight": "600"});
 		recalc_change_pct(idx);
 	}
 
@@ -426,7 +445,7 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 		}
 		const items = selected
 			.filter(r => r.sku_type === "PTA")
-			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog }));
+			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog, buffer_flag: r.buffer_flag || "Non-Buffer" }));
 		if (!items.length) {
 			frappe.show_alert({ message: __("No MTA items selected. Only PTA items can be updated."), indicator: "orange" });
 			return;
@@ -448,12 +467,14 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 	}
 	function reset_selected() {
 		_all_data.forEach(row => {
-			row.new_tog = row.tog;
+			if ((row.buffer_flag || "Non-Buffer") === "Buffer") row.new_tog = row.tog;
 		});
 		document.querySelectorAll(".rmt-new-tog-input").forEach(input => {
 			const idx = parseInt(input.dataset.idx);
 			const row = _all_data[idx];
-			if (row) input.value = row.tog != null ? row.tog : "";
+			if (!row || (row.buffer_flag || "Non-Buffer") !== "Buffer") return;
+			input.value = row.tog != null ? row.tog : "";
+			$(input).css({ color: "inherit", "font-weight": "600" });
 		});
 		frappe.show_alert({ message: __("New TOG reset to Calc TOG for all rows."), indicator: "blue" });
 	}
@@ -475,12 +496,23 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
 			_all_data[idx].new_tog = val === "" ? null : parseInt(val);
+			$(this).css({"color": new_tog_color(val, _all_data[idx].tog), "font-weight": "600"});
 		});
 
 		$(document).off("change", ".rmt-buffer-flag-select").on("change", ".rmt-buffer-flag-select", function () {
 			const idx = parseInt($(this).data("idx"));
-			_all_data[idx].buffer_flag = $(this).val();
-			$(this).css("background", $(this).val() === "Buffer" ? "#e8f5e9" : "#fff8e1");
+			const val = $(this).val();
+			_all_data[idx].buffer_flag = val;
+			$(this).css("background", val === "Buffer" ? "#e8f5e9" : "#fff8e1");
+			const $nt = $(`.rmt-new-tog-input[data-idx="${idx}"]`);
+			if (val === "Non-Buffer") {
+				_all_data[idx].new_tog = null;
+				$nt.val("").prop("disabled", true).css({ background: "#f5f5f5", color: "#aaa", cursor: "not-allowed" });
+			} else {
+				$nt.prop("disabled", false).css({ background: "#fff", cursor: "" });
+				const stored = _all_data[idx].new_tog;
+				$nt.val(stored != null ? stored : "").css("color", new_tog_color(stored, _all_data[idx].tog));
+			}
 		});
 
 		$(document).off("change", "#rmt-select-all").on("change", "#rmt-select-all", function () {
@@ -512,7 +544,7 @@ frappe.pages["rm-tog"].on_page_load = function (wrapper) {
 			const tog = ceil1000((row.adu || 0) * (row.lt || 0) * (1 + fos / 100));
 			const current_tog = row.current_tog || 0;
 			const change_pct = current_tog ? Math.round((tog - current_tog) / current_tog * 1000) / 10 : null;
-			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.new_tog ?? null };
+			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.new_tog ?? ((row.buffer_flag || "Non-Buffer") === "Buffer" ? tog : null) };
 		});
 
 		_selected.clear();
