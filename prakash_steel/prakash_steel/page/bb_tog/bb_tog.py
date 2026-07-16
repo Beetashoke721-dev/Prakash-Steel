@@ -84,7 +84,7 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 
 	assign_hbt_labels(raw_rows)
 
-	# ADU horizon = full period from TOG Horizon Settings (not ADU Horizon doctype)
+	# ADU horizon = full period from TOG Horizon Setting (not ADU Horizon doctype)
 	horizon_days = (to_date - from_date).days + 1
 
 	# Fetch Lead Time, safety_stock (current_tog), sku_type from Item master
@@ -96,7 +96,8 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			lead_time_days AS lt,
 			safety_stock AS current_tog,
 			custom_sku_type AS sku_type,
-			custom_last_saved_tog AS new_tog
+			custom_last_saved_tog AS new_tog,
+			custom_buffer_flag AS buffer_flag
 		FROM `tabItem`
 		WHERE name IN %(item_codes)s
 		""",
@@ -134,6 +135,7 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"tog": math.ceil(adu * lt * 1.25),
 			"current_tog": float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0),
 			"new_tog": item_master_map.get(row["item_code"], {}).get("new_tog") or None,
+			"buffer_flag": item_master_map.get(row["item_code"], {}).get("buffer_flag") or "Non-Buffer",
 			"change_pct": round(
 				(math.ceil(adu * lt * 1.25) - float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0))
 				/ float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) * 100, 1
@@ -157,11 +159,21 @@ def update_tog(items):
 	items = json.loads(items) if isinstance(items, str) else items
 	for item in items:
 		tog = float(item["tog"] or 0)
-		frappe.db.set_value("Item", item["item_code"], {
-			"safety_stock": tog,
-			"custom_top_of_yellow": math.ceil((2 / 3) * tog),
-			"custom_top_of_red": math.ceil((1 / 3) * tog),
-		})
+		buffer_flag = item.get("buffer_flag") or "Non-Buffer"
+		if buffer_flag == "Buffer":
+			frappe.db.set_value("Item", item["item_code"], {
+				"custom_buffer_flag": buffer_flag,
+				"safety_stock": tog,
+				"custom_top_of_yellow": math.ceil((2 / 3) * tog),
+				"custom_top_of_red": math.ceil((1 / 3) * tog),
+			})
+		else:
+			frappe.db.set_value("Item", item["item_code"], {
+				"custom_buffer_flag": buffer_flag,
+				"safety_stock": 0,
+				"custom_top_of_yellow": 0,
+				"custom_top_of_red": 0,
+			})
 	frappe.db.commit()
 	return {"updated": len(items)}
 
@@ -175,7 +187,7 @@ def export_bb_tog_xlsx(data, filename="BB_TOG"):
 	headers = [
 		"SKU Type", "Item Code", "Contr%", "Cumu%", "HBT", "Frequency", "Total Qty",
 		"ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
-		"No of Customer", "Head Customer", "Body Customer", "Tail Customer",
+		"No of Customers", "Head Customer", "Body Customer", "Tail Customer",
 	]
 	rows = [headers] + [
 		[

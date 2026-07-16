@@ -5,5 +5,5 @@
 from frappe.model.document import Document
 
 
-class TOGHorizonSettings(Document):
+class TOGHorizonSetting(Document):
 	pass

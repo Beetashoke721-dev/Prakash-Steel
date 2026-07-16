@@ -33,6 +33,7 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 	});
 
 	page.add_inner_button(__("Refresh"), () => load_data());
+	page.add_inner_button(__("Export to Excel"), () => export_to_xlsx());
 
 	$(`<div id="rbbr-root" style="padding:16px 4px 40px;"></div>`).appendTo(page.main);
 
@@ -169,13 +170,16 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 	let _dt = null;
 	let _dt_observer = null;
 	let _all_data = [];
+	let _last_columns = [];
+
+	function ceil1000(v) { return v ? Math.ceil(v / 1000) * 1000 : 0; }
 
 	function recalc_batch_size(idx) {
 		const row = _all_data[idx];
 		if (!row) return;
 		const no_of_setup = row.no_of_setup;
 		const production_qty = row.production_qty || 0;
-		const batch_size = (no_of_setup && no_of_setup > 0) ? Math.ceil(production_qty / no_of_setup) : 0;
+		const batch_size = (no_of_setup && no_of_setup > 0) ? ceil1000(production_qty / no_of_setup) : 0;
 		row.batch_size = batch_size;
 		const html = batch_size_badge(batch_size, null, null, { _idx: idx });
 		const $el = $(`.rbbr-batch-size[data-idx="${idx}"]`);
@@ -213,12 +217,13 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 			<div style="font-size:12px;color:#888;margin-bottom:10px;padding-left:2px;">
 				Period: <strong>${esc(period_label)}</strong>
 				&nbsp;·&nbsp; ${data.length} items
-				&nbsp;·&nbsp; FOS: <strong style="color:#c0700a;">${fos_pct}%</strong>
+				&nbsp;·&nbsp; Projected Increase: <strong style="color:#c0700a;">${fos_pct}%</strong>
 			</div>
 			<div id="rbbr-dt" style="overflow-x:auto;"></div>
 		`);
 
 		const columns = build_columns(backend_columns);
+		_last_columns = backend_columns;
 		_all_data = data.map((row, idx) => ({ ...row, _idx: idx }));
 
 		_dt = new DataTable(document.getElementById("rbbr-dt"), {
@@ -235,6 +240,35 @@ frappe.pages['rolled-bar-batch-rec'].on_page_load = function(wrapper) {
 		_dt_observer = setup_dt_observer("rbbr-dt", _all_data);
 		apply_row_colors("rbbr-dt", _all_data);
 		bind_events();
+	}
+
+	// ── Export ───────────────────────────────────────────────────────────────
+	function export_to_xlsx() {
+		if (!_all_data || !_all_data.length) {
+			frappe.msgprint(__("No data to export."));
+			return;
+		}
+		const form = document.createElement("form");
+		form.method = "POST";
+		form.action = "/api/method/prakash_steel.prakash_steel.page.rolled_bar_batch_rec.rolled_bar_batch_rec.export_rolled_bar_batch_rec_xlsx";
+		form.style.display = "none";
+
+		const add_field = (name, value) => {
+			const input = document.createElement("input");
+			input.type = "hidden";
+			input.name = name;
+			input.value = value;
+			form.appendChild(input);
+		};
+
+		add_field("data", JSON.stringify(_all_data));
+		add_field("columns", JSON.stringify(_last_columns));
+		add_field("filename", "Rolled_Bar_Batch_Recommendation");
+		add_field("csrf_token", frappe.csrf_token);
+
+		document.body.appendChild(form);
+		form.submit();
+		document.body.removeChild(form);
 	}
 
 	function load_data() {
