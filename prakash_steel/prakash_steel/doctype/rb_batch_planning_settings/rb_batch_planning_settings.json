@@ -50,14 +50,14 @@
   {
    "fieldname": "fos",
    "fieldtype": "Float",
-   "label": "Fos"
+   "label": "FOS %"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-13 14:39:40.280484",
+ "modified": "2026-07-15 15:31:17.637500",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "RB Batch Planning Settings",
