@@ -85,7 +85,7 @@ def get_rm_tog_data(view_by: str = "Sale Quantity") -> dict:
 		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
 		item_customer_counts[r.item_code] += 1
 
-	# ADU horizon = full period from TOG Horizon Settings
+	# ADU horizon = full period from TOG Horizon Setting
 	horizon_days = (to_date - from_date).days + 1
 
 	item_codes = [row["item_code"] for row in raw_rows]
@@ -99,7 +99,8 @@ def get_rm_tog_data(view_by: str = "Sale Quantity") -> dict:
 			safety_stock AS current_tog,
 			custom_sku_type AS sku_type,
 			custom_item_type AS item_type,
-			custom_last_saved_tog AS new_tog
+			custom_last_saved_tog AS new_tog,
+			custom_buffer_flag AS buffer_flag
 		FROM `tabItem`
 		WHERE name IN %(item_codes)s
 		""",
@@ -202,6 +203,7 @@ def get_rm_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"tog": math.ceil(adu * lt * 1.25),
 			"current_tog": float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0),
 			"new_tog": item_master_map.get(row["item_code"], {}).get("new_tog") or None,
+			"buffer_flag": item_master_map.get(row["item_code"], {}).get("buffer_flag") or "Non-Buffer",
 			"change_pct": round(
 				(math.ceil(adu * lt * 1.25) - float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0))
 				/ float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) * 100, 1
@@ -225,11 +227,21 @@ def update_tog(items):
 	items = json.loads(items) if isinstance(items, str) else items
 	for item in items:
 		tog = float(item["tog"] or 0)
-		frappe.db.set_value("Item", item["item_code"], {
-			"safety_stock": tog,
-			"custom_top_of_yellow": math.ceil((2 / 3) * tog),
-			"custom_top_of_red": math.ceil((1 / 3) * tog),
-		})
+		buffer_flag = item.get("buffer_flag") or "Non-Buffer"
+		if buffer_flag == "Buffer":
+			frappe.db.set_value("Item", item["item_code"], {
+				"custom_buffer_flag": buffer_flag,
+				"safety_stock": tog,
+				"custom_top_of_yellow": math.ceil((2 / 3) * tog),
+				"custom_top_of_red": math.ceil((1 / 3) * tog),
+			})
+		else:
+			frappe.db.set_value("Item", item["item_code"], {
+				"custom_buffer_flag": buffer_flag,
+				"safety_stock": 0,
+				"custom_top_of_yellow": 0,
+				"custom_top_of_red": 0,
+			})
 	frappe.db.commit()
 	return {"updated": len(items)}
 
@@ -243,7 +255,7 @@ def export_rm_tog_xlsx(data, filename="RM_TOG"):
 	headers = [
 		"SKU Type", "Item Code", "Contr%", "Cumu%", "HBT", "Frequency", "Total Qty",
 		"ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
-		"No of Customer", "Head Customer", "Body Customer", "Tail Customer",
+		"No of Customers", "Head Customer", "Body Customer", "Tail Customer",
 	]
 	rows = [headers] + [
 		[

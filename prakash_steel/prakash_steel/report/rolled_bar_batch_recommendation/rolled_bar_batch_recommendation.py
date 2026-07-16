@@ -14,6 +14,11 @@ def _ceil(v) -> int:
 	return math.ceil(v) if v else 0
 
 
+def _ceil_1000(v) -> int:
+	"""Round any numeric value up to the nearest 1000."""
+	return math.ceil(v / 1000) * 1000 if v else 0
+
+
 def _get_projection_factor() -> float:
 	"""Projected Qty multiplier = 1 + FOS (factor of safety) from RB Batch Planning Settings.
 
@@ -266,7 +271,7 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 		weights = [_ceil(w) for w in fw.get("weights", [])]
 
 		no_of_setup = production_count
-		batch_size = _ceil(production_qty / no_of_setup) if no_of_setup else 0
+		batch_size = _ceil_1000(production_qty / no_of_setup) if no_of_setup else 0
 
 		row = {
 			"item_code": item_code,

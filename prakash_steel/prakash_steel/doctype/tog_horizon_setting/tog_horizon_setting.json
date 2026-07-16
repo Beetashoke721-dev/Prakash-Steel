@@ -1,48 +1,37 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
- "autoname": "Format: {fiscal_year}",
- "creation": "2026-06-23 11:17:17.438921",
+ "creation": "2026-07-16 16:50:27.461108",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_fswn",
-  "column_break_qxnr",
-  "column_break_ntkd",
-  "column_break_qhxo",
   "from_month",
-  "column_break_zrvr",
-  "to_month"
+  "column_break_zyeh",
+  "to_month",
+  "column_break_itzv"
  ],
  "fields": [
   {
-   "fieldname": "section_break_fswn",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "from_month",
    "fieldtype": "Date",
-   "label": "From Month"
+   "in_list_view": 1,
+   "label": "From Date",
+   "reqd": 1
   },
   {
-   "fieldname": "column_break_ntkd",
+   "fieldname": "column_break_zyeh",
    "fieldtype": "Column Break"
   },
   {
    "fieldname": "to_month",
    "fieldtype": "Date",
-   "label": "To Month"
+   "in_list_view": 1,
+   "label": "To Date",
+   "reqd": 1
   },
   {
-   "fieldname": "column_break_qhxo",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_zrvr",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_qxnr",
+   "fieldname": "column_break_itzv",
    "fieldtype": "Column Break"
   }
  ],
@@ -50,11 +39,10 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-14 14:49:51.290809",
+ "modified": "2026-07-16 16:51:31.293718",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
- "name": "TOG Horizon Settings",
- "naming_rule": "Expression",
+ "name": "TOG Horizon Setting",
  "owner": "Administrator",
  "permissions": [
   {
