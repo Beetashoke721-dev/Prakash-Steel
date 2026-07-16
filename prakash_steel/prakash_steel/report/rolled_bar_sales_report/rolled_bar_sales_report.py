@@ -124,7 +124,7 @@ def get_data(filters) -> list[dict]:
 
 		WHERE {conditions}
 
-		ORDER BY si.posting_date DESC, si.name
+		ORDER BY si.posting_date ASC, si.name ASC
 	"""
 
 	return frappe.db.sql(query, filters, as_dict=True)

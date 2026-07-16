@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import flt
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
+	apply_spike_threshold,
 	calculate_net_order_recommendation,
 	calculate_spike_map,
 	get_mrq_map,
@@ -143,9 +144,13 @@ def get_machine_breakdown(machine_group_name) -> list | dict:
 		batch_size = batch_size_map[item_code]
 
 		qualified_demand, _, _ = get_qualified_demand_for_item(
-			item_code, till_today_map, spike_map, item_buffer_map, item_tog_map, item_type_map, spike_master_map
+			item_code, till_today_map, spike_map, item_buffer_map
 		)
 		qualified_demand = flt(qualified_demand)
+		if is_buffer:
+			qualified_demand = apply_spike_threshold(
+				qualified_demand, tog, item_type_map.get(item_code), spike_master_map
+			)
 
 		if is_buffer:
 			base_order_rec = max(0.0, tog + qualified_demand - stock - wip - mrq)
@@ -333,9 +338,13 @@ def get_data() -> list[dict]:
 		batch_size = batch_size_map[item_code]
 
 		qualified_demand, _, _ = get_qualified_demand_for_item(
-			item_code, till_today_map, spike_map, item_buffer_map, item_tog_map, item_type_map, spike_master_map
+			item_code, till_today_map, spike_map, item_buffer_map
 		)
 		qualified_demand = flt(qualified_demand)
+		if is_buffer:
+			qualified_demand = apply_spike_threshold(
+				qualified_demand, tog, item_type_map.get(item_code), spike_master_map
+			)
 
 		# Prod hours: net order rec / kg_per_hour
 		if is_buffer:

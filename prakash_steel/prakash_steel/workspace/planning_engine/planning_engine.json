@@ -1,7 +1,7 @@
 {
  "app": "prakash_steel",
  "charts": [],
- "content": "[{\"id\":\"p_14y26G3I\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"KA4aZcZgPy\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Dashboard\",\"col\":12}},{\"id\":\"q5wHB2klBR\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"xa6JO0H-Kr\",\"type\":\"card\",\"data\":{\"card_name\":\"Production & Purchase Planning\",\"col\":4}},{\"id\":\"W_MyEfNOZd\",\"type\":\"card\",\"data\":{\"card_name\":\"Buffer Reports\",\"col\":4}},{\"id\":\"Vwuw1s_qnN\",\"type\":\"card\",\"data\":{\"card_name\":\"Non Buffer Reports\",\"col\":4}},{\"id\":\"ZabQUQysVv\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Review\",\"col\":4}},{\"id\":\"qdSCrHKahE\",\"type\":\"card\",\"data\":{\"card_name\":\"TOG Calculation\",\"col\":4}},{\"id\":\"Wl_z4uQOb5\",\"type\":\"card\",\"data\":{\"card_name\":\"Head Body Tail Analysis\",\"col\":4}},{\"id\":\"V0kT7eeieQ\",\"type\":\"card\",\"data\":{\"card_name\":\"Trend Reports\",\"col\":4}},{\"id\":\"Xf5aof9GZ9\",\"type\":\"card\",\"data\":{\"card_name\":\"More Reports\",\"col\":4}},{\"id\":\"6xGcFTcfXV\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"utofq7wIoq\",\"type\":\"card\",\"data\":{\"card_name\":\"Exceptions\",\"col\":4}},{\"id\":\"Q9z4KO6hIy\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"Rg6KSC3X5u\",\"type\":\"paragraph\",\"data\":{\"text\":\"Settings\",\"col\":12}},{\"id\":\"Q8fQvz_Wi3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine\",\"col\":4}},{\"id\":\"LaS_JUlxLb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine Master\",\"col\":4}},{\"id\":\"x1CkjVFxAf\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Colour Weightage Master\",\"col\":4}},{\"id\":\"O5-4ofYR7P\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour\",\"col\":4}},{\"id\":\"BvCHpBPAkY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour Sequence Master\",\"col\":4}},{\"id\":\"JzzkrJGCSA\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Machine Load Colour Master\",\"col\":4}},{\"id\":\"hLcJIjEQH5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rolling Algo\",\"col\":4}},{\"id\":\"wOY7rNMSkX\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Spike Master\",\"col\":4}},{\"id\":\"epRro3mlh5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Delivery Delay Reason Master\",\"col\":4}}]",
+ "content": "[{\"id\":\"p_14y26G3I\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"KA4aZcZgPy\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Dashboard\",\"col\":12}},{\"id\":\"q5wHB2klBR\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"xa6JO0H-Kr\",\"type\":\"card\",\"data\":{\"card_name\":\"Production & Purchase Planning\",\"col\":4}},{\"id\":\"W_MyEfNOZd\",\"type\":\"card\",\"data\":{\"card_name\":\"Buffer Reports\",\"col\":4}},{\"id\":\"Vwuw1s_qnN\",\"type\":\"card\",\"data\":{\"card_name\":\"Non Buffer Reports\",\"col\":4}},{\"id\":\"ZabQUQysVv\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Review\",\"col\":4}},{\"id\":\"qdSCrHKahE\",\"type\":\"card\",\"data\":{\"card_name\":\"TOG Calculation\",\"col\":4}},{\"id\":\"Wl_z4uQOb5\",\"type\":\"card\",\"data\":{\"card_name\":\"Head Body Tail Analysis\",\"col\":4}},{\"id\":\"V0kT7eeieQ\",\"type\":\"card\",\"data\":{\"card_name\":\"Trend Reports\",\"col\":4}},{\"id\":\"Xf5aof9GZ9\",\"type\":\"card\",\"data\":{\"card_name\":\"More Reports\",\"col\":4}},{\"id\":\"6xGcFTcfXV\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"utofq7wIoq\",\"type\":\"card\",\"data\":{\"card_name\":\"Exceptions\",\"col\":4}},{\"id\":\"Q9z4KO6hIy\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"Rg6KSC3X5u\",\"type\":\"paragraph\",\"data\":{\"text\":\"Settings\",\"col\":12}},{\"id\":\"AKoL4CD92u\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Item\",\"col\":10}},{\"id\":\"Q8fQvz_Wi3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine\",\"col\":4}},{\"id\":\"LaS_JUlxLb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bright Machine Master\",\"col\":4}},{\"id\":\"x1CkjVFxAf\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Colour Weightage Master\",\"col\":4}},{\"id\":\"O5-4ofYR7P\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour\",\"col\":4}},{\"id\":\"BvCHpBPAkY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Priority Colour Sequence Master\",\"col\":4}},{\"id\":\"JzzkrJGCSA\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Machine Load Colour Master\",\"col\":4}},{\"id\":\"hLcJIjEQH5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rolling Algo\",\"col\":4}},{\"id\":\"wOY7rNMSkX\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Spike Master\",\"col\":4}},{\"id\":\"epRro3mlh5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Delivery Delay Reason Master\",\"col\":4}},{\"id\":\"lzxq-nMGs3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"RB Batch Planning Settings\",\"col\":4}},{\"id\":\"CrTq3tKYsz\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"TOG Horizon Settings\",\"col\":4}},{\"id\":\"JTb6vVYnTH\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"HBT Period Settings\",\"col\":4}}]",
  "creation": "2026-05-15 13:01:04.636013",
  "custom_blocks": [],
  "docstatus": 0,
@@ -14,56 +14,6 @@
  "is_hidden": 0,
  "label": "Planning Engine",
  "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Other Reports",
-   "link_count": 4,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Planning Engine Sales Invoice",
-   "link_count": 0,
-   "link_to": "Planning Engine Sales Invoice",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Planning Engine RM Production",
-   "link_count": 0,
-   "link_to": "Planning Engine RM Production",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Bright Bar Sales report",
-   "link_count": 0,
-   "link_to": "Bright Bar Sales report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Rolled Bar Sales report",
-   "link_count": 0,
-   "link_to": "Rolled Bar Sales report",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
-   "type": "Link"
-  },
   {
    "hidden": 0,
    "is_query_report": 0,
@@ -205,36 +155,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Production & Purchase Planning",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bright Plan",
-   "link_count": 0,
-   "link_to": "bright-plan-page",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bright Machine Load",
-   "link_count": 0,
-   "link_to": "Bright Machine Load",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Sales Review",
    "link_count": 2,
    "link_type": "DocType",
@@ -259,109 +179,6 @@
    "link_to": "open-so-page",
    "link_type": "Page",
    "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "TOG Calculation",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bright TOG",
-   "link_count": 0,
-   "link_to": "bb-tog",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Rolled TOG",
-   "link_count": 0,
-   "link_to": "rb-tog",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Head Body Tail Analysis",
-   "link_count": 6,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Bright Product HBT",
-   "link_count": 0,
-   "link_to": "Bright Product HBT",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bright Product Analysis",
-   "link_count": 0,
-   "link_to": "Bright Product Analysis",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Rolled Product HBT",
-   "link_count": 0,
-   "link_to": "Rolled Product HBT",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Rolled Product Analysis",
-   "link_count": 0,
-   "link_to": "Rolled Product Analysis",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Customer HBT",
-   "link_count": 0,
-   "link_to": "Customer HBT",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Customer",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Customer Analysis",
-   "link_count": 0,
-   "link_to": "Customer Analysis",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item",
    "type": "Link"
   },
   {
@@ -419,8 +236,8 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Trend Reports",
-   "link_count": 2,
+   "label": "Exceptions",
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -428,32 +245,12 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Category wise Trend Report",
+   "label": "BOM Details",
    "link_count": 0,
-   "link_to": "Category wise Trend Report",
+   "link_to": "BOM Details",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "SKU wise Trend Report",
-   "link_count": 0,
-   "link_to": "SKU wise Trend Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "report_ref_doctype": "Item wise Daily On Hand Colour",
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Exceptions",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
   },
   {
    "hidden": 0,
@@ -475,9 +272,245 @@
    "onboard": 0,
    "report_ref_doctype": "Item",
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Other Reports",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Planning Engine Sales Invoice",
+   "link_count": 0,
+   "link_to": "Planning Engine Sales Invoice",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Planning Engine RM Production",
+   "link_count": 0,
+   "link_to": "Planning Engine RM Production",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bright Bar Sales report",
+   "link_count": 0,
+   "link_to": "Bright Bar Sales report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rolled Bar Sales report",
+   "link_count": 0,
+   "link_to": "Rolled Bar Sales report",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Scorecard Sales Invoice",
+   "link_count": 0,
+   "link_to": "Scorecard Sales Invoice",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "TOG Calculation",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bright TOG",
+   "link_count": 0,
+   "link_to": "bb-tog",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rolled TOG",
+   "link_count": 0,
+   "link_to": "rb-tog",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "BOM wise Buffer Details",
+   "link_count": 0,
+   "link_to": "BOM wise Buffer Details Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Head Body Tail Analysis",
+   "link_count": 6,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bright Product HBT",
+   "link_count": 0,
+   "link_to": "Bright Product HBT",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bright Product Analysis",
+   "link_count": 0,
+   "link_to": "Bright Product Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Rolled Product HBT",
+   "link_count": 0,
+   "link_to": "Rolled Product HBT",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Rolled Product Analysis",
+   "link_count": 0,
+   "link_to": "Rolled Product Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Customer HBT",
+   "link_count": 0,
+   "link_to": "Customer HBT",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Customer Analysis",
+   "link_count": 0,
+   "link_to": "Customer Analysis",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Trend Reports",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Category wise Trend Report",
+   "link_count": 0,
+   "link_to": "Category wise Trend Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "SKU wise Trend Report",
+   "link_count": 0,
+   "link_to": "SKU wise Trend Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production & Purchase Planning",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bright Plan",
+   "link_count": 0,
+   "link_to": "bright-plan-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Bright Machine Load",
+   "link_count": 0,
+   "link_to": "Bright Machine Load",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rolled Bar Batch Recommendation",
+   "link_count": 0,
+   "link_to": "rolled-bar-batch-rec",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-07-01 10:36:15.881808",
+ "modified": "2026-07-15 15:43:18.791410",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Planning Engine",
@@ -492,9 +525,38 @@
   {
    "color": "Grey",
    "doc_view": "List",
+   "label": "RB Batch Planning Settings",
+   "link_to": "RB Batch Planning Settings",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "HBT Period Settings",
+   "link_to": "HBT Period Settings",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Item",
+   "link_to": "Item",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
    "label": "Dashboard",
    "link_to": "prakash-steel-planni",
    "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "TOG Horizon Settings",
+   "link_to": "TOG Horizon Settings",
+   "type": "DocType"
   },
   {
    "color": "Grey",

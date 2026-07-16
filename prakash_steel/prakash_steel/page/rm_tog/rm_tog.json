@@ -1,0 +1,41 @@
+{
+ "content": null,
+ "creation": "2026-07-15 16:24:56.702072",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-07-15 16:24:56.702072",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "rm-tog",
+ "owner": "Administrator",
+ "page_name": "rm-tog",
+ "roles": [
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "RM TOG"
+}

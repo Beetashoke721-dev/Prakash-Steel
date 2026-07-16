@@ -9,47 +9,11 @@ import frappe
 
 from prakash_steel.utils.hbt_utils import (
 	METRIC_COL as _METRIC_COL_MAP,
-	MONTH_TO_NUM,
-	FISCAL_MONTH_ORDER,
 	assign_hbt_labels,
 	get_customer_hbt_map,
-	period_date_range,
+	get_tog_horizon_range,
 )
 from prakash_steel.utils.whitelist_permissions import require_permission
-from frappe.utils import getdate
-
-
-def _get_tog_period_months() -> list[tuple[int, int]]:
-	"""Same logic as get_period_months() but reads from TOG Horizon Settings."""
-	settings = frappe.get_single("TOG Horizon Settings")
-
-	fiscal_year = settings.fiscal_year
-	from_month = settings.from_month
-	to_month = settings.to_month
-
-	if not fiscal_year or not from_month or not to_month:
-		frappe.throw(
-			"Please configure Fiscal Year, From Month, and To Month in TOG Horizon Settings.",
-			title="Incomplete TOG Horizon Settings",
-		)
-
-	from_num = MONTH_TO_NUM[from_month]
-	to_num = MONTH_TO_NUM[to_month]
-
-	from_idx = FISCAL_MONTH_ORDER.index(from_num)
-	to_idx = FISCAL_MONTH_ORDER.index(to_num)
-
-	if from_idx > to_idx:
-		frappe.throw(
-			f"From Month ({from_month}) must come before To Month ({to_month}) in TOG Horizon Settings.",
-			title="Invalid Period Range",
-		)
-
-	fy_doc = frappe.get_doc("Fiscal Year", fiscal_year)
-	start_year = getdate(fy_doc.year_start_date).year
-	end_year = getdate(fy_doc.year_end_date).year
-
-	return [(start_year if m >= 4 else end_year, m) for m in FISCAL_MONTH_ORDER[from_idx: to_idx + 1]]
 
 
 @frappe.whitelist()
@@ -60,11 +24,7 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		view_by = "Sale Quantity"
 	metric_col = _METRIC_COL_MAP[view_by]
 
-	period_months = _get_tog_period_months()
-	if not period_months:
-		return {"data": [], "period_label": ""}
-
-	from_date, to_date = period_date_range(period_months)
+	from_date, to_date = get_tog_horizon_range()
 
 	period_label = f"{from_date.strftime('%b %Y')} – {to_date.strftime('%b %Y')}"
 
@@ -116,9 +76,11 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 	)
 
 	item_hbt_buckets: dict[str, dict[str, float]] = defaultdict(lambda: {"H": 0.0, "B": 0.0, "T": 0.0})
+	item_customer_counts: dict[str, int] = defaultdict(int)
 	for r in item_group_rows:
 		bucket = customer_hbt_map.get(r.group_name, "T")
 		item_hbt_buckets[r.item_code][bucket] += float(r.total or 0)
+		item_customer_counts[r.item_code] += 1
 
 	assign_hbt_labels(raw_rows)
 
@@ -133,7 +95,8 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			name AS item_code,
 			lead_time_days AS lt,
 			safety_stock AS current_tog,
-			custom_sku_type AS sku_type
+			custom_sku_type AS sku_type,
+			custom_last_saved_tog AS new_tog
 		FROM `tabItem`
 		WHERE name IN %(item_codes)s
 		""",
@@ -152,6 +115,7 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		sales_qty = sales_map.get(row["item_code"], 0.0)
 		adu = math.ceil(sales_qty / horizon_days) if horizon_days > 0 and sales_qty > 0 else 0
 		lt = float(item_master_map.get(row["item_code"], {}).get("lt") or 0)
+		_buckets = item_hbt_buckets.get(row["item_code"], _empty)
 		data.append({
 			"item_code": row["item_code"],
 			"total": float(row["total"] or 0),
@@ -159,15 +123,17 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"cumu_pct": round(float(row.get("cumu_pct") or 0), 1),
 			"hbt": row["hbt"],
 			"frequency": int(row["frequency"] or 0),
-			"h": item_hbt_buckets.get(row["item_code"], _empty)["H"],
-			"b": item_hbt_buckets.get(row["item_code"], _empty)["B"],
-			"t": item_hbt_buckets.get(row["item_code"], _empty)["T"],
+			"h": _buckets["H"],
+			"b": _buckets["B"],
+			"t": _buckets["T"],
+			"no_of_customer": item_customer_counts.get(row["item_code"], 0),
 			"sku_type": item_master_map.get(row["item_code"], {}).get("sku_type") or "",
 			"adu": adu,
 			"lt": lt,
 			"fos": 25,
 			"tog": math.ceil(adu * lt * 1.25),
 			"current_tog": float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0),
+			"new_tog": item_master_map.get(row["item_code"], {}).get("new_tog") or None,
 			"change_pct": round(
 				(math.ceil(adu * lt * 1.25) - float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0))
 				/ float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) * 100, 1
@@ -178,31 +144,55 @@ def get_bb_tog_data(view_by: str = "Sale Quantity") -> dict:
 
 
 @frappe.whitelist()
+def save_tog(items):
+	items = json.loads(items) if isinstance(items, str) else items
+	for item in items:
+		frappe.db.set_value("Item", item["item_code"], "custom_last_saved_tog", item["tog"])
+	frappe.db.commit()
+	return {"saved": len(items)}
+
+
+@frappe.whitelist()
+def update_tog(items):
+	items = json.loads(items) if isinstance(items, str) else items
+	for item in items:
+		tog = float(item["tog"] or 0)
+		frappe.db.set_value("Item", item["item_code"], {
+			"safety_stock": tog,
+			"custom_top_of_yellow": math.ceil((2 / 3) * tog),
+			"custom_top_of_red": math.ceil((1 / 3) * tog),
+		})
+	frappe.db.commit()
+	return {"updated": len(items)}
+
+
+@frappe.whitelist()
 def export_bb_tog_xlsx(data, filename="BB_TOG"):
 	from frappe.utils.xlsxutils import build_xlsx_response
 
 	rows_data = json.loads(data) if isinstance(data, str) else data
 
 	headers = [
-		"Item Code", "SKU Type", "Total Qty", "Contr%", "Cumu%", "HBT",
-		"Frequency", "ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
-		"Head Customer", "Body Customer", "Tail Customer",
+		"SKU Type", "Item Code", "Contr%", "Cumu%", "HBT", "Frequency", "Total Qty",
+		"ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
+		"No of Customer", "Head Customer", "Body Customer", "Tail Customer",
 	]
 	rows = [headers] + [
 		[
-			r.get("item_code") or "",
 			r.get("sku_type") or "",
-			r.get("total") or 0,
+			r.get("item_code") or "",
 			r.get("contr_pct") or 0,
 			r.get("cumu_pct") or 0,
 			r.get("hbt") or "",
 			r.get("frequency") or 0,
+			r.get("total") or 0,
 			r.get("adu") or 0,
 			r.get("lt") or 0,
 			r.get("fos") or 0,
 			r.get("tog") or 0,
 			r.get("current_tog") or 0,
 			r.get("change_pct"),
+			r.get("no_of_customer") or 0,
 			r.get("h") or 0,
 			r.get("b") or 0,
 			r.get("t") or 0,

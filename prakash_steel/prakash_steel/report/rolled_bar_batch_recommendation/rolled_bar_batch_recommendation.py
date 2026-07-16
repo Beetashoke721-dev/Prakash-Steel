@@ -13,6 +13,16 @@ def _ceil(v) -> int:
 	"""Round any numeric value up to the nearest integer."""
 	return math.ceil(v) if v else 0
 
+
+def _get_projection_factor() -> float:
+	"""Projected Qty multiplier = 1 + FOS (factor of safety) from RB Batch Planning Settings.
+
+	e.g. FOS = 0.3 -> factor 1.3.
+	"""
+	fos = frappe.db.get_single_value("RB Batch Planning Settings", "fos")
+	return 1 + (fos or 0)
+
+
 MAX_PROD_COLS = 10
 
 
@@ -78,22 +88,29 @@ def get_columns(max_prod_cols: int = 0) -> list[dict]:
 			"width": 120,
 		},
 		{
-			"label": _("Batch Size"),
+			"label": _("Recommended Batch Size"),
 			"fieldname": "batch_size",
 			"fieldtype": "Int",
 			"width": 110,
-		},
-		{
-			"label": _("Production Qty"),
-			"fieldname": "production_qty",
-			"fieldtype": "Int",
-			"width": 120,
 		},
 		{
 			"label": _("Production Count"),
 			"fieldname": "production_count",
 			"fieldtype": "Int",
 			"width": 130,
+		},
+		{
+			"label": _("No of Setup"),
+			"fieldname": "no_of_setup",
+			"fieldtype": "Int",
+			"width": 110,
+			"editable": 1,
+		},
+		{
+			"label": _("Production Qty"),
+			"fieldname": "production_qty",
+			"fieldtype": "Int",
+			"width": 120,
 		},
 	]
 
@@ -233,6 +250,7 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 	)
 
 	# ── Build rows ────────────────────────────────────────────────────────
+	projection_factor = _get_projection_factor()
 	data = []
 	for item_code in item_codes:
 		item = item_map[item_code]
@@ -241,13 +259,14 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 		consumption_qty = _ceil(consumption_map.get(item_code, 0.0))
 
 		total = sales_qty + consumption_qty
-		projected_qty = _ceil(total * 1.3)
+		projected_qty = _ceil(total * projection_factor)
 		fw = fw_map.get(item.item_name, {})
 		production_qty = _ceil(fw.get("production_qty", 0.0))
 		production_count = fw.get("production_count", 0)
 		weights = [_ceil(w) for w in fw.get("weights", [])]
 
-		batch_size = _ceil(projected_qty / production_count) if production_count else 0
+		no_of_setup = production_count
+		batch_size = _ceil(production_qty / no_of_setup) if no_of_setup else 0
 
 		row = {
 			"item_code": item_code,
@@ -259,8 +278,9 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 			"total": total,
 			"projected_qty": projected_qty,
 			"batch_size": batch_size,
-			"production_qty": production_qty,
 			"production_count": production_count,
+			"no_of_setup": no_of_setup,
+			"production_qty": production_qty,
 		}
 
 		for i in range(max_prod_cols):
@@ -322,7 +342,8 @@ def get_item_debug_info(item_code: str) -> dict:
 	consumption_qty = _ceil(sum(float(r.actual_rm_consumption or 0) for r in consumption_records))
 
 	total = sales_qty + consumption_qty
-	projected_qty = _ceil(total * 1.3)
+	projection_factor = _get_projection_factor()
+	projected_qty = _ceil(total * projection_factor)
 
 	# Finish Weight records (all in period, newest first for prod columns)
 	fw_records = frappe.db.sql(
@@ -363,6 +384,7 @@ def get_item_debug_info(item_code: str) -> dict:
 			for r in consumption_records
 		],
 		"total": total,
+		"projection_factor": projection_factor,
 		"projected_qty": projected_qty,
 		"production_count": production_count,
 		"production_qty": production_qty,
