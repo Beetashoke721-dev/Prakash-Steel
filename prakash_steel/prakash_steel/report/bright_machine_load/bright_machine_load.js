@@ -241,7 +241,11 @@ frappe.query_reports["Bright Machine Load"] = {
 	formatter(value, row, column, data, default_formatter) {
 		if (column.fieldname === "no_of_machines" && data) {
 			const v = data.no_of_machines;
-			return `<div style="text-align:center;">${v === null || v === undefined ? "" : v}</div>`;
+			return `<div style="text-align:center;font-weight:bold;">${v === null || v === undefined ? "" : v}</div>`;
+		}
+		if (column.fieldname === "machine_name" && data) {
+			const v = data.machine_name;
+			return `<div style="font-weight:bold;">${v === null || v === undefined ? "" : frappe.utils.escape_html(v)}</div>`;
 		}
 		value = default_formatter(value, row, column, data);
 		if (
