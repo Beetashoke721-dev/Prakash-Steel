@@ -3,9 +3,10 @@ from frappe.utils import today, fmt_money
 
 
 RECIPIENTS = [
-	"avinash@prakashsteel.com",
-	"srimanta@prakashsteel.com",
-	"psprm@prakashsteel.com",
+	# "avinash@prakashsteel.com",
+	# "srimanta@prakashsteel.com",
+	# "psprm@prakashsteel.com",
+	"pratikshya.gochhayat@clapgrow.com",
 ]
 
 
@@ -18,6 +19,7 @@ def send_daily_sales_invoice_email() -> None:
 		SELECT
 			si.name,
 			si.customer,
+			si.territory,
 			si.grand_total,
 			COALESCE(SUM(sii.qty), 0) AS total_qty,
 			(SELECT ps.payment_term FROM `tabPayment Schedule` ps WHERE ps.parent = si.name ORDER BY ps.idx LIMIT 1) AS payment_term
@@ -25,7 +27,7 @@ def send_daily_sales_invoice_email() -> None:
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		WHERE si.docstatus = 1
 		  AND si.posting_date = %s
-		GROUP BY si.name, si.customer, si.grand_total
+		GROUP BY si.name, si.customer, si.territory, si.grand_total
 		ORDER BY si.name
 		""",
 		(posting_date,),
@@ -47,6 +49,9 @@ def send_daily_sales_invoice_email() -> None:
 			return f"{term[1:]} Days"
 		return term
 
+	def is_outside_west_bengal(territory):
+		return (territory or "").strip().lower() != "west bengal"
+
 	# Build summary table rows
 	rows_html = ""
 	for inv in invoices:
@@ -61,6 +66,10 @@ def send_daily_sales_invoice_email() -> None:
 
 	total_grand = sum(inv.grand_total for inv in invoices)
 	total_qty = sum(inv.total_qty for inv in invoices)
+
+	total_count = len(invoices)
+	outside_count = sum(1 for inv in invoices if is_outside_west_bengal(inv.territory))
+	inside_count = total_count - outside_count
 
 	body = f"""
 	<p>Dear Team,</p>
@@ -81,12 +90,25 @@ def send_daily_sales_invoice_email() -> None:
 		</tbody>
 		<tfoot>
 			<tr style="font-weight:bold;background:#fafafa;">
-				<td colspan="2" style="padding:8px 12px;border:1px solid #ddd;">Total ({len(invoices)} invoices)</td>
+				<td colspan="2" style="padding:8px 12px;border:1px solid #ddd;">Total ({total_count} invoices)</td>
 				<td style="padding:8px 12px;border:1px solid #ddd;text-align:right;">{fmt_money(total_grand, currency="INR")}</td>
 				<td style="padding:8px 12px;border:1px solid #ddd;text-align:right;">{int(total_qty)}</td>
 				<td style="padding:8px 12px;border:1px solid #ddd;"></td>
 			</tr>
 		</tfoot>
+	</table>
+
+	<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;margin-top:16px;">
+		<tbody>
+			<tr>
+				<td style="padding:6px 12px;border:1px solid #ddd;">Outside</td>
+				<td style="padding:6px 12px;border:1px solid #ddd;text-align:right;">{outside_count}</td>
+			</tr>
+			<tr style="font-weight:bold;">
+				<td style="padding:6px 12px;border:1px solid #ddd;">Total</td>
+				<td style="padding:6px 12px;border:1px solid #ddd;text-align:right;">{outside_count} + {inside_count} = {total_count}</td>
+			</tr>
+		</tbody>
 	</table>
 
 	<br><p>Regards,<br>Prakash Steel ERP</p>
