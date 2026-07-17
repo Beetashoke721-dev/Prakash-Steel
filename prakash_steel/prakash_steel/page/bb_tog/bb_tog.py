@@ -160,9 +160,11 @@ def update_tog(items):
 	for item in items:
 		tog = float(item["tog"] or 0)
 		buffer_flag = item.get("buffer_flag") or "Non-Buffer"
+		sku_type = item.get("sku_type") or ""
 		if buffer_flag == "Buffer":
 			frappe.db.set_value("Item", item["item_code"], {
 				"custom_buffer_flag": buffer_flag,
+				"custom_sku_type": sku_type,
 				"safety_stock": tog,
 				"custom_top_of_yellow": math.ceil((2 / 3) * tog),
 				"custom_top_of_red": math.ceil((1 / 3) * tog),
@@ -170,12 +172,23 @@ def update_tog(items):
 		else:
 			frappe.db.set_value("Item", item["item_code"], {
 				"custom_buffer_flag": buffer_flag,
+				"custom_sku_type": sku_type,
 				"safety_stock": 0,
 				"custom_top_of_yellow": 0,
 				"custom_top_of_red": 0,
 			})
 	frappe.db.commit()
 	return {"updated": len(items)}
+
+
+@frappe.whitelist()
+def save_buffer_flag(item_code, buffer_flag, sku_type):
+	frappe.db.set_value("Item", item_code, {
+		"custom_buffer_flag": buffer_flag,
+		"custom_sku_type": sku_type,
+	})
+	frappe.db.commit()
+	return {"ok": True}
 
 
 @frappe.whitelist()

@@ -46,14 +46,28 @@ frappe.query_reports["PSP Unsecured Loans and Transaction Report"] = {
 			reqd: 1,
 			get_query: function () {
 				return {
-					filters: [
-						["parent_account", "in", [
-							"Loan From Director - PSPL",
-							"Loan From Shareholders - PSPL",
-							"Unsecured Loan - PSPL"
-						]],
-						["is_group", "=", 0]
-					]
+					filters: [["is_group", "=", 0]],
+					or_filters: [
+						[
+							"parent_account",
+							"in",
+							[
+								"Loan From Director - PSPL",
+								"Loan From Shareholders - PSPL",
+								"Unsecured Loan - PSPL",
+							],
+						],
+						[
+							"name",
+							"in",
+							[
+								"Axis Bank (Loan for Office Property 12 Floor) - PSPL",
+								"Axis Bank (Loan for Office Property 14 Floor) - PSPL",
+								"Axis Bank CC A/c - PSPL",
+								"Axis Bank Current A/c - PSPL",
+							],
+						],
+					],
 				};
 			},
 			on_change: function () {

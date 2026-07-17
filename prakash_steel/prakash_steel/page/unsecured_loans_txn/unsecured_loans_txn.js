@@ -51,7 +51,8 @@ frappe.pages["unsecured-loans-txn"].on_page_load = function (wrapper) {
 		reqd: 1,
 		get_query() {
 			return {
-				filters: [
+				filters: [["is_group", "=", 0]],
+				or_filters: [
 					[
 						"parent_account",
 						"in",
@@ -61,7 +62,16 @@ frappe.pages["unsecured-loans-txn"].on_page_load = function (wrapper) {
 							"Unsecured Loan - PSPL",
 						],
 					],
-					["is_group", "=", 0],
+					[
+						"name",
+						"in",
+						[
+							"Axis Bank (Loan for Office Property 12 Floor) - PSPL",
+							"Axis Bank (Loan for Office Property 14 Floor) - PSPL",
+							"Axis Bank CC A/c - PSPL",
+							"Axis Bank Current A/c - PSPL",
+						],
+					],
 				],
 			};
 		},

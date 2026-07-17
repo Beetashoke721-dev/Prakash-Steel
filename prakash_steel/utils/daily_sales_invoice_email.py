@@ -3,10 +3,10 @@ from frappe.utils import today, fmt_money
 
 
 RECIPIENTS = [
-	# "avinash@prakashsteel.com",
-	# "srimanta@prakashsteel.com",
-	# "psprm@prakashsteel.com",
-	"pratikshya.gochhayat@clapgrow.com",
+	"avinash@prakashsteel.com",
+	"srimanta@prakashsteel.com",
+	"psprm@prakashsteel.com",
+	
 ]
 
 
