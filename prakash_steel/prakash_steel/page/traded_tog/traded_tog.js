@@ -146,6 +146,7 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 	let _all_data = [];
 	let _raw_data = [];
 	let _selected = new Set();
+	let _changed_items = new Set();  // item_codes explicitly changed by user
 
 	function apply_filter() {
 		const sku = sku_type_field.get_value();
@@ -166,6 +167,7 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 			return { ...row, _idx: idx, fos, tog, change_pct, new_tog: row.item_code in _new_tog_map ? _new_tog_map[row.item_code] : (row.new_tog ?? ((row.buffer_flag || "Non-Buffer") === "Buffer" ? tog : null)) };
 		});
 		_selected.clear();
+
 		_all_data.forEach((row, i) => { if (row.sku_type === "TRMTA") _selected.add(i); });
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
@@ -197,7 +199,7 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 		},
 		{
 			name: "SKU Type", id: "sku_type", width: 110, align: "center", editable: false,
-			format: val => val ? esc(val) : dash(),
+			format: (val, _r, _c, d) => `<span class="trt-sku-type" data-idx="${d._idx}">${val ? esc(val) : '—'}</span>`,
 		},
 		{
 			name: "Item Code", id: "item_code", width: 200, align: "center", editable: false,
@@ -416,7 +418,7 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 			return;
 		}
 		const items = selected
-			.filter(r => r.sku_type === "TRMTA")
+			.filter(r => _changed_items.has(r.item_code))
 			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog }));
 		if (!items.length) {
 			frappe.show_alert({ message: __("No MTA items selected. Only TRMTA items can be saved."), indicator: "orange" });
@@ -444,8 +446,8 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 			return;
 		}
 		const items = selected
-			.filter(r => r.sku_type === "TRMTA")
-			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog, buffer_flag: r.buffer_flag || "Non-Buffer" }));
+			.filter(r => _changed_items.has(r.item_code))
+			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog, buffer_flag: r.buffer_flag || "Non-Buffer", sku_type: r.sku_type || "" }));
 		if (!items.length) {
 			frappe.show_alert({ message: __("No MTA items selected. Only TRMTA items can be updated."), indicator: "orange" });
 			return;
@@ -496,6 +498,7 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
 			_all_data[idx].new_tog = val === "" ? null : parseInt(val);
+			_changed_items.add(_all_data[idx].item_code);
 			$(this).css({"color": new_tog_color(val, _all_data[idx].tog), "font-weight": "600"});
 		});
 
@@ -504,6 +507,14 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 			const val = $(this).val();
 			_all_data[idx].buffer_flag = val;
 			$(this).css("background", val === "Buffer" ? "#e8f5e9" : "#fff8e1");
+			const old_sku = _all_data[idx].sku_type || "";
+			const new_sku = val === "Non-Buffer" ? old_sku.replace(/A$/, "O") : old_sku.replace(/O$/, "A");
+			_all_data[idx].sku_type = new_sku;
+			$(`.trt-sku-type[data-idx="${idx}"]`).text(new_sku || "—");
+			if (val === "Buffer") { _selected.add(idx); $(`.trt-row-check[data-idx="${idx}"]`).prop("checked", true); }
+			_changed_items.add(_all_data[idx].item_code);
+			const raw_row = _raw_data.find(r => r.item_code === _all_data[idx].item_code);
+			if (raw_row) { raw_row.buffer_flag = val; raw_row.sku_type = new_sku; }
 			const $nt = $(`.trt-new-tog-input[data-idx="${idx}"]`);
 			if (val === "Non-Buffer") {
 				_all_data[idx].new_tog = null;
@@ -548,6 +559,8 @@ frappe.pages["traded-tog"].on_page_load = function (wrapper) {
 		});
 
 		_selected.clear();
+		_changed_items.clear();
+
 		_all_data.forEach((row, i) => { if (row.sku_type === "TRMTA") _selected.add(i); });
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
