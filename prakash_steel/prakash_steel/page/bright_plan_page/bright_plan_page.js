@@ -257,7 +257,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 
             rows_html += `<tr>
 				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;">${esc(machine)}</td>
-				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">${info.no_of_machines || "—"}</td>
+				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:center;">${info.no_of_machines || "—"}</td>
 				<td style="padding:6px 12px;border-bottom:1px solid #dce8fb;text-align:right;">
 					<span style="display:inline-block;padding:2px 10px;border-radius:3px;
 						background:${bg};color:${fg};font-weight:600;min-width:50px;text-align:right;">
@@ -281,17 +281,28 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
 
         const dt_data = data.map((row, idx) => ({ ...row, _idx: idx }));
 
+        const select_col = {
+            name: "Tomorrow's Plan",
+            id: "_select",
+            width: 90,
+            editable: false,
+            resizable: false,
+            sortable: false,
+            align: "center",
+            format: (_val, _row, _col, d) =>
+                `<input type="checkbox" class="bp-row-check" data-idx="${d._idx}" ${_selected.has(d._idx) ? "checked" : ""}>`
+        };
+
         const dt_columns = [
             {
-                name: "Tomorrow's Plan",
-                id: "_select",
-                width: 90,
+                name: "",
+                id: "_index",
+                width: 50,
                 editable: false,
                 resizable: false,
                 sortable: false,
                 align: "center",
-                format: (_val, _row, _col, d) =>
-                    `<input type="checkbox" class="bp-row-check" data-idx="${d._idx}" ${_selected.has(d._idx) ? "checked" : ""}>`
+                format: (_val, _row, _col, d) => d._idx + 1
             },
             {
                 name: "Machine",
@@ -300,7 +311,7 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
                 editable: false,
                 format: (val, _row, _col, d) => machine_select_html(d._idx, d.item_code, val || "")
             },
-            ...COLS.map(c => {
+            ...COLS.flatMap(c => {
                 const dt_col = {
                     name: c.label,
                     id: c.key,
@@ -352,7 +363,9 @@ frappe.pages["bright-plan-page"].on_page_load = function (wrapper) {
                 } else {
                     dt_col.format = (val) => fmtr(val);
                 }
-                return dt_col;
+                return c.key === "production_qty_based_on_child_stock"
+                    ? [select_col, dt_col]
+                    : [dt_col];
             }),
         ];
 

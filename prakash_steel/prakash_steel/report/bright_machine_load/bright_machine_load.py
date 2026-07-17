@@ -1,8 +1,16 @@
 # Copyright (c) 2026, Beetashoke Chakraborty and contributors
 # For license information, please see license.txt
 
+from decimal import ROUND_HALF_UP, Decimal
+
 import frappe
 from frappe.utils import flt
+
+
+def _round_half_up(value, decimals=1) -> float:
+	"""Round to `decimals` places, rounding .5 away from zero (e.g. 5.25 -> 5.3)."""
+	quant = Decimal("1." + "0" * decimals) if decimals else Decimal("1")
+	return float(Decimal(str(value)).quantize(quant, rounding=ROUND_HALF_UP))
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
 	apply_spike_threshold,
 	calculate_net_order_recommendation,
@@ -222,19 +230,20 @@ def get_columns() -> list[dict]:
 			"fieldname": "no_of_machines",
 			"fieldtype": "Int",
 			"width": 150,
+			"align": "center",
 		},
 		{
 			"label": "Net Prod Load (Days)",
 			"fieldname": "net_prod_load",
 			"fieldtype": "Float",
-			"precision": 2,
+			"precision": 1,
 			"width": 180,
 		},
 		{
 			"label": "Net Order Load (Days)",
 			"fieldname": "net_order_load",
 			"fieldtype": "Float",
-			"precision": 2,
+			"precision": 1,
 			"width": 180,
 		},
 	]
@@ -374,8 +383,8 @@ def get_data() -> list[dict]:
 		effective_runtime = runtime * (oee / 100.0) if oee else 0
 
 		if effective_runtime and no_of_machines:
-			net_prod_load = round((total_prod_hours / effective_runtime) / no_of_machines, 2)
-			net_order_load = round((total_order_hours / effective_runtime) / no_of_machines, 2)
+			net_prod_load = _round_half_up((total_prod_hours / effective_runtime) / no_of_machines, 1)
+			net_order_load = _round_half_up((total_order_hours / effective_runtime) / no_of_machines, 1)
 		else:
 			net_prod_load = 0
 			net_order_load = 0

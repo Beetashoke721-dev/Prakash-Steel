@@ -183,10 +183,20 @@ function show_machine_breakdown(d) {
 	});
 }
 
+function ensure_bold_headers() {
+	if (document.getElementById("bright-machine-load-bold-headers")) return;
+	const style = document.createElement("style");
+	style.id = "bright-machine-load-bold-headers";
+	style.innerHTML = `.dt-cell--header .dt-cell__content { font-weight: 700 !important; }`;
+	document.head.appendChild(style);
+}
+
 frappe.query_reports["Bright Machine Load"] = {
 	"filters": [],
 
 	onload(report) {
+		ensure_bold_headers();
+
 		// Fetch colour rules once into module-level variable
 		frappe.call({
 			method: "prakash_steel.prakash_steel.report.bright_machine_load.bright_machine_load.get_machine_load_colours",
@@ -229,6 +239,14 @@ frappe.query_reports["Bright Machine Load"] = {
 	},
 
 	formatter(value, row, column, data, default_formatter) {
+		if (column.fieldname === "no_of_machines" && data) {
+			const v = data.no_of_machines;
+			return `<div style="text-align:center;font-weight:bold;">${v === null || v === undefined ? "" : v}</div>`;
+		}
+		if (column.fieldname === "machine_name" && data) {
+			const v = data.machine_name;
+			return `<div style="font-weight:bold;">${v === null || v === undefined ? "" : frappe.utils.escape_html(v)}</div>`;
+		}
 		value = default_formatter(value, row, column, data);
 		if (
 			(column.fieldname === "net_prod_load" || column.fieldname === "net_order_load") &&
