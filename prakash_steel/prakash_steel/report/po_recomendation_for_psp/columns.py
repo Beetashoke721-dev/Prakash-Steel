@@ -32,6 +32,13 @@ def get_columns(filters: dict | None = None) -> list[dict]:
 			"width": 120,
 		},
 		{
+			"label": _("Machine Name"),
+			"fieldname": "machine_name",
+			"fieldtype": "Link",
+			"options": "Bright Machine",
+			"width": 140,
+		},
+		{
 			"label": _("SKU Type"),
 			"fieldname": "sku_type",
 			"fieldtype": "Data",

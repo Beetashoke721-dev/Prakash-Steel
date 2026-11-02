@@ -64,6 +64,12 @@ class TestCalculateSkuType(unittest.TestCase):
     def test_traded_non_buffer(self):
         self.assertEqual(self._run("Traded"), "TRMTO")
 
+    def test_cs_buffer(self):
+        self.assertEqual(self._run("CS", "Buffer"), "CSMTA")
+
+    def test_cs_non_buffer(self):
+        self.assertEqual(self._run("CS"), "CSMTO")
+
     def test_no_item_type_returns_none(self):
         self.assertIsNone(self._run(None))
 

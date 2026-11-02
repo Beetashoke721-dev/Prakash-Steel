@@ -1,0 +1,187 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "Format: {work_order}-{billet_weight}",
+ "creation": "2026-09-18 15:58:52.788185",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_urle",
+  "work_order",
+  "billet_weight",
+  "column_break_ppek",
+  "raw_material_item",
+  "raw_material_make",
+  "column_break_jywf",
+  "billet_length",
+  "billet_pcs",
+  "amended_from",
+  "section_break_zdqs",
+  "cutting_category",
+  "column_break_gnic",
+  "rate",
+  "column_break_seig",
+  "amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_urle",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Billet Cutting Rate Calculation",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "work_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Work Order",
+   "link_filters": "[[\"Work Order\",\"custom_rolled_production\",\"=\",1]]",
+   "options": "Work Order",
+   "reqd": 1
+  },
+  {
+   "fieldname": "billet_weight",
+   "fieldtype": "Int",
+   "label": "Billet Weight",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ppek",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_jywf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "raw_material_item",
+   "fieldtype": "Link",
+   "label": "Raw Material Item",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "raw_material_make",
+   "fieldtype": "Link",
+   "label": "Raw Material Make",
+   "options": "Supplier"
+  },
+  {
+   "fetch_from": "work_order.custom_billet_length",
+   "fieldname": "billet_length",
+   "fieldtype": "Data",
+   "label": "Billet Length",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "work_order.custom_billet_pcs",
+   "fieldname": "billet_pcs",
+   "fieldtype": "Int",
+   "label": "Billet Pcs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_zdqs",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "cutting_category",
+   "fieldtype": "Link",
+   "label": "Cutting Category",
+   "options": "Cutting Category"
+  },
+  {
+   "fieldname": "column_break_gnic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_seig",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "cutting_category.rate",
+   "fieldname": "rate",
+   "fieldtype": "Float",
+   "label": "Rate",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Float",
+   "label": "Amount",
+   "precision": "2",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-18 17:01:09.658053",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Billet Cutting Rate Calculation",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

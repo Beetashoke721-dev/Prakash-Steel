@@ -1,26 +1,10 @@
-# Copyright (c) 2026, Beetashoke Chakraborty and contributors
-# For license information, please see license.txt
-
-"""
-Pure calculation functions for the PO Recommendation report.
-No database calls — only math, maps passed as arguments, and frappe.utils helpers.
-"""
-
 import math
 
 from frappe.utils import date_diff, flt, nowdate
 
-# ---------------------------------------------------------------------------
-# Priority colour constants (shared across PO report and sibling reports)
-# ---------------------------------------------------------------------------
 
 _STATUS_PRIORITY = {"BLACK": 5, "RED": 4, "YELLOW": 3, "GREEN": 2, "WHITE": 1}
-_PRIORITY_TO_COLOUR = {5: "Black", 4: "Red", 3: "Yellow", 2: "Green", 1: "White"}
-
-
-# ---------------------------------------------------------------------------
-# SKU type derivation
-# ---------------------------------------------------------------------------
+_PRIORITY_TO_COLOUR = {5: "BLACK", 4: "RED", 3: "YELLOW", 2: "GREEN", 1: "WHITE"}
 
 
 def calculate_sku_type(buffer_flag: str, item_type: str | None) -> str | None:
@@ -41,11 +25,6 @@ def calculate_sku_type(buffer_flag: str, item_type: str | None) -> str | None:
 		return "TRMTA" if is_buffer else "TRMTO"
 
 	return None
-
-
-# ---------------------------------------------------------------------------
-# Non-buffer priority helpers
-# ---------------------------------------------------------------------------
 
 
 def _compute_order_status(delivery_date: str | None, transaction_date: str | None) -> str | None:
@@ -72,12 +51,6 @@ def _compute_order_status(delivery_date: str | None, transaction_date: str | Non
 
 
 def _non_buffer_priority(item_code: str, level: float, so_map: dict) -> str:
-	"""
-	FIFO-allocate `level` across open SOs sorted by delivery_date ASC.
-	- If any SO has shortage  return worst order_status colour of shortage SOs.
-	- If no shortage anywhere  return worst order_status colour of no-shortage SOs.
-	- If no open SOs  return ''.
-	"""
 	sos = so_map.get(item_code, [])
 	if not sos:
 		return ""
@@ -103,9 +76,20 @@ def _non_buffer_priority(item_code: str, level: float, so_map: dict) -> str:
 	return ""
 
 
-# ---------------------------------------------------------------------------
-# Order recommendation calculations
-# ---------------------------------------------------------------------------
+def buffer_order_recommendation_colour(level: float, total: float) -> str:
+	level = flt(level)
+	total = flt(total)
+	if level == 0:
+		return "Black"
+	if total <= 0:
+		return ""
+	if level <= total / 3:
+		return "Red"
+	if level <= (2 * total) / 3:
+		return "Yellow"
+	if level <= total:
+		return "Green"
+	return "White"
 
 
 def calculate_net_order_recommendation(base_order_rec: float, moq: float, batch_size: float) -> float:
@@ -113,7 +97,7 @@ def calculate_net_order_recommendation(base_order_rec: float, moq: float, batch_
 	moq = flt(moq)
 	batch_size = flt(batch_size)
 
-	if base_order_rec <= 0:
+	if base_order_rec < 1:
 		return 0
 
 	if moq > 0:
@@ -139,12 +123,14 @@ def calculate_initial_order_recommendation(
 	open_so_map: dict[str, float],
 	qualified_demand_map: dict[str, float],
 	open_po_map: dict[str, float],
+	open_subcon_po_map: dict[str, float] | None = None,
 ) -> float:
 	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
 	is_buffer = buffer_flag == "Buffer"
 
 	stock = flt(stock_map.get(item_code, 0))
 	wip = flt(wip_map.get(item_code, 0))
+	open_subcon_po = flt((open_subcon_po_map or {}).get(item_code, 0))
 
 	if is_buffer:
 		tog = flt(item_tog_map.get(item_code, 0))
@@ -153,18 +139,18 @@ def calculate_initial_order_recommendation(
 		open_po = flt(open_po_map.get(item_code, 0))
 
 		if sku_type in ["BOTA", "PTA"]:
-			order_rec = max(0, tog + qualified_demand - stock - wip - open_po)
+			order_rec = max(0, tog + qualified_demand - stock - wip - open_po - open_subcon_po)
 		else:
-			order_rec = max(0, tog + qualified_demand - stock - wip - open_po)
+			order_rec = max(0, tog + qualified_demand - stock - wip - open_po - open_subcon_po)
 	else:
-		qualified_demand = flt(open_so_map.get(item_code, 0))  # all-time open SO for non-buffer
+		qualified_demand = flt(open_so_map.get(item_code, 0))
 		sku_type = item_sku_type_map.get(item_code)
 		open_po = flt(open_po_map.get(item_code, 0))
 
 		if sku_type in ["PTO", "BOTO", "TRMTO"]:
-			order_rec = max(0, qualified_demand - stock - wip - open_po)
+			order_rec = max(0, qualified_demand - stock - wip - open_po - open_subcon_po)
 		else:
-			order_rec = max(0, qualified_demand - stock - wip - open_po)
+			order_rec = max(0, qualified_demand - stock - wip - open_po - open_subcon_po)
 
 	return order_rec
 
@@ -183,6 +169,7 @@ def calculate_final_order_recommendation(
 	parent_demand_map: dict[str, float],
 	item_type_map: dict[str, str] | None = None,
 	spike_master_map: dict[str, dict] | None = None,
+	open_subcon_po_map: dict[str, float] | None = None,
 ) -> float:
 	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
 	is_buffer = buffer_flag == "Buffer"
@@ -190,6 +177,7 @@ def calculate_final_order_recommendation(
 	stock = flt(stock_map.get(item_code, 0))
 	wip = flt(wip_map.get(item_code, 0))
 	mrq = flt(mrq_map.get(item_code, 0))
+	open_subcon_po = flt((open_subcon_po_map or {}).get(item_code, 0))
 
 	if is_buffer:
 		tog = flt(item_tog_map.get(item_code, 0))
@@ -206,31 +194,26 @@ def calculate_final_order_recommendation(
 		open_po = flt(open_po_map.get(item_code, 0))
 
 		if sku_type in ["BOTA", "PTA"]:
-			base_order_rec = tog + total_demand - stock - wip - open_po
+			base_order_rec = tog + total_demand - stock - wip - open_po - open_subcon_po
 		else:
-			base_order_rec = tog + total_demand - stock - wip - open_po
+			base_order_rec = tog + total_demand - stock - wip - open_po - open_subcon_po
 
 		order_rec = max(0, base_order_rec - mrq)
 	else:
-		open_so = flt(open_so_map.get(item_code, 0))  # all-time open SO for non-buffer
+		open_so = flt(open_so_map.get(item_code, 0))
 		parent_demand = flt(parent_demand_map.get(item_code, 0))
 		requirement = open_so + parent_demand
 		sku_type = item_sku_type_map.get(item_code)
 		open_po = flt(open_po_map.get(item_code, 0))
 
 		if sku_type in ["PTO", "BOTO", "TRMTO"]:
-			base_order_rec = requirement - stock - wip - open_po
+			base_order_rec = requirement - stock - wip - open_po - open_subcon_po
 		else:
-			base_order_rec = requirement - stock - wip - open_po
+			base_order_rec = requirement - stock - wip - open_po - open_subcon_po
 
 		order_rec = max(0, base_order_rec - mrq)
 
 	return order_rec
-
-
-# ---------------------------------------------------------------------------
-# Qualified demand
-# ---------------------------------------------------------------------------
 
 
 def get_qualified_demand_for_item(
@@ -239,16 +222,8 @@ def get_qualified_demand_for_item(
 	spike_map: dict[str, float],
 	item_buffer_map: dict[str, str],
 ) -> tuple[float, float, float]:
-	"""Returns an item's raw (un-thresholded) qualified demand: till_today + spike.
-
-	The spike threshold can only be evaluated once parent demand (pushed down
-	via BOM explosion) is known, so it is NOT applied here — see
-	`calculate_total_demand` / `apply_spike_threshold`, which combine this raw
-	value with parent demand before thresholding.
-	"""
 	till_today = flt(till_today_map.get(item_code, 0))
 
-	# Spike logic ONLY applies to buffer items
 	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
 	if buffer_flag != "Buffer":
 		spike = 0.0
@@ -265,9 +240,6 @@ def apply_spike_threshold(
 	item_type: str | None,
 	spike_master_map: dict[str, dict] | None,
 ) -> float:
-	"""Zero out a buffer item's total demand (own qualified demand + parent
-	demand) when it doesn't clear TOG x spike_threshold% for its item_type.
-	"""
 	if not spike_master_map or not item_type or tog <= 0:
 		return total_demand
 
@@ -293,10 +265,6 @@ def calculate_total_demand(
 	item_type_map: dict[str, str] | None = None,
 	spike_master_map: dict[str, dict] | None = None,
 ) -> float:
-	"""Combine an item's own qualified demand with parent demand pushed down
-	via BOM explosion, then (buffer items only) apply the spike threshold to
-	the combined total — not to the qualified-demand component alone.
-	"""
 	qualified_demand = flt(qualified_demand_map.get(item_code, 0))
 	parent_demand = flt(parent_demand_map.get(item_code, 0))
 	total_demand = qualified_demand + parent_demand
@@ -307,11 +275,6 @@ def calculate_total_demand(
 		total_demand = apply_spike_threshold(total_demand, tog, item_type, spike_master_map)
 
 	return total_demand
-
-
-# ---------------------------------------------------------------------------
-# Breakdown / log builders (no DB)
-# ---------------------------------------------------------------------------
 
 
 def build_calculation_breakdown_po_report(
@@ -334,6 +297,7 @@ def build_calculation_breakdown_po_report(
 	parent_demand_details_list: list[dict],
 	till_today: float | None = None,
 	spike: float | None = None,
+	open_subcon_po: float = 0,
 ) -> str:
 	lines = []
 	lines.append(f"\n  Item: {item_code}")
@@ -370,26 +334,33 @@ def build_calculation_breakdown_po_report(
 		lines.append(f"  Stock: {stock}")
 		lines.append(f"  WIP: {wip}")
 		lines.append(f"  Open PO: {open_po}")
+		lines.append(f"  Open Subcon PO: {open_subcon_po}")
 		lines.append(f"  MRQ: {mrq}")
 
 		if sku_type in ["BOTA", "PTA"]:
-			base_calc = tog + total_demand - stock - wip - open_po
+			base_calc = tog + total_demand - stock - wip - open_po - open_subcon_po
 			lines.append(
-				"  Base Calculation: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO"
+				"  Base Calculation: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO - Open Subcon PO"
 			)
 			lines.append(
-				f"                    = {tog} + ({qualified_demand} + {total_parent_demand}) - {stock} - {wip} - {open_po}"
+				f"                    = {tog} + ({qualified_demand} + {total_parent_demand}) - {stock} - {wip} - {open_po} - {open_subcon_po}"
 			)
-			lines.append(f"                    = {tog} + {total_demand} - {stock} - {wip} - {open_po}")
+			lines.append(
+				f"                    = {tog} + {total_demand} - {stock} - {wip} - {open_po} - {open_subcon_po}"
+			)
 			lines.append(f"                    = {base_calc}")
 			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
 		else:
-			base_calc = tog + total_demand - stock - wip
-			lines.append("  Base Calculation: TOG + (Qualified Demand + Parent Demand) - Stock - WIP")
+			base_calc = tog + total_demand - stock - wip - open_po - open_subcon_po
 			lines.append(
-				f"                    = {tog} + ({qualified_demand} + {total_parent_demand}) - {stock} - {wip}"
+				"  Base Calculation: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO - Open Subcon PO"
 			)
-			lines.append(f"                    = {tog} + {total_demand} - {stock} - {wip}")
+			lines.append(
+				f"                    = {tog} + ({qualified_demand} + {total_parent_demand}) - {stock} - {wip} - {open_po} - {open_subcon_po}"
+			)
+			lines.append(
+				f"                    = {tog} + {total_demand} - {stock} - {wip} - {open_po} - {open_subcon_po}"
+			)
 			lines.append(f"                    = {base_calc}")
 			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
 
@@ -420,7 +391,6 @@ def build_calculation_breakdown_po_report(
 			lines.append("  No MOQ or Batch Size")
 			lines.append(f"  Net Order Recommendation: {final_order_rec}")
 	else:
-		# Non-buffer items
 		open_so_for_breakdown = qualified_demand
 		lines.append(f"  Open SO: {open_so_for_breakdown}")
 		if till_today is not None and spike is not None:
@@ -429,6 +399,7 @@ def build_calculation_breakdown_po_report(
 		lines.append(f"  Stock: {stock}")
 		lines.append(f"  WIP: {wip}")
 		lines.append(f"  Open PO: {open_po}")
+		lines.append(f"  Open Subcon PO: {open_subcon_po}")
 		lines.append(f"  Total Parent Demand: {total_parent_demand}")
 
 		if total_parent_demand > 0 and parent_demand_details_list:
@@ -446,21 +417,25 @@ def build_calculation_breakdown_po_report(
 		requirement = open_so_for_breakdown + total_parent_demand
 
 		if sku_type in ["PTO", "BOTO"]:
-			base_calc = requirement - stock - wip - open_po
+			base_calc = requirement - stock - wip - open_po - open_subcon_po
 			lines.append(
 				f"  Requirement: Open SO + Parent Demand = {open_so_for_breakdown} + {total_parent_demand} = {requirement}"
 			)
-			lines.append("  Base Calculation: Requirement - Stock - WIP - Open PO")
-			lines.append(f"                    = {requirement} - {stock} - {wip} - {open_po}")
+			lines.append("  Base Calculation: Requirement - Stock - WIP - Open PO - Open Subcon PO")
+			lines.append(
+				f"                    = {requirement} - {stock} - {wip} - {open_po} - {open_subcon_po}"
+			)
 			lines.append(f"                    = {base_calc}")
 			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
 		else:
-			base_calc = requirement - stock - wip
+			base_calc = requirement - stock - wip - open_po - open_subcon_po
 			lines.append(
 				f"  Requirement: Open SO + Parent Demand = {open_so_for_breakdown} + {total_parent_demand} = {requirement}"
 			)
-			lines.append("  Base Calculation: Requirement - Stock - WIP")
-			lines.append(f"                    = {requirement} - {stock} - {wip}")
+			lines.append("  Base Calculation: Requirement - Stock - WIP - Open PO - Open Subcon PO")
+			lines.append(
+				f"                    = {requirement} - {stock} - {wip} - {open_po} - {open_subcon_po}"
+			)
 			lines.append(f"                    = {base_calc}")
 			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
 

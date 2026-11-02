@@ -1,0 +1,269 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "Format: {date}",
+ "creation": "2026-09-02 12:24:49.671178",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_n0gv",
+  "date",
+  "column_break_socc",
+  "amended_from",
+  "column_break_pghw",
+  "column_break_tlur",
+  "section_break_fght",
+  "billet_basic_ms",
+  "column_break_ofqx",
+  "rolling_charges",
+  "column_break_xdmk",
+  "payment_terms",
+  "section_break_dzne",
+  "ms_round_basic",
+  "ms_round_basic_rate",
+  "column_break_fwkr",
+  "c4_round",
+  "c4_round_rate",
+  "column_break_shuj",
+  "c4_flat_square",
+  "c4_flat_square_rate",
+  "column_break_pdni",
+  "ms_square",
+  "ms_square_rate",
+  "section_break_sqyo",
+  "bright_round_basic_difference",
+  "bright_round_basic",
+  "column_break_lzzi",
+  "round_bright_c4_difference",
+  "round_bright_c4_rate",
+  "column_break_qmmr",
+  "bright_flat_basic_difference",
+  "bright_flat_basic"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_n0gv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Basic Rate Structure",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_fght",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "billet_basic_ms",
+   "fieldtype": "Float",
+   "label": "Billet Basic MS",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rolling_charges",
+   "fieldtype": "Float",
+   "label": "Rolling Charges",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ofqx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ms_round_basic",
+   "fieldtype": "Float",
+   "label": "MS Round Basic Difference",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ms_square",
+   "fieldtype": "Float",
+   "label": "MS Square Difference",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_xdmk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "c4_round",
+   "fieldtype": "Float",
+   "label": "C4 Round Difference",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "c4_flat_square",
+   "fieldtype": "Float",
+   "label": "C4 Flat & Square Difference",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_terms",
+   "fieldtype": "Int",
+   "label": "Payment Terms (Days)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_socc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_pghw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_tlur",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_dzne",
+   "fieldtype": "Section Break",
+   "label": "Rolled Bar Basics"
+  },
+  {
+   "fieldname": "column_break_fwkr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ms_round_basic_rate",
+   "fieldtype": "Float",
+   "label": "MS Round Basic Rate",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_shuj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ms_square_rate",
+   "fieldtype": "Float",
+   "label": "MS Square Rate",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "c4_round_rate",
+   "fieldtype": "Float",
+   "label": "C4 Round Rate",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_sqyo",
+   "fieldtype": "Section Break",
+   "label": "Bright Bar Basics"
+  },
+  {
+   "fieldname": "column_break_lzzi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "c4_flat_square_rate",
+   "fieldtype": "Float",
+   "label": "C4 Flat & Square Rate",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qmmr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bright_round_basic",
+   "fieldtype": "Float",
+   "label": "Bright Round Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bright_flat_basic",
+   "fieldtype": "Float",
+   "label": "Bright Flat & Square Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bright_round_basic_difference",
+   "fieldtype": "Float",
+   "label": "Bright Round Basic Difference",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bright_flat_basic_difference",
+   "fieldtype": "Float",
+   "label": "Bright Flat & Square Basic Difference",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_pdni",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "round_bright_c4_difference",
+   "fieldtype": "Float",
+   "label": "Bright Round C4 Difference",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "round_bright_c4_rate",
+   "fieldtype": "Float",
+   "label": "Bright Round C4 Rate",
+   "precision": "2",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-16 17:41:02.894126",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Basic Rate Structure",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "M.D",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

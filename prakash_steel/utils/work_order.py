@@ -2,21 +2,80 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
+from prakash_steel.utils.whitelist_permissions import require_all_permissions
+
+
+def is_automatic_manufacture_stock_entry_enabled() -> bool:
+	"""Feature flag controlled by `Stock Entry Setting` single doctype."""
+	try:
+		return (
+			cint(
+				frappe.db.get_single_value(
+					"Stock Entry Setting",
+					"enable_automatic_manufacture_stock_entry",
+				)
+			)
+			== 1
+		)
+	except Exception:
+		# If the setting DocType isn't installed/migrated yet, keep auto logic off.
+		return False
+
+
+@frappe.whitelist()
+def get_stock_entry_setting_auto_manufacture_enabled() -> dict:
+	"""Used by Work Order JS to decide whether to patch Finish Stock Entry logic."""
+	return {"enabled": is_automatic_manufacture_stock_entry_enabled()}
+
+
+def _require_auto_stock_entry_enabled() -> None:
+	if not is_automatic_manufacture_stock_entry_enabled():
+		frappe.throw(
+			_(
+				"Automatic Manufacture Stock Entry is disabled. Enable it in `Stock Entry Setting`."
+			)
+		)
+
+
+PRODUCTION_TYPE_FIELDS = (
+	("custom_bright_production", "Bright Production"),
+	("custom_rolled_production", "Rolled Production"),
+	("custom_annealing", "Annealing"),
+	("custom_straightning", "Straightning"),
+	("custom_cutting", "Cutting"),
+)
+
+
+def _format_production_type_labels(labels, separator: str) -> str:
+	bold = [f"<b>{_(label)}</b>" for label in labels]
+	if len(bold) == 1:
+		return bold[0]
+	return "{0} {1} {2}".format(", ".join(bold[:-1]), separator, bold[-1])
+
+
+def get_selected_production_types(doc) -> list[str]:
+	return [label for fieldname, label in PRODUCTION_TYPE_FIELDS if cint(doc.get(fieldname))]
+
 
 def validate_production_type(doc, method=None):
-	"""Exactly one of Bright Production or Rolled Production must be checked."""
-	bright = bool(doc.custom_bright_production)
-	rolled = bool(doc.custom_rolled_production)
+	"""Exactly one production type checkbox must be selected."""
+	selected = get_selected_production_types(doc)
 
-	if not bright and not rolled:
+	if not selected:
 		frappe.throw(
-			_("Please select one production type: <b>Bright Production</b> or <b>Rolled Production</b>."),
+			_("Please select one production type: {0}.").format(
+				_format_production_type_labels(
+					[label for _fieldname, label in PRODUCTION_TYPE_FIELDS], _("or")
+				)
+			),
 			title=_("Production Type Required"),
 		)
 
-	if bright and rolled:
+	if len(selected) > 1:
 		frappe.throw(
-			_("Only one production type can be selected at a time: either <b>Bright Production</b> or <b>Rolled Production</b>, not both."),
+			_("Only one production type can be selected at a time. Currently selected: {0}.").format(
+				_format_production_type_labels(selected, _("and"))
+			),
 			title=_("Production Type Conflict"),
 		)
 
@@ -135,49 +194,44 @@ def update_custom_wastage_after_stock_entry(doc, method=None):
 	update_job_cards_billet_weight(doc.work_order)
 
 
-def copy_production_type_to_job_card(doc, method=None):
-	"""Copy production type checkboxes from the parent Work Order to this Job Card."""
-	if not doc.work_order:
-		return
+def get_work_order_production_types(work_order: str) -> dict | None:
+	"""Read every production type checkbox from a Work Order."""
+	if not work_order:
+		return None
 
-	wo = frappe.db.get_value(
-		"Work Order",
-		doc.work_order,
-		["custom_bright_production", "custom_rolled_production"],
-		as_dict=True,
-	)
+	fieldnames = [fieldname for fieldname, _label in PRODUCTION_TYPE_FIELDS]
+	wo = frappe.db.get_value("Work Order", work_order, fieldnames, as_dict=True)
 
 	if not wo:
+		return None
+
+	return {fieldname: cint(wo.get(fieldname)) for fieldname in fieldnames}
+
+
+def copy_production_type_to_job_card(doc, method=None):
+	"""Copy production type checkboxes from the parent Work Order to this Job Card."""
+	production_types = get_work_order_production_types(doc.work_order)
+
+	if not production_types:
 		return
 
 	frappe.db.set_value(
 		"Job Card",
 		doc.name,
-		{
-			"custom_bright_production": wo.custom_bright_production,
-			"custom_rolled_production": wo.custom_rolled_production,
-		},
+		production_types,
 		update_modified=False,
 	)
 
 
 def lock_production_type_from_work_order(doc, method=None):
 	"""Keep Job Card production type in sync with the linked Work Order."""
-	if not doc.work_order:
+	production_types = get_work_order_production_types(doc.work_order)
+
+	if not production_types:
 		return
 
-	wo = frappe.db.get_value(
-		"Work Order",
-		doc.work_order,
-		["custom_bright_production", "custom_rolled_production"],
-		as_dict=True,
-	)
-
-	if not wo:
-		return
-
-	doc.custom_bright_production = wo.custom_bright_production
-	doc.custom_rolled_production = wo.custom_rolled_production
+	for fieldname, value in production_types.items():
+		doc.set(fieldname, value)
 
 
 def _time_log_used_pcs(row) -> float:
@@ -232,6 +286,503 @@ def get_job_card_billet_cutting_context(work_order: str, exclude_job_card: str |
 		"pool": flt(wo.custom_total_raw_material_pcs),
 		"other_used": get_submitted_job_card_used_pcs(work_order, exclude_job_card),
 		"is_rolled": 1,
+	}
+
+
+def is_last_operation_job_card(doc) -> bool:
+	"""True when this Job Card is for the Work Order's last operation (or there are none)."""
+	if not doc.work_order:
+		return False
+
+	operations = frappe.get_all(
+		"Work Order Operation",
+		filters={"parent": doc.work_order},
+		fields=["name", "sequence_id", "operation"],
+		order_by="sequence_id asc, idx asc",
+	)
+	if not operations:
+		return True
+
+	last = operations[-1]
+	if getattr(doc, "operation_id", None):
+		return doc.operation_id == last.get("name")
+	if getattr(doc, "sequence_id", None):
+		return flt(doc.sequence_id) == flt(last.get("sequence_id"))
+	if getattr(doc, "operation", None):
+		return doc.operation == last.get("operation")
+	return True
+
+
+def should_create_manufacture_stock_entry_for_job_card(doc) -> bool:
+	"""Manufacture FG only after a normal last-operation Job Card is submitted."""
+	if cint(getattr(doc, "docstatus", 0)) != 1:
+		return False
+	if cint(getattr(doc, "is_corrective_job_card", 0)):
+		return False
+	if not getattr(doc, "work_order", None):
+		return False
+	if cint(frappe.db.get_value("Work Order", doc.work_order, "track_semi_finished_goods")):
+		return False
+	return is_last_operation_job_card(doc)
+
+
+def is_raw_material_stock_entry_row(row) -> bool:
+	"""Outgoing consumption row: source warehouse only, not FG / scrap / secondary."""
+	if cint(getattr(row, "is_finished_item", 0)):
+		return False
+	if getattr(row, "type", None):
+		return False
+	if cint(getattr(row, "is_legacy_scrap_item", 0)) or cint(getattr(row, "is_scrap_item", 0)):
+		return False
+	return bool(getattr(row, "s_warehouse", None)) and not getattr(row, "t_warehouse", None)
+
+
+def is_finished_good_stock_entry_row(row) -> bool:
+	if getattr(row, "type", None):
+		return False
+	return cint(getattr(row, "is_finished_item", 0)) == 1
+
+
+def is_secondary_stock_entry_row(row) -> bool:
+	if getattr(row, "type", None):
+		return True
+	return cint(getattr(row, "is_legacy_scrap_item", 0)) or cint(getattr(row, "is_scrap_item", 0))
+
+
+def get_job_card_secondary_items(job_card) -> list:
+	"""Return Job Card Secondary Items (Qty column is stock_qty)."""
+	if not job_card:
+		return []
+
+	if not isinstance(job_card, str) and getattr(job_card, "secondary_items", None) is not None:
+		rows = []
+		for row in job_card.secondary_items or []:
+			item_code = getattr(row, "item_code", None)
+			qty = flt(getattr(row, "stock_qty", 0))
+			if not item_code or qty <= 0:
+				continue
+			rows.append(
+				{
+					"type": getattr(row, "type", None),
+					"item_code": item_code,
+					"item_name": getattr(row, "item_name", None),
+					"description": getattr(row, "description", None),
+					"stock_qty": qty,
+					"stock_uom": getattr(row, "stock_uom", None),
+					"bom_secondary_item": getattr(row, "bom_secondary_item", None),
+				}
+			)
+		return rows
+
+	name = job_card if isinstance(job_card, str) else getattr(job_card, "name", None)
+	if not name:
+		return []
+
+	items = frappe.get_all(
+		"Job Card Secondary Item",
+		filters={"parent": name, "parenttype": "Job Card"},
+		fields=[
+			"type",
+			"item_code",
+			"item_name",
+			"description",
+			"stock_qty",
+			"stock_uom",
+			"bom_secondary_item",
+		],
+		order_by="idx",
+	)
+	return [item for item in items if item.get("item_code") and flt(item.get("stock_qty")) > 0]
+
+
+def get_process_loss_qty_from_secondary_items(secondary_items) -> float:
+	return sum(flt(row.get("stock_qty")) for row in (secondary_items or []))
+
+
+def get_job_card_process_loss_qty(job_card, secondary_items=None) -> float:
+	"""Resolve process loss for Manufacture Stock Entry from a Job Card.
+
+	Prefer Job Card Secondary Items qty. When those are empty, fall back to
+	Job Card.process_loss_qty (ERPNext shortfall vs for_quantity).
+	"""
+	if secondary_items is None:
+		secondary_items = get_job_card_secondary_items(job_card)
+
+	loss = get_process_loss_qty_from_secondary_items(secondary_items)
+	if loss:
+		return loss
+
+	if isinstance(job_card, str):
+		return flt(frappe.db.get_value("Job Card", job_card, "process_loss_qty"))
+	if isinstance(job_card, dict):
+		return flt(job_card.get("process_loss_qty"))
+	return flt(getattr(job_card, "process_loss_qty", 0))
+
+
+def _secondary_item_warehouses(stock_entry) -> dict:
+	fg = getattr(stock_entry, "to_warehouse", None)
+	scrap = fg
+	work_order = getattr(stock_entry, "work_order", None)
+	if work_order and isinstance(work_order, str):
+		wo = frappe.db.get_value(
+			"Work Order", work_order, ["scrap_warehouse", "fg_warehouse"], as_dict=True
+		)
+		if wo:
+			fg = wo.fg_warehouse or fg
+			scrap = wo.scrap_warehouse or fg
+	return {
+		"Scrap": scrap,
+		"Additional Finished Good": fg,
+		"Co-Product": fg,
+		"By-Product": fg,
+		"default": fg,
+	}
+
+
+def apply_job_card_secondary_items(stock_entry, secondary_items) -> None:
+	"""Replace Manufacture scrap/secondary rows with Job Card Secondary Items qtys."""
+	payloads = []
+	warehouses = _secondary_item_warehouses(stock_entry)
+	for item in secondary_items or []:
+		qty = flt(item.get("stock_qty"))
+		item_code = item.get("item_code")
+		if not item_code or qty <= 0:
+			continue
+		item_type = item.get("type")
+		payloads.append(
+			{
+				"item_code": item_code,
+				"item_name": item.get("item_name"),
+				"description": item.get("description"),
+				"qty": qty,
+				"transfer_qty": qty,
+				"uom": item.get("stock_uom"),
+				"stock_uom": item.get("stock_uom"),
+				"conversion_factor": 1,
+				"type": item_type,
+				"s_warehouse": None,
+				"t_warehouse": warehouses.get(item_type) or warehouses["default"],
+				"is_finished_item": 0,
+				"is_scrap_item": 1 if item_type == "Scrap" else 0,
+				"bom_secondary_item": item.get("bom_secondary_item"),
+			}
+		)
+
+	if getattr(stock_entry, "doctype", None) == "Stock Entry":
+		kept = [
+			row.as_dict()
+			for row in (stock_entry.items or [])
+			if not is_secondary_stock_entry_row(row)
+		]
+		stock_entry.set("items", kept + payloads)
+		return
+
+	from types import SimpleNamespace
+
+	kept_rows = [
+		row for row in (stock_entry.items or []) if not is_secondary_stock_entry_row(row)
+	]
+	stock_entry.items = kept_rows + [SimpleNamespace(**payload) for payload in payloads]
+
+
+def set_stock_entry_item_qty(row, qty: float) -> None:
+	row.qty = flt(qty)
+	conversion = flt(getattr(row, "conversion_factor", None)) or 1
+	row.transfer_qty = flt(row.qty) * conversion
+
+
+def _apply_qty_to_rows(rows, qty: float) -> None:
+	if len(rows) == 1:
+		set_stock_entry_item_qty(rows[0], qty)
+		return
+
+	current_total = sum(flt(row.qty) for row in rows)
+	if current_total <= 0:
+		set_stock_entry_item_qty(rows[0], qty)
+		for row in rows[1:]:
+			set_stock_entry_item_qty(row, 0)
+		return
+
+	remaining = qty
+	for index, row in enumerate(rows):
+		if index == len(rows) - 1:
+			set_stock_entry_item_qty(row, remaining)
+		else:
+			share = flt(row.qty) / current_total * qty
+			set_stock_entry_item_qty(row, share)
+			remaining -= share
+
+
+def apply_actual_rm_consumption(stock_entry, actual_rm_consumption: float) -> None:
+	"""Replace Manufacture Stock Entry raw-material qty with Job Card actual consumption."""
+	qty = flt(actual_rm_consumption)
+	if qty <= 0:
+		frappe.throw(_("Actual RM Consumption must be greater than 0."))
+
+	rm_rows = [row for row in (stock_entry.items or []) if is_raw_material_stock_entry_row(row)]
+	if not rm_rows:
+		frappe.throw(_("No raw material rows found on the Manufacture Stock Entry."))
+
+	_apply_qty_to_rows(rm_rows, qty)
+
+
+def apply_finished_good_qty(
+	stock_entry, finished_good_qty: float, process_loss_qty: float | None = None
+) -> None:
+	"""Set Manufacture Stock Entry FG qty from Job Card total_completed_qty.
+
+	`fg_completed_qty` must stay FG qty + process loss so ERPNext
+	`validate_fg_completed_qty` accepts the entry.
+	"""
+	qty = flt(finished_good_qty)
+	if qty <= 0:
+		frappe.throw(_("Completed Qty must be greater than 0."))
+
+	fg_rows = [row for row in (stock_entry.items or []) if is_finished_good_stock_entry_row(row)]
+	if not fg_rows:
+		frappe.throw(_("No finished good row found on the Manufacture Stock Entry."))
+
+	_apply_qty_to_rows(fg_rows, qty)
+	if process_loss_qty is None:
+		loss = flt(getattr(stock_entry, "process_loss_qty", 0))
+	else:
+		loss = flt(process_loss_qty)
+		stock_entry.process_loss_qty = loss
+	stock_entry.fg_completed_qty = qty + loss
+	if qty + loss:
+		stock_entry.process_loss_percentage = (loss / (qty + loss)) * 100
+	else:
+		stock_entry.process_loss_percentage = 0
+
+
+def get_job_card_posting_date(job_card) -> str | None:
+	"""Return Job Card posting_date from a doc or name."""
+	if not job_card:
+		return None
+	if not isinstance(job_card, str):
+		return getattr(job_card, "posting_date", None) or None
+	return frappe.db.get_value("Job Card", job_card, "posting_date")
+
+
+def apply_job_card_posting_date(stock_entry, posting_date) -> None:
+	"""Use Job Card posting date on Manufacture Stock Entry (not today's date)."""
+	if not posting_date:
+		return
+	stock_entry.set_posting_time = 1
+	stock_entry.posting_date = posting_date
+
+
+def prepare_auto_manufacture_stock_entry(
+	stock_entry,
+	actual_rm_consumption: float | None = None,
+	finished_good_qty: float | None = None,
+	process_loss_qty: float | None = None,
+	secondary_items: list | None = None,
+	posting_date=None,
+) -> None:
+	"""Apply Prakash Steel Finish defaults before insert/submit."""
+	stock_entry.inspection_required = 0
+	qty_changed = False
+
+	apply_job_card_posting_date(stock_entry, posting_date)
+
+	if actual_rm_consumption not in (None, ""):
+		apply_actual_rm_consumption(stock_entry, actual_rm_consumption)
+		qty_changed = True
+
+	if finished_good_qty not in (None, ""):
+		apply_finished_good_qty(stock_entry, finished_good_qty, process_loss_qty=process_loss_qty)
+		qty_changed = True
+
+	if secondary_items:
+		apply_job_card_secondary_items(stock_entry, secondary_items)
+		qty_changed = True
+
+	if qty_changed and hasattr(stock_entry, "calculate_rate_and_amount"):
+		stock_entry.calculate_rate_and_amount(raise_error_if_no_rate=False)
+
+
+@frappe.whitelist()
+def submit_manufacture_stock_entry(
+	work_order_id: str,
+	qty: float | None = None,
+	job_card: str | None = None,
+	actual_rm_consumption: float | None = None,
+	finished_good_qty: float | None = None,
+	process_loss_qty: float | None = None,
+) -> dict:
+	"""Create the Manufacture Stock Entry the same way as ERPNext Finish, then submit it."""
+	from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry
+
+	_require_auto_stock_entry_enabled()
+
+	require_all_permissions(
+		[
+			("Work Order", "read"),
+			("Stock Entry", "create"),
+			("Stock Entry", "submit"),
+		]
+	)
+
+	if not work_order_id:
+		frappe.throw(_("Work Order is required to create Stock Entry."))
+
+	work_order = frappe.db.get_value(
+		"Work Order",
+		work_order_id,
+		["name", "docstatus", "status"],
+		as_dict=True,
+	)
+	if not work_order:
+		frappe.throw(_("Work Order {0} not found.").format(frappe.bold(work_order_id)))
+	if cint(work_order.docstatus) != 1:
+		frappe.throw(_("Work Order {0} must be submitted.").format(frappe.bold(work_order_id)))
+	if work_order.status in ("Stopped", "Closed"):
+		frappe.throw(
+			_("Cannot finish Work Order {0} because it is {1}.").format(
+				frappe.bold(work_order_id), frappe.bold(work_order.status)
+			)
+		)
+
+	qty = flt(qty) if qty not in (None, "") else None
+	loss = flt(process_loss_qty) if process_loss_qty not in (None, "") else None
+	fg_qty = flt(finished_good_qty) if finished_good_qty not in (None, "") else None
+	rm_qty = flt(actual_rm_consumption) if actual_rm_consumption not in (None, "") else None
+	secondary_items = []
+	posting_date = None
+
+	if job_card:
+		if not rm_qty or rm_qty <= 0:
+			frappe.throw(
+				_(
+					"Actual RM Consumption is required to create Manufacture Stock Entry for Job Card {0}."
+				).format(frappe.bold(job_card))
+			)
+		if not fg_qty or fg_qty <= 0:
+			frappe.throw(_("Completed Qty must be greater than 0."))
+		secondary_items = get_job_card_secondary_items(job_card)
+		loss = get_job_card_process_loss_qty(job_card, secondary_items)
+		posting_date = get_job_card_posting_date(job_card)
+
+	if qty is None and fg_qty:
+		qty = fg_qty + (loss or 0)
+	elif fg_qty is not None and loss is not None:
+		qty = fg_qty + loss
+
+	stock_entry = frappe.get_doc(make_stock_entry(work_order_id, "Manufacture", qty=qty))
+	# Do not set stock_entry.job_card. That field is for semi-finished manufacture
+	# against Job Card.finished_good; these mill Job Cards leave finished_good empty,
+	# and ERPNext then throws "Finished Good must be None".
+	prepare_auto_manufacture_stock_entry(
+		stock_entry,
+		actual_rm_consumption=rm_qty,
+		finished_good_qty=fg_qty,
+		process_loss_qty=loss,
+		secondary_items=secondary_items,
+		posting_date=posting_date,
+	)
+	stock_entry.insert()
+	stock_entry.submit()
+	return stock_entry.as_dict()
+
+
+def submit_manufacture_stock_entry_for_job_card(doc, method=None):
+	"""Auto-run Work Order Finish after the last-operation Job Card is submitted."""
+	if not is_automatic_manufacture_stock_entry_enabled():
+		return
+
+	if not should_create_manufacture_stock_entry_for_job_card(doc):
+		return
+
+	completed_qty = flt(doc.total_completed_qty)
+	if completed_qty <= 0:
+		frappe.throw(
+			_(
+				"Cannot finish Work Order because Completed Qty is 0 on Job Card {0}."
+			).format(frappe.bold(doc.name))
+		)
+
+	actual_rm_consumption = flt(getattr(doc, "custom_actual_rm_consumption", 0))
+	if actual_rm_consumption <= 0:
+		frappe.throw(
+			_(
+				"Actual RM Consumption is required to finish Work Order from Job Card {0}."
+			).format(frappe.bold(doc.name))
+		)
+
+	secondary_items = get_job_card_secondary_items(doc)
+	process_loss_qty = get_job_card_process_loss_qty(doc, secondary_items)
+
+	stock_entry = submit_manufacture_stock_entry(
+		doc.work_order,
+		qty=completed_qty + process_loss_qty,
+		job_card=doc.name,
+		actual_rm_consumption=actual_rm_consumption,
+		finished_good_qty=completed_qty,
+		process_loss_qty=process_loss_qty,
+	)
+	frappe.msgprint(
+		_("Work Order Finish submitted Stock Entry {0}").format(frappe.bold(stock_entry.get("name"))),
+		indicator="green",
+		alert=True,
+	)
+
+
+@frappe.whitelist()
+def get_work_order_finish_defaults(work_order_id: str) -> dict:
+	"""Qty defaults for the Work Order Finish popup: Job Card completed qty + process_loss_qty."""
+	_require_auto_stock_entry_enabled()
+
+	require_all_permissions([("Work Order", "read")])
+
+	if not work_order_id:
+		frappe.throw(_("Work Order is required."))
+
+	job_cards = frappe.get_all(
+		"Job Card",
+		filters={
+			"work_order": work_order_id,
+			"docstatus": 1,
+			"is_corrective_job_card": 0,
+		},
+		fields=[
+			"name",
+			"total_completed_qty",
+			"process_loss_qty",
+			"custom_actual_rm_consumption",
+			"operation_id",
+			"sequence_id",
+			"operation",
+		],
+		order_by="modified desc",
+	)
+
+	job_card = None
+	for card in job_cards:
+		card_doc = frappe._dict(card)
+		card_doc.work_order = work_order_id
+		card_doc.docstatus = 1
+		if should_create_manufacture_stock_entry_for_job_card(card_doc):
+			job_card = card
+			break
+
+	if not job_card:
+		return {
+			"job_card": None,
+			"total_completed_qty": 0,
+			"process_loss_qty": 0,
+			"actual_rm_consumption": 0,
+			"qty": 0,
+		}
+
+	completed_qty = flt(job_card.get("total_completed_qty"))
+	process_loss_qty = get_job_card_process_loss_qty(job_card.get("name"))
+	return {
+		"job_card": job_card.get("name"),
+		"total_completed_qty": completed_qty,
+		"process_loss_qty": process_loss_qty,
+		"actual_rm_consumption": flt(job_card.get("custom_actual_rm_consumption")),
+		"qty": completed_qty + process_loss_qty,
 	}
 
 

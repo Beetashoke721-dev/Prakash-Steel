@@ -5,7 +5,11 @@ frappe.query_reports["Scorecard Sales Invoice"] = {
 	formatter: function (value, row, column, data, default_formatter) {
 		const fname = column.fieldname || column.id;
 		// Int/Currency formatters wrap in text-align:right; inline skips that wrapper.
-		if (fname === "qty" || fname === "item_price") {
+		if (
+			["qty_ordered", "qty_invoiced", "invoice_qty", "pending_qty", "book_value"].includes(
+				fname
+			)
+		) {
 			const formatted = frappe.format(value, column, {
 				for_print: false,
 				always_show_decimals: true,
@@ -18,31 +22,6 @@ frappe.query_reports["Scorecard Sales Invoice"] = {
 			return `<div style="text-align:left;width:100%">${formatted ?? ""}</div>`;
 		}
 		return default_formatter(value, row, column, data);
-	},
-	onload: function (report) {
-		frappe.call({
-			method: "frappe.client.get_list",
-			args: {
-				doctype: "Sales Invoice",
-				fields: ["place_of_supply"],
-				filters: {
-					docstatus: 1,
-				},
-				group_by: "place_of_supply",
-				order_by: "place_of_supply asc",
-				limit_page_length: 500,
-			},
-			callback: function (r) {
-				const values = [""];
-				(r.message || []).forEach((row) => {
-					if (row.place_of_supply) values.push(row.place_of_supply);
-				});
-
-				const placeFilter = report.get_filter("place_of_supply");
-				placeFilter.df.options = values.join("\n");
-				placeFilter.refresh();
-			},
-		});
 	},
 	filters: [
 		{
@@ -65,10 +44,10 @@ frappe.query_reports["Scorecard Sales Invoice"] = {
 			default: frappe.defaults.get_user_default("Company"),
 		},
 		{
-			fieldname: "sales_invoice",
-			label: __("Sales Invoice"),
+			fieldname: "sales_order",
+			label: __("Sales Order"),
 			fieldtype: "Link",
-			options: "Sales Invoice",
+			options: "Sales Order",
 		},
 		{
 			fieldname: "customer",
@@ -82,28 +61,10 @@ frappe.query_reports["Scorecard Sales Invoice"] = {
 			fieldtype: "Data",
 		},
 		{
-			fieldname: "sales_order",
-			label: __("Sales Order"),
-			fieldtype: "Link",
-			options: "Sales Order",
-		},
-		{
 			fieldname: "item_code",
 			label: __("Item Code"),
 			fieldtype: "Link",
 			options: "Item",
-		},
-		{
-			fieldname: "category_name",
-			label: __("Category Name"),
-			fieldtype: "Link",
-			options: "Item Category",
-		},
-		{
-			fieldname: "place_of_supply",
-			label: __("Place of Supply"),
-			fieldtype: "Select",
-			options: "",
 		},
 	],
 };

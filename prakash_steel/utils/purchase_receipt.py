@@ -6,6 +6,19 @@ from frappe import _
 from frappe.utils import flt
 
 
+def validate_transporter_for_psp_freight(doc, method=None) -> None:
+	"""Require transporter when Freight Payable By is PSP."""
+	if doc.custom_freight_payable_by != "PSP":
+		return
+
+	transporter = getattr(doc, "transporter", None)
+	if not transporter or (isinstance(transporter, str) and not transporter.strip()):
+		frappe.throw(
+			_("Transporter is mandatory when Freight Payable By is PSP."),
+			title=_("Validation Error"),
+		)
+
+
 def validate_purchase_receipt_quantity(doc, method=None) -> None:
 	"""
 	Validate Purchase Receipt quantity against Purchase Order quantity.

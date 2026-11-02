@@ -45,7 +45,7 @@ class TestNonBufferPriority(unittest.TestCase):
 			]
 		}
 		# level 100 covers all → no shortage, worst is RED
-		self.assertEqual(self._fn("ITEM", 100.0, so_map), "Red")
+		self.assertEqual(self._fn("ITEM", 100.0, so_map), "RED")
 
 	def test_shortage_returns_worst_shortage_colour(self):
 		so_map = {
@@ -55,7 +55,7 @@ class TestNonBufferPriority(unittest.TestCase):
 			]
 		}
 		# level 100: first SO uses 80, 20 left; second SO needs 40 → shortage 20 (RED)
-		self.assertEqual(self._fn("ITEM", 100.0, so_map), "Red")
+		self.assertEqual(self._fn("ITEM", 100.0, so_map), "RED")
 
 	def test_shortage_takes_priority_over_no_shortage(self):
 		so_map = {
@@ -64,8 +64,8 @@ class TestNonBufferPriority(unittest.TestCase):
 				{"pending_qty": 10, "order_status": "WHITE"},
 			]
 		}
-		# level 50: BLACK SO has shortage; WHITE has no shortage; result = Black
-		self.assertEqual(self._fn("ITEM", 50.0, so_map), "Black")
+		# level 50: BLACK SO has shortage; WHITE has no shortage; result = BLACK
+		self.assertEqual(self._fn("ITEM", 50.0, so_map), "BLACK")
 
 	def test_fifo_allocation_picks_correct_worst_shortage(self):
 		so_map = {
@@ -77,7 +77,7 @@ class TestNonBufferPriority(unittest.TestCase):
 		}
 		# level 50: SO1 GREEN(30) uses 30→20 left, SO2 YELLOW(30) short 10, SO3 RED(30) short 30
 		# worst shortage = RED (priority 4 > YELLOW 3)
-		self.assertEqual(self._fn("ITEM", 50.0, so_map), "Red")
+		self.assertEqual(self._fn("ITEM", 50.0, so_map), "RED")
 
 	def test_zero_level_all_shortage(self):
 		so_map = {
@@ -85,7 +85,7 @@ class TestNonBufferPriority(unittest.TestCase):
 				{"pending_qty": 10, "order_status": "GREEN"},
 			]
 		}
-		self.assertEqual(self._fn("ITEM", 0.0, so_map), "Green")
+		self.assertEqual(self._fn("ITEM", 0.0, so_map), "GREEN")
 
 	def test_unknown_order_status_ignored(self):
 		so_map = {
@@ -150,6 +150,35 @@ class TestGetQualifiedDemandForItem(unittest.TestCase):
 		self.assertEqual(qd, 0.0)
 		self.assertEqual(till_today, 0.0)
 		self.assertEqual(spike, 0.0)
+
+
+# ---------------------------------------------------------------------------
+# buffer_order_recommendation_colour
+# ---------------------------------------------------------------------------
+
+
+class TestBufferOrderRecommendationColour(unittest.TestCase):
+	def setUp(self):
+		self._fn = _import().buffer_order_recommendation_colour
+
+	def test_level_zero_is_black(self):
+		self.assertEqual(self._fn(0, 150), "Black")
+
+	def test_total_non_positive_is_blank(self):
+		self.assertEqual(self._fn(10, 0), "")
+		self.assertEqual(self._fn(10, -5), "")
+
+	def test_up_to_one_third_is_red(self):
+		self.assertEqual(self._fn(50, 150), "Red")  # exactly total/3
+
+	def test_up_to_two_thirds_is_yellow(self):
+		self.assertEqual(self._fn(100, 150), "Yellow")  # exactly 2*total/3
+
+	def test_up_to_total_is_green(self):
+		self.assertEqual(self._fn(150, 150), "Green")  # exactly total
+
+	def test_above_total_is_white(self):
+		self.assertEqual(self._fn(151, 150), "White")
 
 
 # ---------------------------------------------------------------------------

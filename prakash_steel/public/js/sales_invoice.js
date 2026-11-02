@@ -1,12 +1,22 @@
+function setup_attachment_guard(frm) {
+	prakash_steel.attachment_utils.prevent_attachment_deletion(frm);
+}
+
 frappe.ui.form.on("Sales Invoice", {
     onload(frm) {
         setup_sales_order_row_guard(frm);
+        prakash_steel.item_row_restriction.apply(frm);
+        toggle_payment_terms_template_mandatory(frm);
         if (frm.is_new() && frm.doc.company) {
             fetch_dispatch_address(frm);
         }
     },
     refresh(frm) {
+        setup_attachment_guard(frm);
+
         setup_sales_order_row_guard(frm);
+        prakash_steel.item_row_restriction.apply(frm);
+        toggle_payment_terms_template_mandatory(frm);
 
         if (frm.is_new() && !frm.doc.dispatch_address_name) {
             fetch_dispatch_address(frm);
@@ -30,6 +40,12 @@ frappe.ui.form.on("Sales Invoice", {
                 __("e-Invoice")
             );
         }
+    },
+    is_return(frm) {
+        toggle_payment_terms_template_mandatory(frm);
+    },
+    is_pos(frm) {
+        toggle_payment_terms_template_mandatory(frm);
     },
     before_cancel(frm) {
         // If IRN exists, India Compliance handles the cancellation flow (incl. IRN/e-Waybill cancel dialog).
@@ -235,6 +251,12 @@ async function pspl_cancel_e_invoice_with_internal_reason(frm) {
             ${__("Sales invoice will be cancelled along with the IRN.")}
         </div>
     `).prependTo(d.wrapper);
+}
+
+function toggle_payment_terms_template_mandatory(frm) {
+	// Credit notes / POS hide this field; keep it optional there.
+	const required = !(cint(frm.doc.is_return) || cint(frm.doc.is_pos));
+	frm.toggle_reqd("payment_terms_template", required);
 }
 
 function fetch_dispatch_address(frm) {

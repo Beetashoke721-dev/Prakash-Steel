@@ -5,6 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
+	_round_up_2dp,
 	get_mrq_map,
 	get_open_po_map,
 	get_stock_map,
@@ -63,6 +64,12 @@ def get_columns() -> list[dict]:
 			"width": 160,
 		},
 		{
+			"label": _("Net Order Recommendation"),
+			"fieldname": "net_order_recommendation",
+			"fieldtype": "Int",
+			"width": 180,
+		},
+		{
 			"label": _("On Hand Status"),
 			"fieldname": "on_hand_status",
 			"fieldtype": "Data",
@@ -79,12 +86,6 @@ def get_columns() -> list[dict]:
 			"fieldname": "moq",
 			"fieldtype": "Int",
 			"width": 80,
-		},
-		{
-			"label": _("Net Order Recommendation"),
-			"fieldname": "net_order_recommendation",
-			"fieldtype": "Int",
-			"width": 180,
 		},
 	]
 
@@ -152,7 +153,7 @@ def get_data() -> list[dict]:
 		on_order = int(flt(open_po_map.get(item_code, 0)))
 		mrq = int(flt(mrq_map.get(item_code, 0)))
 		order_recommendation = max(0, tog - on_hand_stock - on_order - mrq)
-		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
+		on_hand_status_value = _round_up_2dp((on_hand_stock / tog) * 100) if tog else 0
 		on_hand_status = f"{on_hand_status_value:.2f}%"
 		moq = int(flt(item.moq))
 		net_order_recommendation = 0 if order_recommendation == 0 else max(order_recommendation, moq)

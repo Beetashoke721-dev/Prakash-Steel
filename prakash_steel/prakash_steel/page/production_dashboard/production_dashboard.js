@@ -2,11 +2,34 @@
 // For license information, please see license.txt
 
 // ================================================================
-// Production Dashboard – Rolled & Bright Production Tabs
+// Production Dashboard – Rolled, Bright, Bend Weight & Coal Consumption Tabs
 // ================================================================
 
 if (!frappe.pages['production-dashboard']) {
     frappe.pages['production-dashboard'] = {};
+}
+
+// ────────────────────────────────────────────────────────────────
+// Financial Year helpers (April → March) — used by the Monthly
+// Production With Coal Consumption tab, which defaults to the
+// current financial year instead of the shared date filters.
+// ────────────────────────────────────────────────────────────────
+function getCurrentFinancialYearStart() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1; // 1-12
+    return month >= 4 ? year : year - 1;
+}
+
+function financialYearLabel(startYear) {
+    return `${startYear}-${String(startYear + 1).slice(-2)}`;
+}
+
+function financialYearRange(startYear) {
+    return {
+        from_date: `${startYear}-04-01`,
+        to_date: `${startYear + 1}-03-31`,
+    };
 }
 
 frappe.pages['production-dashboard'].on_page_load = function (wrapper) {
@@ -57,12 +80,12 @@ function initializeDashboard(state) {
 function render_filters(state) {
     const $filterBar = $(`
         <div class="production-filters"
-             style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;
-                    margin-bottom:16px;background:#f8f9fa;padding:16px;
+             style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;
+                    margin-bottom:10px;background:#f8f9fa;padding:10px 12px;
                     border-radius:8px;">
         </div>`);
 
-    const $filterControls = $('<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;"></div>');
+    const $filterControls = $('<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;"></div>');
 
     const $fromDateWrap = $('<div></div>');
     const $toDateWrap = $('<div></div>');
@@ -110,7 +133,7 @@ function render_filters(state) {
         parent: $ppWrap.get(0),
         df: {
             fieldtype: 'Autocomplete',
-            label: __('Production Plan'),
+            label: __('Production Plan / Work Order'),
             fieldname: 'production_plan',
             options: [],
             reqd: 0,
@@ -167,7 +190,7 @@ function getProductionPlanNameFilter(state) {
     // Same tab-aware name pattern used for both legacy and new doctypes because
     // `Production Planning` uses naming series "Rolled Plan - ..." / "Bright Plan - ..."
     // which match the existing %Rolled% / %Bright% patterns.
-    if (state.currentTab === 'rolled_production') return ['like', '%Rolled%'];
+    if (state.currentTab === 'rolled_production' || state.currentTab === 'hourly_production') return ['like', '%Rolled%'];
     if (state.currentTab === 'bright_production') return ['like', '%Bright%'];
     return null;
 }
@@ -190,16 +213,35 @@ async function refreshProductionPlanOptions(state) {
             })
             .catch(() => []);
 
+    // Work Order is now the primary source (rolled/bright driven by the
+    // custom_rolled_production / custom_bright_production flags instead of a
+    // name pattern). Old Production Plan / Production Planning options are
+    // kept too, so filtering by legacy data still works.
+    const woFilters = { docstatus: 1 };
+    if (state.currentTab === 'rolled_production' || state.currentTab === 'hourly_production') woFilters.custom_rolled_production = 1;
+    else if (state.currentTab === 'bright_production') woFilters.custom_bright_production = 1;
+    const fetchWorkOrderList = () =>
+        frappe.db
+            .get_list('Work Order', {
+                filters: woFilters,
+                fields: ['name'],
+                limit: 0,
+                order_by: 'creation desc',
+            })
+            .catch(() => []);
+
     try {
-        const [legacyList, planningList] = await Promise.all([
+        const [workOrderList, legacyList, planningList] = await Promise.all([
+            fetchWorkOrderList(),
             fetchList('Production Plan'),
             fetchList('Production Planning'),
         ]);
 
-        // Merge + de-duplicate (legacy names listed first, preserving priority).
+        // Merge + de-duplicate (Work Order names listed first since that's now
+        // the primary source; legacy names kept after so old data stays filterable).
         const merged = [];
         const seen = new Set();
-        [...(legacyList || []), ...(planningList || [])].forEach((r) => {
+        [...(workOrderList || []), ...(legacyList || []), ...(planningList || [])].forEach((r) => {
             if (r && r.name && !seen.has(r.name)) {
                 seen.add(r.name);
                 merged.push(r.name);
@@ -234,24 +276,32 @@ function getFilters(state) {
 // Tabs
 // ────────────────────────────────────────────────────────────────
 function createTabbedInterface(state) {
-    const $tabContainer = $('<div class="production-tabs" style="margin-bottom:20px;"></div>');
-    const $tabList = $('<ul class="nav nav-tabs" role="tablist" style="border-bottom:2px solid #dee2e6;"></ul>');
-    const $tabContent = $('<div class="tab-content" style="margin-top:20px;"></div>');
+    const $tabContainer = $('<div class="production-tabs" style="margin-bottom:8px;"></div>');
+    const $tabList = $(`<ul class="nav nav-tabs" role="tablist"
+        style="border-bottom:2px solid #dee2e6;margin-bottom:0;display:flex;flex-wrap:nowrap;
+               overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;"></ul>`);
+    const $tabContent = $('<div class="tab-content" style="margin-top:16px;"></div>');
 
     const tabs = [
         { id: 'rolled_production', label: __('Rolled Production'), icon: 'fa fa-industry' },
+        { id: 'hourly_production', label: __('Hourly Production'), icon: 'fa fa-clock-o' },
         { id: 'bright_production', label: __('Bright Production'), icon: 'fa fa-cog' },
         { id: 'bend_weight_details', label: __('Bend Weight Details'), icon: 'fa fa-balance-scale' },
+        { id: 'coal_consumption', label: __('Coal Consumption'), icon: 'fa fa-fire' },
+        { id: 'monthly_production_coal', label: __('Monthly Production With Coal Consumption'), icon: 'fa fa-calendar' },
+        { id: 'billet_cutting_amount', label: __('Monthly Billet Cutting Amount'), icon: 'fa fa-cut' },
+        { id: 'weekly_billet_cutting_amount', label: __('Weekly Billet Cutting Amount'), icon: 'fa fa-calendar-check-o' },
     ];
 
     tabs.forEach((tab, idx) => {
         const $tabItem = $(`
-            <li class="nav-item" role="presentation">
+            <li class="nav-item" role="presentation" style="flex:0 0 auto;">
                 <button class="nav-link ${idx === 0 ? 'active' : ''}"
                         id="${tab.id}-tab" type="button" role="tab"
-                        style="border:none;background:none;padding:12px 20px;
-                               color:#6c757d;font-weight:500;cursor:pointer;">
-                    <i class="${tab.icon}" style="margin-right:8px;"></i>${tab.label}
+                        style="border:none;background:none;padding:10px 14px;
+                               color:#6c757d;font-weight:500;font-size:0.88rem;
+                               white-space:nowrap;cursor:pointer;">
+                    <i class="${tab.icon}" style="margin-right:6px;"></i>${tab.label}
                 </button>
             </li>`);
 
@@ -272,9 +322,14 @@ function createTabbedInterface(state) {
 }
 
 function createContentContainers(state) {
+    // Only these tabs ever render KPI cards — the rest stay permanently empty,
+    // so they shouldn't reserve the cards container's bottom margin either.
+    const tabsWithCards = ['rolled_production', 'bright_production'];
+
     Object.keys(state.$tabs).forEach(tabId => {
         // Cards
-        const $cards = $('<div class="number-cards-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px;"></div>');
+        const cardsMargin = tabsWithCards.includes(tabId) ? '16px' : '0';
+        const $cards = $(`<div class="number-cards-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:${cardsMargin};"></div>`);
         state.$tabs[tabId].$content.append($cards);
         if (!state.$cards) state.$cards = {};
         state.$cards[tabId] = $cards;
@@ -283,17 +338,33 @@ function createContentContainers(state) {
         let title;
         if (tabId === 'rolled_production') {
             title = __('Rolled Production Details');
+        } else if (tabId === 'hourly_production') {
+            title = __('Hourly Production Details');
         } else if (tabId === 'bright_production') {
             title = __('Bright Production Details');
         } else if (tabId === 'bend_weight_details') {
             title = __('Bend Weight Details');
+        } else if (tabId === 'coal_consumption') {
+            title = __('Coal Consumption');
+        } else if (tabId === 'monthly_production_coal') {
+            title = __('Monthly Production With Coal Consumption');
+        } else if (tabId === 'billet_cutting_amount') {
+            title = __('Monthly Billet Cutting Amount');
+        } else if (tabId === 'weekly_billet_cutting_amount') {
+            title = __('Weekly Billet Cutting Amount');
         } else {
             title = '';
         }
 
+        // Title and the Columns/Export toolbar share one row so the toolbar
+        // lines up with the heading instead of sitting on its own row above the table.
         const $tableSection = $(`
             <div class="detailed-data-section">
-                <h3 style="margin-bottom:16px;color:#495057;font-weight:600;">${title}</h3>
+                <div style="display:flex;justify-content:space-between;align-items:center;
+                            flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                    <h3 style="margin:0;color:#495057;font-weight:600;">${title}</h3>
+                    <div class="table-toolbar" id="${tabId}-toolbar"></div>
+                </div>
                 <div class="data-tables-container" id="${tabId}-tables"
                      style="overflow-x:auto;"></div>
             </div>`);
@@ -380,15 +451,39 @@ function refreshDashboard(state) {
     let apiMethod;
     if (tabId === 'rolled_production') {
         apiMethod = 'prakash_steel.api.production_dashboard.get_rolled_production_data';
+    } else if (tabId === 'hourly_production') {
+        apiMethod = 'prakash_steel.api.production_dashboard.get_hourly_production_data';
     } else if (tabId === 'bright_production') {
         apiMethod = 'prakash_steel.api.production_dashboard.get_bright_production_data';
     } else if (tabId === 'bend_weight_details') {
         apiMethod = 'prakash_steel.api.production_dashboard.get_bend_weight_details';
+    } else if (tabId === 'coal_consumption') {
+        apiMethod = 'prakash_steel.api.production_dashboard.get_coal_consumption_data';
+    } else if (tabId === 'monthly_production_coal') {
+        apiMethod = 'prakash_steel.api.production_dashboard.get_monthly_production_with_coal_consumption_data';
+    } else if (tabId === 'billet_cutting_amount') {
+        apiMethod = 'prakash_steel.api.production_dashboard.get_billet_cutting_amount_data';
+    } else if (tabId === 'weekly_billet_cutting_amount') {
+        apiMethod = 'prakash_steel.api.production_dashboard.get_weekly_billet_cutting_amount_data';
     }
 
-    // If no date filters are set, fetch data till today (but keep UI filters empty)
-    const from_date = filters.from_date || '';
-    const to_date = filters.to_date || (filters.from_date ? '' : frappe.datetime.get_today());
+    // Monthly / weekly summary tabs ignore the shared date filters — they're
+    // always scoped to the current Financial Year (April → March).
+    const financialYearTabs = [
+        'monthly_production_coal',
+        'billet_cutting_amount',
+        'weekly_billet_cutting_amount',
+    ];
+    let from_date, to_date;
+    if (financialYearTabs.includes(tabId)) {
+        const fyRange = financialYearRange(getCurrentFinancialYearStart());
+        from_date = fyRange.from_date;
+        to_date = fyRange.to_date;
+    } else {
+        // If no date filters are set, fetch data till today (but keep UI filters empty)
+        from_date = filters.from_date || '';
+        to_date = filters.to_date || (filters.from_date ? '' : frappe.datetime.get_today());
+    }
 
     frappe.call({
         method: apiMethod,
@@ -419,17 +514,109 @@ function refreshDashboard(state) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// Number formatting helpers
+// ────────────────────────────────────────────────────────────────
+function format_qty_as_integer(value) {
+    if (value === undefined || value === null || value === '') {
+        return '--';
+    }
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+        return '--';
+    }
+    const truncated = Math.trunc(num);
+    return format_number(truncated, null, 0);
+}
+
+function format_number_with_decimals(value) {
+    if (value === undefined || value === null || value === '') {
+        return '--';
+    }
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+        return '--';
+    }
+    return format_number(num);
+}
+
+function format_percentage(value) {
+    if (value === undefined || value === null || value === '') {
+        return '--';
+    }
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+        return '--';
+    }
+    return num.toFixed(2);
+}
+
+function getGradientStyle(gradientClass) {
+    const gradients = {
+        'card-orange': 'linear-gradient(135deg, #fdd085, #fde0a8)',
+        'card-blue': 'linear-gradient(135deg, #a8c8f0, #c4d9f5)',
+        'card-green': 'linear-gradient(135deg, #85e0a8, #a8ecc4)',
+        'card-purple': 'linear-gradient(135deg, #c9a5d9, #d9b8e6)',
+        'card-teal': 'linear-gradient(135deg, #7dd3c0, #a3e4d4)',
+        'card-red': 'linear-gradient(135deg, #f5a5a0, #f8b8b3)',
+        'card-pink': 'linear-gradient(135deg, #f8c8d8, #fce0e8)',
+        'card-yellow': 'linear-gradient(135deg, #d4a574, #e8d5b7)',
+    };
+    return gradients[gradientClass] || gradients['card-blue'];
+}
+
+function buildCardHtml(card) {
+    const raw = card.value;
+    let display;
+    if (card.isQty) {
+        display = format_qty_as_integer(raw);
+    } else if (card.isPercentage) {
+        display = format_percentage(raw);
+    } else {
+        display = format_number_with_decimals(raw);
+    }
+
+    const gradientClass = card.gradientClass || 'card-blue';
+    const gradient = getGradientStyle(gradientClass);
+
+    const desc = card.description
+        ? `<div style="font-size:0.85rem;color:#000;margin-top:8px;opacity:0.7;">${frappe.utils.escape_html(card.description)}</div>`
+        : '';
+
+    return $(`
+        <div class="number-card ${gradientClass}"
+             style="background:${gradient} !important;background-image:${gradient} !important;
+                    border-radius:10px;padding:14px 18px;
+                    box-shadow:none;min-height:110px;
+                    position:relative;overflow:hidden;
+                    transition:transform .2s,box-shadow .2s;
+                    color:#000;border:none;">
+            <div style="text-align:center;">
+                <div style="font-size:1.9rem;font-weight:700;color:#000;
+                            margin-bottom:6px;line-height:1.1;">${display}</div>
+                <div style="font-size:0.95rem;color:#000;font-weight:500;opacity:0.95;">
+                    ${frappe.utils.escape_html(card.label || '')}</div>
+                ${desc}
+            </div>
+        </div>`);
+}
+
+// ────────────────────────────────────────────────────────────────
 // KPI Cards
 // ────────────────────────────────────────────────────────────────
 function render_cards(state, totals) {
     const tabId = state.currentTab;
-    const $container = state.$cards[tabId];
+    const $container = state.$cards && state.$cards[tabId];
+    if (!$container || !$container.length) {
+        return;
+    }
     $container.empty();
 
     totals = totals || {};
 
-    // For Bend Weight Details, skip KPI cards for now
-    if (tabId === 'bend_weight_details') {
+    // For Bend Weight Details / Coal Consumption, skip KPI cards for now
+    if (tabId === 'bend_weight_details' || tabId === 'coal_consumption' || tabId === 'hourly_production'
+        || tabId === 'monthly_production_coal' || tabId === 'billet_cutting_amount'
+        || tabId === 'weekly_billet_cutting_amount') {
         return;
     }
 
@@ -462,14 +649,6 @@ function render_cards(state, totals) {
         const totalMissBilletWeight = parseFloat(totals.total_miss_billet_weight) || 0;
         const totalMissRollWeight = parseFloat(totals.total_miss_roll_weight) || 0;
         const totalMissIngotWeight = parseFloat(totals.total_miss_ingot_weight) || 0;
-
-        // Total Hr = Sum of Total Hr Consumed
-        cards.push({
-            value: totalHr,
-            label: __('Total Hr'),
-            gradientClass: 'card-yellow',
-            description: __('Sum of Total Hr Consumed'),
-        });
 
         // Average Production = Total Production / Sum(Total Hr Consumed)
         let avgProduction = 0;
@@ -520,22 +699,22 @@ function render_cards(state, totals) {
             isQty: true,
         });
 
-        // Burning Loss % — ((RM + Miss Billet − Production − Miss Ingot) / RM) × 100 (backend)
+        // Wastage % — (Total RM Wt − Miss Ingot − Production) / Total RM Wt × 100 (backend)
         cards.push({
             value: totals.burning_loss_per,
-            label: __('Burning Loss %'),
+            label: __('Wastage %'),
             gradientClass: 'card-red',
-            description: __('Avg Burning Loss %'),
+            description: __('Avg Wastage %'),
             isPercentage: true,
         });
 
     } else if (tabId === 'bright_production') {
-        // Melting Weight — Sum from Bright Bar Production (backend calculated)
+        // End Cutting Weight — Sum across all rows (backend calculated)
         cards.push({
-            value: totals.total_fg_weight,
-            label: __('Melting Weight'),
+            value: totals.total_end_cutting_weight,
+            label: __('Total End Cutting Weight'),
             gradientClass: 'card-teal',
-            description: __('Total Melting Weight (from Bright Bar Production)'),
+            description: __('Sum of End Cutting Weight across all rows'),
             isQty: true,
         });
 
@@ -554,127 +733,108 @@ function render_cards(state, totals) {
     });
 }
 
-// Helper function to format Qty fields: truncate (don't round) and show as INTEGER only
-function format_qty_as_integer(value) {
-    if (value === undefined || value === null || value === '') {
-        return '--';
-    }
-    const num = parseFloat(value);
-    if (isNaN(num)) {
-        return '--';
-    }
-    const truncated = Math.trunc(num);
-    return format_number(truncated, null, 0);
-}
-
-// Helper function to format other numeric fields: keep decimal values as is (no rounding)
-function format_number_with_decimals(value) {
-    if (value === undefined || value === null || value === '') {
-        return '--';
-    }
-    const num = parseFloat(value);
-    if (isNaN(num)) {
-        return '--';
-    }
-    return format_number(num);
-}
-
-// Helper function to format percentage values: show exactly 2 decimal places
-function format_percentage(value) {
-    if (value === undefined || value === null || value === '') {
-        return '--';
-    }
-    const num = parseFloat(value);
-    if (isNaN(num)) {
-        return '--';
-    }
-    return num.toFixed(2);
-}
-
-function buildCardHtml(card) {
-    const raw = card.value;
-    let display;
-    if (card.isQty) {
-        display = format_qty_as_integer(raw);
-    } else if (card.isPercentage) {
-        display = format_percentage(raw);
-    } else {
-        display = format_number_with_decimals(raw);
-    }
-
-    const gradientClass = card.gradientClass || 'card-blue';
-    const gradient = getGradientStyle(gradientClass);
-
-    const desc = card.description
-        ? `<div style="font-size:0.85rem;color:#000;margin-top:8px;opacity:0.7;">${frappe.utils.escape_html(card.description)}</div>`
-        : '';
-
-    return $(`
-        <div class="number-card ${gradientClass}"
-             style="background:${gradient} !important;background-image:${gradient} !important;
-                    border-radius:10px;padding:14px 18px;
-                    box-shadow:none;min-height:110px;
-                    position:relative;overflow:hidden;
-                    transition:transform .2s,box-shadow .2s;
-                    color:#000;border:none;">
-            <div style="text-align:center;">
-                <div style="font-size:1.9rem;font-weight:700;color:#000;
-                            margin-bottom:6px;line-height:1.1;">${display}</div>
-                <div style="font-size:0.95rem;color:#000;font-weight:500;opacity:0.95;">
-                    ${frappe.utils.escape_html(card.label || '')}</div>
-                ${desc}
-            </div>
-        </div>`);
-}
-
-function getGradientStyle(gradientClass) {
-    const gradients = {
-        'card-orange': 'linear-gradient(135deg, #fdd085, #fde0a8)',
-        'card-blue': 'linear-gradient(135deg, #a8c8f0, #c4d9f5)',
-        'card-green': 'linear-gradient(135deg, #85e0a8, #a8ecc4)',
-        'card-purple': 'linear-gradient(135deg, #c9a5d9, #d9b8e6)',
-        'card-teal': 'linear-gradient(135deg, #7dd3c0, #a3e4d4)',
-        'card-red': 'linear-gradient(135deg, #f5a5a0, #f8b8b3)',
-        'card-pink': 'linear-gradient(135deg, #f8c8d8, #fce0e8)',
-        'card-yellow': 'linear-gradient(135deg, #d4a574, #e8d5b7)',
-    };
-    return gradients[gradientClass] || gradients['card-blue'];
-}
-
 // ────────────────────────────────────────────────────────────────
 // Table Rendering
 // ────────────────────────────────────────────────────────────────
 function render_table(state, rows) {
     const tabId = state.currentTab;
     const $container = $(`#${tabId}-tables`);
+    if (!$container.length) {
+        return;
+    }
     $container.empty();
 
     const columns = getTableColumns(tabId);
 
-    // ── Export toolbar (Excel / PDF) ──
+    // ── Export toolbar (Excel / PDF) — lives in the header row, next to the title ──
+    const $toolbarMount = $(`#${tabId}-toolbar`);
+    $toolbarMount.empty();
     const $exportBar = buildExportToolbar(state, tabId, columns, rows || []);
-    $container.append($exportBar);
+    $toolbarMount.append($exportBar);
 
     // ── Header ──
+    const isBilletCuttingAmount = tabId === 'billet_cutting_amount';
+    const isWeeklyBilletCuttingAmount = tabId === 'weekly_billet_cutting_amount';
     const thBase = 'background:#495057;padding:12px;font-weight:600;color:#ffffff;'
         + 'border-bottom:2px solid #343a40;white-space:nowrap;text-align:center !important;'
         + 'position:sticky;top:0;z-index:2;';
 
-    const thCol0 = thBase.replace('z-index:2', 'z-index:3') + 'left:0;min-width:180px;';
+    const thCol0 = thBase.replace('z-index:2', 'z-index:3')
+        + 'left:0;width:220px;max-width:220px;overflow:hidden;text-overflow:ellipsis;';
     const thCol1 = thBase.replace('z-index:2', 'z-index:3')
-        + 'left:180px;min-width:140px;border-right:2px solid #dee2e6;';
+        + 'left:220px;width:140px;max-width:140px;overflow:hidden;text-overflow:ellipsis;border-right:2px solid #dee2e6;';
 
-    const headerHtml = columns.map((c, idx) => {
-        const borderAfterQty =
-            (tabId === 'rolled_production' && (idx === 11 || idx === 21)) ||
-            (tabId === 'bright_production' && idx === 5);
-        const borderRight = borderAfterQty ? ' border-right:2px solid #dee2e6;' : '';
-        let style;
-        if (idx === 0) style = thCol0;
-        else if (idx === 1) style = thCol1;
-        else style = thBase;
-        return `<th style="${style}${borderRight}">${c.label}</th>`;
-    }).join('');
+    let theadHtml;
+    if (isBilletCuttingAmount || isWeeklyBilletCuttingAmount) {
+        // Two-row header: group labels (colspan) + Qty / Amount (or Weeks from/to) sub-columns.
+        const thGroup = thBase; // top:0
+        const thSub = thBase.replace('top:0', 'top:42px');
+        const groupBorder = 'border-left:1px solid rgba(255,255,255,.35);';
+        const cuttingGroups = [
+            __('Full Cutting (FC) (MT)'),
+            __('Half Cutting (HF) (MT)'),
+            __('General Cutting (GC) (MT)'),
+            __('Full Cutting-NG (FC-N) (MT)'),
+            __('Total (MT)'),
+        ];
+
+        let topRow;
+        let subRow;
+        if (isWeeklyBilletCuttingAmount) {
+            // Match Monthly table styling: same group/sub header treatment,
+            // no sticky fixed-width lead columns.
+            topRow = [
+                `<th colspan="2" style="${thGroup}">${__('Weekly Billet Cutting Details')}</th>`,
+                ...cuttingGroups.map((label) =>
+                    `<th colspan="2" style="${thGroup}${groupBorder}">${label}</th>`
+                ),
+            ].join('');
+            const weekSubs = [
+                `<th style="${thSub}">${__('Weeks from')}</th>`,
+                `<th style="${thSub}">${__('Weeks to')}</th>`,
+            ];
+            const qtyAmountSubs = [];
+            for (let i = 0; i < 5; i++) {
+                qtyAmountSubs.push(
+                    `<th style="${thSub}${groupBorder}">${__('Qty')}</th>`,
+                    `<th style="${thSub}">${__('Amount')}</th>`
+                );
+            }
+            subRow = weekSubs.concat(qtyAmountSubs).join('');
+        } else {
+            const thMonth = thCol0; // rowspan covers both header rows
+            topRow = [
+                `<th rowspan="2" style="${thMonth}">${__('Month')}</th>`,
+                ...cuttingGroups.map((label) =>
+                    `<th colspan="2" style="${thGroup}${groupBorder}">${label}</th>`
+                ),
+            ].join('');
+            const subLabels = [];
+            for (let i = 0; i < 5; i++) {
+                subLabels.push(__('Qty'), __('Amount'));
+            }
+            subRow = subLabels
+                .map((label, idx) => {
+                    const borderLeft = idx % 2 === 0 ? groupBorder : '';
+                    return `<th style="${thSub}${borderLeft}">${label}</th>`;
+                })
+                .join('');
+        }
+        theadHtml = `<tr>${topRow}</tr><tr>${subRow}</tr>`;
+    } else {
+        const headerHtml = columns.map((c, idx) => {
+            const borderAfterQty =
+                (tabId === 'rolled_production' && (idx === 11 || idx === 21)) ||
+                (tabId === 'bright_production' && idx === 4);
+            const borderRight = borderAfterQty ? ' border-right:2px solid #dee2e6;' : '';
+            let style;
+            if (idx === 0) style = thCol0;
+            else if (idx === 1) style = thCol1;
+            else style = thBase;
+            return `<th style="${style}${borderRight}">${c.label}</th>`;
+        }).join('');
+        theadHtml = `<tr>${headerHtml}</tr>`;
+    }
 
     // ── Body ──
     let bodyHtml = '';
@@ -683,7 +843,7 @@ function render_table(state, rows) {
             style="padding:24px;text-align:center;color:#7f8c8d;font-style:italic;">
             ${__('No data available for the selected filters.')}</td></tr>`;
     } else {
-        bodyHtml = rows.map(row => buildTableRow(tabId, row)).join('');
+        bodyHtml = rows.map((row, idx) => buildTableRow(tabId, row, idx)).join('');
     }
 
     const $table = $(`
@@ -691,7 +851,7 @@ function render_table(state, rows) {
                     border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.1);">
             <table style="width:100%;border-collapse:separate;border-spacing:0;
                           background:#fff;min-width:1000px;">
-                <thead><tr>${headerHtml}</tr></thead>
+                <thead>${theadHtml}</thead>
                 <tbody>${bodyHtml}</tbody>
             </table>
         </div>`);
@@ -699,18 +859,24 @@ function render_table(state, rows) {
     $container.append($table);
 }
 
-function buildTableRow(tabId, row) {
+function buildTableRow(tabId, row, rowIndex) {
     const tdStyle = 'padding:12px;border-bottom:1px solid #e9ecef;color:#495057;text-align:center !important;';
-    const tdCol0 = tdStyle + 'position:sticky;left:0;z-index:1;background:#fff;min-width:180px;';
-    const tdCol1 = tdStyle + 'position:sticky;left:180px;z-index:1;background:#fff;min-width:140px;border-right:2px solid #dee2e6;';
+    const tdCol0 = tdStyle
+        + 'position:sticky;left:0;z-index:1;background:#fff;'
+        + 'width:220px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    const tdCol1 = tdStyle
+        + 'position:sticky;left:220px;z-index:1;background:#fff;'
+        + 'width:140px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-right:2px solid #dee2e6;';
 
     // Production Plan (link)
-    const ppRoute =
-        row.production_plan_doctype === 'Production Planning'
-            ? 'production-planning'
-            : 'production-plan';
+    const ppRouteMap = {
+        'Production Planning': 'production-planning',
+        'Work Order': 'work-order',
+    };
+    const ppRoute = ppRouteMap[row.production_plan_doctype] || 'production-plan';
     const ppLink = row.production_plan
         ? `<a href="/app/${ppRoute}/${encodeURIComponent(row.production_plan)}"
+              title="${frappe.utils.escape_html(row.production_plan)}"
               style="color:#007bff;text-decoration:none;">${frappe.utils.escape_html(row.production_plan)}</a>`
         : '';
 
@@ -727,7 +893,6 @@ function buildTableRow(tabId, row) {
     // Qty fields
     const fgPlannedQty = format_qty_as_integer(row.fg_planned_qty);
     const actualQty = format_qty_as_integer(row.actual_qty);
-    const fgWeight = format_qty_as_integer(row.fg_weight);
     const meltingWeight = format_qty_as_integer(row.melting_weight);
     const finishPcs = format_qty_as_integer(row.finish_pcs);
     const totalMissRollPcs = format_qty_as_integer(row.total_miss_roll_pcs);
@@ -794,6 +959,8 @@ function buildTableRow(tabId, row) {
             <td style="${tdHighlight} border-right:2px solid #dee2e6;">${totalMissIngotWeight}</td>
             <td style="${tdHighlight}">${meltingWeight}</td>
             <td style="${tdHighlight}">${lastColValue}</td>
+            <td style="${tdHighlight}">${format_percentage(row.melting_wastage)}</td>
+            <td style="${tdHighlight}">${format_percentage(row.finish_goods)}</td>
             <td style="${tdHighlight}">${totalHrConsumed}</td>
         </tr>`;
     }
@@ -801,23 +968,141 @@ function buildTableRow(tabId, row) {
     // ── Bend Weight Details ──
     if (tabId === 'bend_weight_details') {
         const id = row.id || row.name || '';
-        const safeId = id ? frappe.utils.escape_html(String(id)) : '';
+        const idRouteMap = {
+            'Finish Weight': 'finish-weight',
+            'Job Card': 'job-card',
+        };
+        const idRoute = idRouteMap[row.id_doctype] || 'finish-weight';
+        const idLink = id
+            ? `<a href="/app/${idRoute}/${encodeURIComponent(id)}"
+                  title="${frappe.utils.escape_html(String(id))}"
+                  style="color:#007bff;text-decoration:none;">${frappe.utils.escape_html(String(id))}</a>`
+            : '';
         const itemCode = row.item_code ? frappe.utils.escape_html(String(row.item_code)) : '';
         const bendCategoryName = row.category_name ? frappe.utils.escape_html(String(row.category_name)) : '';
         const bendWeight = format_number_with_decimals(row.bend_material_weight);
 
         return `<tr style="border-bottom:1px solid #e9ecef;">
-            <td style="${tdCol0}">${safeId}</td>
+            <td style="${tdCol0}">${idLink}</td>
             <td style="${tdCol1}">${itemCode}</td>
             <td style="${tdStyle}">${bendCategoryName}</td>
             <td style="${tdStyle}">${bendWeight}</td>
         </tr>`;
     }
 
+    // ── Coal Consumption ──
+    if (tabId === 'coal_consumption') {
+        const coalDate = row.date
+            ? frappe.format(row.date, { fieldtype: 'Date' })
+            : '';
+        const coalItem = row.item ? frappe.utils.escape_html(String(row.item)) : '';
+        const coalQty = format_number_with_decimals(row.qty);
+        const coalUom = row.uom ? frappe.utils.escape_html(String(row.uom)) : '';
+
+        return `<tr style="border-bottom:1px solid #e9ecef;">
+            <td style="${tdCol0}">${coalDate}</td>
+            <td style="${tdCol1}">${coalItem}</td>
+            <td style="${tdStyle}">${coalQty}</td>
+            <td style="${tdStyle}">${coalUom}</td>
+        </tr>`;
+    }
+
+    // ── Monthly Production With Coal Consumption ──
+    if (tabId === 'monthly_production_coal') {
+        const month = row.month ? frappe.utils.escape_html(String(row.month)) : '';
+        const totalProduction = format_number_with_decimals(row.total_production);
+        const totalCoalConsumption = format_number_with_decimals(row.total_coal_consumption);
+        const perTonCoal = format_number_with_decimals(row.per_ton_coal_consumption);
+
+        return `<tr style="border-bottom:1px solid #e9ecef;">
+            <td style="${tdCol0}">${month}</td>
+            <td style="${tdStyle}">${totalProduction}</td>
+            <td style="${tdStyle}">${totalCoalConsumption}</td>
+            <td style="${tdStyle}">${perTonCoal}</td>
+        </tr>`;
+    }
+
+    // ── Hourly Production ──
+    if (tabId === 'hourly_production') {
+        const hourlyDate = row.date
+            ? frappe.format(row.date, { fieldtype: 'Date' })
+            : '';
+        const hours = format_number_with_decimals(row.hours);
+
+        return `<tr style="border-bottom:1px solid #e9ecef;">
+            <td style="${tdCol0}">${hourlyDate}</td>
+            <td style="${tdCol1}">${hours}</td>
+        </tr>`;
+    }
+
+    // ── Monthly Billet Cutting Amount ──
+    if (tabId === 'billet_cutting_amount') {
+        const month = row.month ? frappe.utils.escape_html(String(row.month)) : '';
+        const fcQty = format_number_with_decimals(row.fc_qty);
+        const fcAmount = format_number_with_decimals(row.fc_amount);
+        const hfQty = format_number_with_decimals(row.hf_qty);
+        const hfAmount = format_number_with_decimals(row.hf_amount);
+        const gcQty = format_number_with_decimals(row.gc_qty);
+        const gcAmount = format_number_with_decimals(row.gc_amount);
+        const fcnQty = format_number_with_decimals(row.fcn_qty);
+        const fcnAmount = format_number_with_decimals(row.fcn_amount);
+        const totalQty = format_number_with_decimals(row.total_qty);
+        const totalAmount = format_number_with_decimals(row.total_amount);
+        const groupBorder = 'border-left:1px solid #dee2e6;';
+
+        return `<tr style="border-bottom:1px solid #e9ecef;">
+            <td style="${tdCol0}">${month}</td>
+            <td style="${tdStyle}${groupBorder}">${fcQty}</td>
+            <td style="${tdStyle}">${fcAmount}</td>
+            <td style="${tdStyle}${groupBorder}">${hfQty}</td>
+            <td style="${tdStyle}">${hfAmount}</td>
+            <td style="${tdStyle}${groupBorder}">${gcQty}</td>
+            <td style="${tdStyle}">${gcAmount}</td>
+            <td style="${tdStyle}${groupBorder}">${fcnQty}</td>
+            <td style="${tdStyle}">${fcnAmount}</td>
+            <td style="${tdStyle}${groupBorder};font-weight:600;">${totalQty}</td>
+            <td style="${tdStyle};font-weight:600;">${totalAmount}</td>
+        </tr>`;
+    }
+
+    // ── Weekly Billet Cutting Amount ──
+    if (tabId === 'weekly_billet_cutting_amount') {
+        const weeksFrom = row.weeks_from ? frappe.utils.escape_html(String(row.weeks_from)) : '';
+        const weeksTo = row.weeks_to ? frappe.utils.escape_html(String(row.weeks_to)) : '';
+        const fcQty = format_number_with_decimals(row.fc_qty);
+        const fcAmount = format_number_with_decimals(row.fc_amount);
+        const hfQty = format_number_with_decimals(row.hf_qty);
+        const hfAmount = format_number_with_decimals(row.hf_amount);
+        const gcQty = format_number_with_decimals(row.gc_qty);
+        const gcAmount = format_number_with_decimals(row.gc_amount);
+        const fcnQty = format_number_with_decimals(row.fcn_qty);
+        const fcnAmount = format_number_with_decimals(row.fcn_amount);
+        const totalQty = format_number_with_decimals(row.total_qty);
+        const totalAmount = format_number_with_decimals(row.total_amount);
+        const groupBorder = 'border-left:1px solid #dee2e6;';
+
+        // Same cell styling as Monthly (centered tdStyle, group borders on Qty leads).
+        return `<tr style="border-bottom:1px solid #e9ecef;">
+            <td style="${tdStyle}">${weeksFrom}</td>
+            <td style="${tdStyle}">${weeksTo}</td>
+            <td style="${tdStyle}${groupBorder}">${fcQty}</td>
+            <td style="${tdStyle}">${fcAmount}</td>
+            <td style="${tdStyle}${groupBorder}">${hfQty}</td>
+            <td style="${tdStyle}">${hfAmount}</td>
+            <td style="${tdStyle}${groupBorder}">${gcQty}</td>
+            <td style="${tdStyle}">${gcAmount}</td>
+            <td style="${tdStyle}${groupBorder}">${fcnQty}</td>
+            <td style="${tdStyle}">${fcnAmount}</td>
+            <td style="${tdStyle}${groupBorder};font-weight:600;">${totalQty}</td>
+            <td style="${tdStyle};font-weight:600;">${totalAmount}</td>
+        </tr>`;
+    }
+
     // ── Bright Production ──
     const machineName = row.machine_name ? frappe.utils.escape_html(String(row.machine_name)) : '';
     const finishLength = row.finish_length ? frappe.utils.escape_html(String(row.finish_length)) : '';
-    const tolerance = format_percentage(row.tolerance);
+    const tolerance = row.tolerance ? frappe.utils.escape_html(String(row.tolerance)) : '';
+    const endCuttingWeight = format_qty_as_integer(row.end_cutting_weight);
     const brightRmCategoryName = row.rm_category_name ? frappe.utils.escape_html(String(row.rm_category_name)) : '';
     const brightFiCategoryName = row.finished_item_category_name ? frappe.utils.escape_html(String(row.finished_item_category_name)) : '';
 
@@ -826,15 +1111,15 @@ function buildTableRow(tabId, row) {
         <td style="${tdCol1}">${prodDate}</td>
         <td style="${tdStyle}">${rm}</td>
         <td style="${tdStyle}">${brightRmCategoryName}</td>
-        <td style="${tdStyle}">${rmConsumption}</td>
         <td style="${tdStyle} border-right:2px solid #dee2e6;">${machineName}</td>
         <td style="${tdStyle}">${finishedItem}</td>
         <td style="${tdStyle}">${brightFiCategoryName}</td>
         <td style="${tdStyle}">${fgPlannedQty}</td>
+        <td style="${tdStyle}">${rmConsumption}</td>
         <td style="${tdStyle}">${actualQty}</td>
         <td style="${tdStyle}">${finishLength}</td>
         <td style="${tdStyle}">${tolerance}</td>
-        <td style="${tdStyle}">${fgWeight}</td>
+        <td style="${tdStyle}">${endCuttingWeight}</td>
         <td style="${tdStyle}">${lastColValue}</td>
     </tr>`;
 }
@@ -842,7 +1127,7 @@ function buildTableRow(tabId, row) {
 function getTableColumns(tabId) {
     if (tabId === 'rolled_production') {
         return [
-            { key: 'production_plan', label: __('Production Plan'), align: 'left' },
+            { key: 'production_plan', label: __('Production Plan / Work Order'), align: 'left' },
             { key: 'production_date', label: __('Production Date'), align: 'left' },
             { key: 'rm', label: __('RM'), align: 'left' },
             { key: 'rm_category_name', label: __('RM Category Name'), align: 'left' },
@@ -865,7 +1150,9 @@ function getTableColumns(tabId) {
             { key: 'total_miss_ingot_pcs', label: __('Total Miss Ingot'), align: 'left' },
             { key: 'total_miss_ingot_weight', label: __('Total Miss Ingot / Billet Weight'), align: 'left' },
             { key: 'melting_weight', label: __('Melting Weight'), align: 'left' },
-            { key: 'burning_loss', label: __('Burning Loss %'), align: 'left' },
+            { key: 'burning_loss', label: __('Wastage %'), align: 'left' },
+            { key: 'melting_wastage', label: __('Melting Wastage %'), align: 'left' },
+            { key: 'finish_goods', label: __('Finish Goods %'), align: 'left' },
             { key: 'total_hr_consumed', label: __('Total Hr Consumed'), align: 'left' },
         ];
     }
@@ -879,21 +1166,81 @@ function getTableColumns(tabId) {
         ];
     }
 
+    if (tabId === 'coal_consumption') {
+        return [
+            { key: 'date', label: __('Date'), align: 'left' },
+            { key: 'item', label: __('Item'), align: 'left' },
+            { key: 'qty', label: __('Qty'), align: 'left' },
+            { key: 'uom', label: __('UOM'), align: 'left' },
+        ];
+    }
+
+    if (tabId === 'hourly_production') {
+        return [
+            { key: 'date', label: __('Date'), align: 'left' },
+            { key: 'hours', label: __('Hours'), align: 'left' },
+        ];
+    }
+
+    if (tabId === 'monthly_production_coal') {
+        return [
+            { key: 'month', label: __('Month'), align: 'left' },
+            { key: 'total_production', label: __('Total Production'), align: 'left' },
+            { key: 'total_coal_consumption', label: __('Total Coal Consumption'), align: 'left' },
+            { key: 'per_ton_coal_consumption', label: __('Per Ton Coal Consumption (In KG)'), align: 'left' },
+        ];
+    }
+
+    if (tabId === 'billet_cutting_amount') {
+        // Leaf columns for export / column picker. Group headers (FC/HF/GC/FC-N/Total)
+        // are rendered separately as a two-row thead with Qty / Amount sub-columns.
+        return [
+            { key: 'month', label: __('Month'), align: 'left' },
+            { key: 'fc_qty', label: __('Full Cutting (FC) (MT) — Qty'), align: 'left' },
+            { key: 'fc_amount', label: __('Full Cutting (FC) (MT) — Amount'), align: 'left' },
+            { key: 'hf_qty', label: __('Half Cutting (HF) (MT) — Qty'), align: 'left' },
+            { key: 'hf_amount', label: __('Half Cutting (HF) (MT) — Amount'), align: 'left' },
+            { key: 'gc_qty', label: __('General Cutting (GC) (MT) — Qty'), align: 'left' },
+            { key: 'gc_amount', label: __('General Cutting (GC) (MT) — Amount'), align: 'left' },
+            { key: 'fcn_qty', label: __('Full Cutting-NG (FC-N) (MT) — Qty'), align: 'left' },
+            { key: 'fcn_amount', label: __('Full Cutting-NG (FC-N) (MT) — Amount'), align: 'left' },
+            { key: 'total_qty', label: __('Total (MT) — Qty'), align: 'left' },
+            { key: 'total_amount', label: __('Total (MT) — Amount'), align: 'left' },
+        ];
+    }
+
+    if (tabId === 'weekly_billet_cutting_amount') {
+        return [
+            { key: 'weeks_from', label: __('Weeks from'), align: 'left' },
+            { key: 'weeks_to', label: __('Weeks to'), align: 'left' },
+            { key: 'fc_qty', label: __('Full Cutting (FC) (MT) — Qty'), align: 'left' },
+            { key: 'fc_amount', label: __('Full Cutting (FC) (MT) — Amount'), align: 'left' },
+            { key: 'hf_qty', label: __('Half Cutting (HF) (MT) — Qty'), align: 'left' },
+            { key: 'hf_amount', label: __('Half Cutting (HF) (MT) — Amount'), align: 'left' },
+            { key: 'gc_qty', label: __('General Cutting (GC) (MT) — Qty'), align: 'left' },
+            { key: 'gc_amount', label: __('General Cutting (GC) (MT) — Amount'), align: 'left' },
+            { key: 'fcn_qty', label: __('Full Cutting-NG (FC-N) (MT) — Qty'), align: 'left' },
+            { key: 'fcn_amount', label: __('Full Cutting-NG (FC-N) (MT) — Amount'), align: 'left' },
+            { key: 'total_qty', label: __('Total (MT) — Qty'), align: 'left' },
+            { key: 'total_amount', label: __('Total (MT) — Amount'), align: 'left' },
+        ];
+    }
+
     // bright_production
     return [
-        { key: 'production_plan', label: __('Production Plan'), align: 'left' },
+        { key: 'production_plan', label: __('Production Plan / Work Order'), align: 'left' },
         { key: 'production_date', label: __('Production Date'), align: 'left' },
         { key: 'rm', label: __('RM'), align: 'left' },
         { key: 'rm_category_name', label: __('RM Category Name'), align: 'left' },
-        { key: 'rm_consumption', label: __('Actual RM Consumption'), align: 'left' },
         { key: 'machine_name', label: __('Machine Name'), align: 'left' },
         { key: 'finished_item', label: __('Finished Item'), align: 'left' },
         { key: 'finished_item_category_name', label: __('Finished Item Category Name'), align: 'left' },
         { key: 'fg_planned_qty', label: __('FG Planned Qty'), align: 'left' },
+        { key: 'rm_consumption', label: __('Actual RM Consumption'), align: 'left' },
         { key: 'actual_qty', label: __('Actual Qty'), align: 'left' },
         { key: 'finish_length', label: __('Finish Length'), align: 'left' },
         { key: 'tolerance', label: __('Tolerance'), align: 'left' },
-        { key: 'melting_weight', label: __('Melting Weight'), align: 'left' },
+        { key: 'end_cutting_weight', label: __('End Cutting Weight'), align: 'left' },
         { key: 'wastage', label: __('Wastage %'), align: 'left' },
     ];
 }
@@ -903,7 +1250,7 @@ function getTableColumns(tabId) {
 // ────────────────────────────────────────────────────────────────
 function buildExportToolbar(state, tabId, columns, rows) {
     const $wrapper = $(`
-        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-shrink:0;">
             <button type="button" class="btn btn-sm btn-default col-picker-btn"
                     style="padding:6px 14px;border-radius:4px;border:1px solid #ced4da;
                            display:flex;align-items:center;gap:6px;">
@@ -1036,8 +1383,16 @@ function showColumnPickerDialog(state, tabId) {
 function exportTableToExcel(state, tabId) {
     const filters = getFilters(state);
 
-    const from_date = filters.from_date || '';
-    const to_date = filters.to_date || (filters.from_date ? '' : frappe.datetime.get_today());
+    let from_date, to_date;
+    if (tabId === 'monthly_production_coal' || tabId === 'billet_cutting_amount'
+        || tabId === 'weekly_billet_cutting_amount') {
+        const fyRange = financialYearRange(getCurrentFinancialYearStart());
+        from_date = fyRange.from_date;
+        to_date = fyRange.to_date;
+    } else {
+        from_date = filters.from_date || '';
+        to_date = filters.to_date || (filters.from_date ? '' : frappe.datetime.get_today());
+    }
 
     const allColumns = getTableColumns(tabId);
     const selectedKeys = state.selectedColumns[tabId] || allColumns.map(c => c.key);
@@ -1170,6 +1525,8 @@ function getExportValueByKey(tabId, key, row) {
             total_miss_ingot_weight: row.total_miss_ingot_weight || 0,
             melting_weight: row.melting_weight || 0,
             burning_loss: row.burning_loss || 0,
+            melting_wastage: row.melting_wastage || 0,
+            finish_goods: row.finish_goods || 0,
             total_hr_consumed: row.total_hr_consumed || 0,
         };
         return map[key] !== undefined ? map[key] : '';
@@ -1181,6 +1538,69 @@ function getExportValueByKey(tabId, key, row) {
             item_code: row.item_code || '',
             category_name: row.category_name || '',
             bend_material_weight: row.bend_material_weight || 0,
+        };
+        return map[key] !== undefined ? map[key] : '';
+    }
+
+    if (tabId === 'coal_consumption') {
+        const map = {
+            date: fmtDate(row.date),
+            item: row.item || '',
+            qty: row.qty || 0,
+            uom: row.uom || '',
+        };
+        return map[key] !== undefined ? map[key] : '';
+    }
+
+    if (tabId === 'hourly_production') {
+        const map = {
+            date: fmtDate(row.date),
+            hours: row.hours || 0,
+        };
+        return map[key] !== undefined ? map[key] : '';
+    }
+
+    if (tabId === 'monthly_production_coal') {
+        const map = {
+            month: row.month || '',
+            total_production: row.total_production || 0,
+            total_coal_consumption: row.total_coal_consumption || 0,
+            per_ton_coal_consumption: row.per_ton_coal_consumption || 0,
+        };
+        return map[key] !== undefined ? map[key] : '';
+    }
+
+    if (tabId === 'billet_cutting_amount') {
+        const map = {
+            month: row.month || '',
+            fc_qty: row.fc_qty || 0,
+            fc_amount: row.fc_amount || 0,
+            hf_qty: row.hf_qty || 0,
+            hf_amount: row.hf_amount || 0,
+            gc_qty: row.gc_qty || 0,
+            gc_amount: row.gc_amount || 0,
+            fcn_qty: row.fcn_qty || 0,
+            fcn_amount: row.fcn_amount || 0,
+            total_qty: row.total_qty || 0,
+            total_amount: row.total_amount || 0,
+        };
+        return map[key] !== undefined ? map[key] : '';
+    }
+
+    if (tabId === 'weekly_billet_cutting_amount') {
+        const map = {
+            weeks_from: row.weeks_from || '',
+            weeks_to: row.weeks_to || '',
+            fc_qty: row.fc_qty || 0,
+            fc_amount: row.fc_amount || 0,
+            hf_qty: row.hf_qty || 0,
+            hf_amount: row.hf_amount || 0,
+            gc_qty: row.gc_qty || 0,
+            gc_amount: row.gc_amount || 0,
+            fcn_qty: row.fcn_qty || 0,
+            fcn_amount: row.fcn_amount || 0,
+            total_qty: row.total_qty || 0,
+            total_amount: row.total_amount || 0,
         };
         return map[key] !== undefined ? map[key] : '';
     }
@@ -1199,7 +1619,7 @@ function getExportValueByKey(tabId, key, row) {
         actual_qty: row.actual_qty || 0,
         finish_length: row.finish_length || '',
         tolerance: row.tolerance || 0,
-        melting_weight: row.fg_weight || 0,
+        end_cutting_weight: row.end_cutting_weight || 0,
         wastage: row.wastage || 0,
     };
     return map[key] !== undefined ? map[key] : '';
@@ -1234,6 +1654,8 @@ function mapRowForExport(tabId, row) {
             row.total_miss_ingot_weight || 0,
             row.melting_weight || 0,
             row.burning_loss || 0,
+            row.melting_wastage || 0,
+            row.finish_goods || 0,
             row.total_hr_consumed || 0,
         ];
     }
@@ -1247,6 +1669,26 @@ function mapRowForExport(tabId, row) {
         ];
     }
 
+    if (tabId === 'coal_consumption') {
+        return [
+            row.date
+                ? frappe.format(row.date, { fieldtype: 'Date' })
+                : '',
+            row.item || '',
+            row.qty || 0,
+            row.uom || '',
+        ];
+    }
+
+    if (tabId === 'hourly_production') {
+        return [
+            row.date
+                ? frappe.format(row.date, { fieldtype: 'Date' })
+                : '',
+            row.hours || 0,
+        ];
+    }
+
     // bright_production
     return [
         row.production_plan || '',
@@ -1255,11 +1697,11 @@ function mapRowForExport(tabId, row) {
             : '',
         row.rm || '',
         row.rm_category_name || '',
-        row.rm_consumption || 0,
         row.machine_name || '',
         row.finished_item || '',
         row.finished_item_category_name || '',
         row.fg_planned_qty || 0,
+        row.rm_consumption || 0,
         row.actual_qty || 0,
         row.finish_length || '',
         row.tolerance || 0,

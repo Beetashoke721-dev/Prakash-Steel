@@ -36,11 +36,14 @@ doctype_js = {
 	"Payment Entry": "public/js/payment_entry.js",
 	"Item": "public/js/item.js",
 	"Stock Entry": "public/js/stock_entry.js",
+	"Stock Reconciliation": "public/js/stock_reconciliation.js",
 	"Purchase Receipt": "public/js/purchase_receipt.js",
 	"Job Card": "public/js/job_card.js",
 	"Sales Invoice": "public/js/sales_invoice.js",
+	"Delivery Note": "public/js/delivery_note.js",
 	"Production Plan": "public/js/production_plan.js",
 	"Salary Slip": "public/js/salary_slip.js",
+	"Customer": "public/js/customer.js",
 	# "Payment Reconciliation": "public/js/payment_reconciliation.js",
 }
 
@@ -59,7 +62,11 @@ page_js = {
 # App Include JS
 # ------------------------------------------------------------------------------
 
-app_include_js = ["/assets/prakash_steel/js/number_cards_uom.js"]
+app_include_js = [
+	"/assets/prakash_steel/js/number_cards_uom.js",
+	"/assets/prakash_steel/js/attachment_utils.js",
+	"/assets/prakash_steel/js/item_row_restriction.js",
+]
 
 # ------------------------------------------------------------------------------
 # Document Events
@@ -86,6 +93,8 @@ doc_events = {
 		"on_update_after_submit": "prakash_steel.utils.item.update_decoupled_lead_time_on_bom_save",
 	},
 	"Purchase Receipt": {
+		"validate": "prakash_steel.utils.purchase_receipt.validate_transporter_for_psp_freight",
+		"before_submit": "prakash_steel.utils.attachment_validation.validate_mandatory_attachment",
 		"on_submit": [
 			"prakash_steel.utils.purchase_receipt.validate_purchase_receipt_quantity",
 			"prakash_steel.utils.job_work_order_utils.update_jwo_on_purchase_receipt_submit",
@@ -107,9 +116,13 @@ doc_events = {
 		"on_submit": "prakash_steel.utils.work_order.update_custom_wastage_after_stock_entry",
 		"on_cancel": "prakash_steel.utils.work_order.update_custom_wastage_after_stock_entry",
 	},
+	"Stock Reconciliation": {
+		"validate": "prakash_steel.utils.stock_reconciliation.set_total_quantity_and_amount",
+	},
 	"Job Card": {
 		"after_insert": "prakash_steel.utils.work_order.copy_production_type_to_job_card",
 		"before_validate": "prakash_steel.utils.work_order.prepare_job_card_completed_qty",
+		"on_submit": "prakash_steel.utils.work_order.submit_manufacture_stock_entry_for_job_card",
 		"validate": [
 			"prakash_steel.utils.work_order.lock_production_type_from_work_order",
 			"prakash_steel.utils.work_order.validate_job_card_time_log_miss_fields",
@@ -128,7 +141,11 @@ doc_events = {
 	"Sales Order": {
 		"before_cancel": "prakash_steel.utils.sales_order_cancel.validate_cancel_reason",
 		"validate": "prakash_steel.utils.order_validation.validate_no_zero_rate_items",
-		"before_update_after_submit": "prakash_steel.utils.order_validation.validate_no_zero_rate_items",
+		"before_submit": "prakash_steel.utils.sales_order_rate_floor.validate_item_rate_floor",
+		"before_update_after_submit": [
+			"prakash_steel.utils.order_validation.validate_no_zero_rate_items",
+			"prakash_steel.utils.sales_order_rate_floor.validate_item_rate_floor",
+		],
 	},
 	"Purchase Order": {
 		"before_cancel": "prakash_steel.utils.purchase_order_cancel.validate_cancel_reason",
@@ -154,6 +171,15 @@ doc_events = {
 	"Material Request": {
 		"before_cancel": "prakash_steel.utils.material_request_cancel.validate_cancel_reason",
 	},
+	"Customer": {
+		"validate": "prakash_steel.utils.party.warn_if_party_details_missing",
+	},
+	"Supplier": {
+		"validate": "prakash_steel.utils.party.warn_if_party_details_missing",
+	},
+	"File": {
+		"on_trash": "prakash_steel.utils.attachment_validation.prevent_protected_attachment_deletion",
+	},
 }
 
 # ------------------------------------------------------------------------------
@@ -162,16 +188,44 @@ doc_events = {
 
 scheduler_events = {
 	"cron": {
-		# Sync ESSL biometric punches daily at 11:20 AM IST (syncs yesterday's full day)
-		"30 10 * * *": ["prakash_steel.utils.essl_biometric.sync_essl_checkins"],
+		# Sync ESSL biometric punches daily at 10:30 AM (syncs yesterday's full day).
+		"30 10 * * *": ["prakash_steel.utils.essl_biometric.sync_essl_checkins_morning"],
+		# Re-sync the same "yesterday" a second time at 6 PM: a shift that
+		# checks out well into the next afternoon (e.g. Night Shift 8 PM ->
+		# 2 PM next day) hasn't punched OUT yet at the 10:30 AM run, so that
+		# run alone would leave the employee marked Absent. This pass picks
+		# such punches up and flips the existing Attendance to Present -
+		# sync_essl_checkins() with no args always resolves "yesterday"
+		# relative to when it runs, so both crons target the same date.
+		#
+		# This MUST be a different method than the 10:30 AM entry above, even
+		# though both just call sync_essl_checkins(). Frappe's scheduler keys
+		# "Scheduled Job Type" by method name alone, so the same method under
+		# two cron entries collides: whichever migrate runs last overwrites
+		# the other's cron_format on the SAME record, and the other time never
+		# actually gets scheduled. See the note above
+		# sync_essl_checkins_morning/_evening in essl_biometric.py.
+		"0 18 * * *": ["prakash_steel.utils.essl_biometric.sync_essl_checkins_evening"],
 		# Runs daily at 14:52 server time
 		"05 08 * * *": [
 			"prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp.save_daily_on_hand_colour"
 		],
+		# Saves each Non-Buffer (MTO) item's SKU type daily, for the weekly register's MTO inventory
+		"27 11 * * *": [
+			"prakash_steel.prakash_steel.doctype.item_wise_daily_mto_sku.item_wise_daily_mto_sku.save_daily_mto_sku"
+		],
+		# Saves each Bright Machine's Net Order Load daily, for the weekly register
+		"30 14 * * *": [
+			"prakash_steel.prakash_steel.doctype.item_wise_daily_bright_machine_load.item_wise_daily_bright_machine_load.save_daily_bright_machine_load"
+		],
+		# Saves each Bright and Rolled Critical Spares item's On Hand Colour daily, for the weekly register
+		"00 14 * * *": [
+			"prakash_steel.prakash_steel.doctype.item_wise_daily_cs_colour.item_wise_daily_cs_colour.save_daily_cs_colour"
+		],
 		# Sends daily Sales Invoice summary email at 11:58 PM
 		"58 23 * * *": ["prakash_steel.utils.daily_sales_invoice_email.send_daily_sales_invoice_email"],
 		# Sends yesterday Payment Entry report daily at 1:25 PM
-		"15 11 * * *": ["prakash_steel.utils.daily_payment_entry_email.send_daily_payment_entry_email"],
+		"01 11 * * *": ["prakash_steel.utils.daily_payment_entry_email.send_daily_payment_entry_email"],
 		# Captures PO Recommendation Snapshot daily at 2:06 PM
 		"00 04 * * *": [
 			"prakash_steel.po_recommendation_history.doctype.po_recommendation_snapshot.po_recommendation_snapshot.capture_daily_po_snapshot"
@@ -189,6 +243,16 @@ scheduler_events = {
 		# Captures Bright Machine Load Snapshot daily at 4:30 AM IST
 		"04 04 * * *": [
 			"prakash_steel.po_recommendation_history.doctype.bright_machine_load_snapshot.bright_machine_load_snapshot.capture_daily_snapshot"
+		],
+		# Saves each Bright / Rolled / BO / Traded item's Free Stock daily
+		"06 04 * * *": [
+			"prakash_steel.prakash_steel.doctype.item_wise_daily_free_stock.item_wise_daily_free_stock.save_daily_free_stock"
+		],
+		# Sends Rolled Bar / Bright Bar Production Dashboard summary daily at 4:00 PM IST
+		# (server local time). Covers yesterday's production, except: Sunday sends nothing
+		# (factory closed), and Monday covers Saturday's production instead.
+		"00 16 * * *": [
+			"prakash_steel.utils.daily_production_dashboard_email.send_daily_production_dashboard_email"
 		],
 	},
 	# Recalculate ADU for all items once per day so Item.custom_adu stays in sync
@@ -215,10 +279,16 @@ override_doctype_class = {
 
 override_whitelisted_methods = {
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "prakash_steel.utils.sales_order.make_sales_invoice",
+	"erpnext.selling.doctype.sales_order.sales_order.make_delivery_note": "prakash_steel.utils.sales_order.make_delivery_note",
+	"erpnext.stock.doctype.delivery_note.delivery_note.make_sales_invoice": "prakash_steel.utils.delivery_note.make_sales_invoice",
 	"erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_receipt": "prakash_steel.utils.purchase_order.make_purchase_receipt",
+	"erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_invoice": "prakash_steel.utils.purchase_invoice.make_purchase_invoice",
 	# Ensure our custom_cancel_reason validation doesn't block e-Invoice cancellation
 	"india_compliance.gst_india.utils.e_invoice.cancel_e_invoice": "prakash_steel.utils.e_invoice.cancel_e_invoice",
 	# Inject custom_invoice_date (= invoice posting_date) into the reference-details
 	# response so it populates alongside due_date when a reference is picked.
 	"erpnext.accounts.doctype.payment_entry.payment_entry.get_reference_details": "prakash_steel.utils.payment_entry.get_reference_details",
+	# Notify pratikshyagochhayat@clapgrow.com whenever items are edited via the
+	# "Update Items" dialog on Sales Order / Purchase Order.
+	"erpnext.controllers.accounts_controller.update_child_qty_rate": "prakash_steel.utils.order_item_update_notification.update_child_qty_rate",
 }

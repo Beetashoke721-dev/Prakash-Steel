@@ -127,6 +127,47 @@ def _get_daily_balances(account, loop_start, loop_end) -> dict:
     return balances
 
 
+def _get_interest_periods(parent_names: list[str]) -> dict[str, list[dict]]:
+    """
+    Fetch Period Per Annum (Interest %) child rows for the given parent docs.
+
+    Returns: {parent_name: [{from_date, to_date, interest}, ...]}
+    """
+    if not parent_names:
+        return {}
+
+    rows = frappe.db.sql(
+        """
+        SELECT parent, from_date, to_date, interest
+        FROM `tabUnsecured loan table`
+        WHERE parent IN %(parents)s
+          AND parenttype = 'Unsecured Loans and Transaction'
+        ORDER BY from_date ASC
+        """,
+        {"parents": tuple(parent_names)},
+        as_dict=True,
+    )
+
+    periods: dict[str, list[dict]] = {}
+    for row in rows:
+        periods.setdefault(row.parent, []).append(
+            {
+                "from_date": getdate(row.from_date),
+                "to_date": getdate(row.to_date),
+                "interest": flt(row.interest),
+            }
+        )
+    return periods
+
+
+def _interest_for_date(periods: list[dict], date) -> float | None:
+    """Return Interest % whose From/To date range covers `date`, else None."""
+    for period in periods:
+        if period["from_date"] <= date <= period["to_date"]:
+            return period["interest"]
+    return None
+
+
 # Month mapping
 MONTH_MAP = {
     "January": 1,
@@ -167,8 +208,7 @@ def get_data(filters) -> list[dict]:
             unsecured_loan,
             financial_year,
             from_date,
-            to_date,
-            interest_percent
+            to_date
         FROM
             `tabUnsecured Loans and Transaction`
         {where_clause}
@@ -179,6 +219,8 @@ def get_data(filters) -> list[dict]:
         values,
         as_dict=True,
     )
+
+    interest_periods = _get_interest_periods([rec["name"] for rec in records])
 
     yesterday = add_days(getdate(today()), -1)
 
@@ -193,8 +235,8 @@ def get_data(filters) -> list[dict]:
 
         from_date = getdate(rec["from_date"])
         to_date = getdate(rec["to_date"])
-        interest_pct = flt(rec["interest_percent"])
         account = rec["unsecured_loan"]
+        periods = interest_periods.get(rec["name"], [])
 
         loop_start = from_date
         loop_end = min(to_date, yesterday)
@@ -228,8 +270,12 @@ def get_data(filters) -> list[dict]:
             month_name = calendar.month_name[current.month]
             days_in_month = calendar.monthrange(current.year, current.month)[1]
 
+            # Interest % for this date from Period Per Annum child table
+            interest_pct = _interest_for_date(periods, current)
+            interest_pct_value = flt(interest_pct) if interest_pct is not None else 0.0
+
             # Daily Interest Calculation
-            day_interest_pct = round((interest_pct / 12.0) / days_in_month, 6)
+            day_interest_pct = round((interest_pct_value / 12.0) / days_in_month, 6)
 
             closing_bal = daily_balances.get(str(current), 0.0)
 
@@ -242,7 +288,7 @@ def get_data(filters) -> list[dict]:
             row = {
                 "name": rec["name"] if is_first_row else "",
                 "unsecured_loan": account if is_first_row else "",
-                "interest_percent": interest_pct if is_first_row else None,
+                "interest_percent": interest_pct,
                 "month": month_name,
                 "detail_date": current,
                 "closing_balance": closing_bal,

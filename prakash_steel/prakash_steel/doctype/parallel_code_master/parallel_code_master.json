@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "Format: {item_code}",
+ "creation": "2026-10-13 16:33:06.589785",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "column_break_fiwl",
+  "column_break_gcnh",
+  "section_break_ysfq",
+  "parallel_code_1",
+  "column_break_scbc",
+  "parallel_code_2",
+  "column_break_oyge",
+  "parallel_code_3"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_fiwl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_gcnh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_ysfq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "parallel_code_1",
+   "fieldtype": "Link",
+   "label": "Parallel Code 1",
+   "options": "Item"
+  },
+  {
+   "fieldname": "column_break_scbc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "parallel_code_2",
+   "fieldtype": "Link",
+   "label": "Parallel Code 2",
+   "options": "Item"
+  },
+  {
+   "fieldname": "column_break_oyge",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "parallel_code_3",
+   "fieldtype": "Link",
+   "label": "Parallel Code 3",
+   "options": "Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-13 16:38:14.583174",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Parallel Code Master",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,44 @@
+{
+ "content": null,
+ "creation": "2026-08-01 11:33:36.718788",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-08-01 11:33:36.718788",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "customer-hbt",
+ "owner": "Administrator",
+ "page_name": "customer-hbt",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Administrator"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Sales Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Customer HBT"
+}

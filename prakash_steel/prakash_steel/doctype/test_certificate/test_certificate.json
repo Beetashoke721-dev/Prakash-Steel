@@ -1,0 +1,357 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-30 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "date",
+  "column_break_1",
+  "sales_invoice",
+  "items",
+  "truck_no",
+  "section_break_2",
+  "customer",
+  "column_break_3",
+  "customer_name",
+  "section_break_4",
+  "manufacturing_process",
+  "condition",
+  "column_break_5",
+  "quantity",
+  "destination",
+  "chemical_analysis_section",
+  "grade",
+  "size",
+  "column_break_chem",
+  "colour_code",
+  "readings_section",
+  "quality_inspection_template",
+  "manual_inspection",
+  "readings",
+  "section_break_11",
+  "micro_structure",
+  "hardenability_test",
+  "column_break_insp1",
+  "surface_inspection",
+  "internal_soundness",
+  "column_break_insp2",
+  "step_down_test",
+  "spectro_spark_test",
+  "section_break_12",
+  "uts",
+  "ys",
+  "elongation",
+  "column_break_mech1",
+  "reduction_in_area",
+  "bend_test",
+  "column_break_mech2",
+  "surface_hardness_bhn",
+  "mechanical_size"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "PSP/TC/.####",
+   "default": "PSP/TC/.####",
+   "reqd": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "default": "Today",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Invoice No",
+   "options": "Sales Invoice",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "depends_on": "sales_invoice",
+   "description": "Items from the selected Sales Invoice",
+   "fieldname": "items",
+   "fieldtype": "Table MultiSelect",
+   "label": "Items",
+   "options": "Test Certificate Item"
+  },
+  {
+   "fetch_from": "sales_invoice.vehicle_no",
+   "fetch_if_empty": 1,
+   "fieldname": "truck_no",
+   "fieldtype": "Data",
+   "label": "Truck No"
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Customer"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "fetch_from": "sales_invoice.customer",
+   "fetch_if_empty": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "fetch_from": "customer.customer_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break",
+   "label": "Dispatch Details"
+  },
+  {
+   "fieldname": "manufacturing_process",
+   "fieldtype": "Link",
+   "label": "Manufacturing Process",
+   "options": "Manufacturing Process"
+  },
+  {
+   "fieldname": "condition",
+   "fieldtype": "Link",
+   "label": "Condition",
+   "options": "Condition"
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Quantity (MT)",
+   "precision": "3",
+   "read_only_depends_on": "eval:doc.items && doc.items.length",
+   "description": "Auto-calculated from the selected items of the Sales Invoice"
+  },
+  {
+   "fieldname": "destination",
+   "fieldtype": "Data",
+   "label": "Destination"
+  },
+  {
+   "fieldname": "chemical_analysis_section",
+   "fieldtype": "Section Break",
+   "label": "Chemical Analysis"
+  },
+  {
+   "fieldname": "grade",
+   "fieldtype": "Data",
+   "label": "Specification & Grade",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "size",
+   "fieldtype": "Data",
+   "label": "Size"
+  },
+  {
+   "fieldname": "column_break_chem",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "colour_code",
+   "fieldtype": "Data",
+   "label": "Colour Code",
+   "read_only": 1,
+   "description": "Auto-filled from the Grade of the selected Items"
+  },
+  {
+   "fieldname": "readings_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "quality_inspection_template",
+   "fieldtype": "Link",
+   "label": "Quality Inspection Template",
+   "options": "Quality Inspection Template"
+  },
+  {
+   "default": "0",
+   "fieldname": "manual_inspection",
+   "fieldtype": "Check",
+   "label": "Manual Inspection"
+  },
+  {
+   "fieldname": "readings",
+   "fieldtype": "Table",
+   "label": "Readings",
+   "options": "Quality Inspection Reading"
+  },
+  {
+   "fieldname": "section_break_11",
+   "fieldtype": "Section Break",
+   "label": "Inspection"
+  },
+  {
+   "fieldname": "micro_structure",
+   "fieldtype": "Data",
+   "label": "Micro Structure"
+  },
+  {
+   "fieldname": "hardenability_test",
+   "fieldtype": "Data",
+   "label": "Hardenability Test"
+  },
+  {
+   "fieldname": "column_break_insp1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "surface_inspection",
+   "fieldtype": "Data",
+   "label": "Surface Inspection"
+  },
+  {
+   "fieldname": "internal_soundness",
+   "fieldtype": "Data",
+   "label": "Internal Soundness"
+  },
+  {
+   "fieldname": "column_break_insp2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "step_down_test",
+   "fieldtype": "Data",
+   "label": "Step Down Test"
+  },
+  {
+   "fieldname": "spectro_spark_test",
+   "fieldtype": "Data",
+   "label": "Spectro / Spark Test"
+  },
+  {
+   "fieldname": "section_break_12",
+   "fieldtype": "Section Break",
+   "label": "Mechanical Properties"
+  },
+  {
+   "fieldname": "uts",
+   "fieldtype": "Float",
+   "label": "UTS (N/mm²)"
+  },
+  {
+   "fieldname": "ys",
+   "fieldtype": "Float",
+   "label": "YS (N/mm²)"
+  },
+  {
+   "fieldname": "elongation",
+   "fieldtype": "Percent",
+   "label": "Elongation %"
+  },
+  {
+   "fieldname": "column_break_mech1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reduction_in_area",
+   "fieldtype": "Data",
+   "label": "Reduction In Area %"
+  },
+  {
+   "fieldname": "bend_test",
+   "fieldtype": "Data",
+   "label": "Bend Test"
+  },
+  {
+   "fieldname": "column_break_mech2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "surface_hardness_bhn",
+   "fieldtype": "Float",
+   "label": "Surface Hardness (BHN)"
+  },
+  {
+   "fieldname": "mechanical_size",
+   "fieldtype": "Data",
+   "label": "Size"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-09-30 23:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Test Certificate",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "customer,sales_invoice",
+ "show_title_field_in_link": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer_name",
+ "track_changes": 1
+}

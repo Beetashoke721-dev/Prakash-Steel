@@ -14,6 +14,8 @@ SKU_TYPE_MAP = {
 	("RM", False): "PTO",
 	("Traded", True): "TRMTA",
 	("Traded", False): "TRMTO",
+	("CS", True): "CSMTA",
+	("CS", False): "CSMTO",
 }
 
 

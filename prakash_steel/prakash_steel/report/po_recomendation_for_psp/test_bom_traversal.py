@@ -89,7 +89,7 @@ class TestTraverseBomSimple(unittest.TestCase):
 		# item_groups_cache miss → fetches from DB, still stops if Raw Material
 		demand_map = {}
 		with patch(MODULE + ".frappe") as mf, patch(MODULE + ".get_default_bom") as mgb:
-			mf.get_doc.return_value = _item_doc("Raw Material")
+			mf.db.get_value.return_value = "Raw Material"
 			self._fn("RM", 100, demand_map, set(), {}, {})
 			mgb.assert_not_called()
 		self.assertEqual(demand_map, {})
@@ -503,12 +503,12 @@ class TestPropagatePriorityThroughBomTree(unittest.TestCase):
 				MODULE + ".get_open_so_map_for_priority",
 				return_value={"PARENT": [{"pending_qty": 100, "order_status": "RED"}]},
 			),
-			patch(MODULE + ".get_stock_map", return_value={}),
+			patch(MODULE + ".get_planning_stock_map", return_value={}),
 		):
 			mf.db.sql.side_effect = _sql_dispatch
 			self._fn(data, {}, {})
 
-		self.assertEqual(data[0]["priority"], "Red")
+		self.assertEqual(data[0]["priority"], "RED")
 
 	def test_buffer_rows_are_not_overwritten(self):
 		# Same ancestor setup as above, but the report row itself is a Buffer item —
@@ -532,12 +532,94 @@ class TestPropagatePriorityThroughBomTree(unittest.TestCase):
 				MODULE + ".get_open_so_map_for_priority",
 				return_value={"PARENT": [{"pending_qty": 100, "order_status": "RED"}]},
 			),
-			patch(MODULE + ".get_stock_map", return_value={}),
+			patch(MODULE + ".get_planning_stock_map", return_value={}),
 		):
 			mf.db.sql.side_effect = _sql_dispatch
 			self._fn(data, {}, {})
 
 		self.assertEqual(data[0]["priority"], "OLD")
+
+	def test_buffer_bb_ancestor_uses_bright_plan_colour(self):
+		# CHILD's only BOM parent is a Buffer BB item. Its contributed colour must
+		# come from the Bright Plan "Order Recommendation" formula (buffer
+		# penetration of stock + WIP + draft WO against TOG + qualified demand),
+		# NOT the FIFO open-SO shortage colour.
+		#   tog=100, qualified demand=50  -> net order rec = max(0,150-20) = 130 > 0
+		#   so it IS in Bright Plan; worst batch level = 20 (<= 150/3) -> Red
+		data = [{"item_code": "CHILD", "priority": "", "buffer_flag": "Non-Buffer"}]
+		bom_calls = {"n": 0}
+
+		def _sql_dispatch(query, params=None, as_dict=False):
+			if "tabBOM" in query:
+				bom_calls["n"] += 1
+				if bom_calls["n"] == 1:
+					return [_row(parent_item="PARENT", child_item="CHILD")]
+				return []
+			if "tabItem" in query:
+				return [
+					_row(
+						item_code="PARENT",
+						custom_buffer_flag="Buffer",
+						custom_item_type="BB",
+						safety_stock=100,
+					)
+				]
+			return []
+
+		with (
+			patch(MODULE + ".frappe") as mf,
+			patch(MODULE + ".get_open_so_map_for_priority", return_value={}),
+			patch(MODULE + ".get_planning_stock_map", return_value={"PARENT": 20}),
+			patch(MODULE + ".get_draft_wo_map", return_value={}),
+			patch(MODULE + ".get_qualified_demand_map", return_value=({"PARENT": 50.0}, {})),
+			patch(MODULE + ".calculate_spike_map", return_value={}),
+			patch(MODULE + ".get_mrq_map", return_value={}),
+		):
+			mf.db.sql.side_effect = _sql_dispatch
+			mf.get_all.return_value = []
+			self._fn(data, {}, {})
+
+		self.assertEqual(data[0]["priority"], "RED")
+
+	def test_buffer_bb_ancestor_with_zero_net_order_rec_contributes_nothing(self):
+		# Buffer BB parent that is over-stocked: net order rec = max(0, 100-500) = 0,
+		# so it is NOT in the Bright Plan report and must contribute no colour.
+		# CHILD's own priority must be left untouched.
+		#   tog=100, qualified demand=0, stock=500
+		data = [{"item_code": "CHILD", "priority": "GREEN", "buffer_flag": "Non-Buffer"}]
+		bom_calls = {"n": 0}
+
+		def _sql_dispatch(query, params=None, as_dict=False):
+			if "tabBOM" in query:
+				bom_calls["n"] += 1
+				if bom_calls["n"] == 1:
+					return [_row(parent_item="PARENT", child_item="CHILD")]
+				return []
+			if "tabItem" in query:
+				return [
+					_row(
+						item_code="PARENT",
+						custom_buffer_flag="Buffer",
+						custom_item_type="BB",
+						safety_stock=100,
+					)
+				]
+			return []
+
+		with (
+			patch(MODULE + ".frappe") as mf,
+			patch(MODULE + ".get_open_so_map_for_priority", return_value={}),
+			patch(MODULE + ".get_planning_stock_map", return_value={"PARENT": 500}),
+			patch(MODULE + ".get_draft_wo_map", return_value={}),
+			patch(MODULE + ".get_qualified_demand_map", return_value=({"PARENT": 0.0}, {})),
+			patch(MODULE + ".calculate_spike_map", return_value={}),
+			patch(MODULE + ".get_mrq_map", return_value={}),
+		):
+			mf.db.sql.side_effect = _sql_dispatch
+			mf.get_all.return_value = []
+			self._fn(data, {}, {})
+
+		self.assertEqual(data[0]["priority"], "GREEN")
 
 
 # ---------------------------------------------------------------------------

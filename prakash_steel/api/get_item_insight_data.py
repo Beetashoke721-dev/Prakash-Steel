@@ -28,7 +28,9 @@ def get_item_insight_data(
         frappe.throw(_("Not permitted to access item insight data."), frappe.PermissionError)
 
     # Build item filter
-    item_filter: dict[str, object] = {"is_stock_item": 1}
+    # Non-stock items (e.g. consumables under Miscellaneous) are in scope too,
+    # since they can still have purchase history that PO/PI rows need to show.
+    item_filter: dict[str, object] = {}
 
     if item_code:
         item_filter["name"] = item_code
@@ -50,6 +52,7 @@ def get_item_insight_data(
             "custom_grade as item_grade",
             "custom_category_name as category_name",
             "custom_desc_code",
+            "custom_store_item",
         ],
         order_by="item_code",
         limit_page_length=int(limit) if limit else None,
@@ -58,14 +61,20 @@ def get_item_insight_data(
     if not items:
         return []
 
-    # Classify items by type (Rolled vs Bright)
+    # Classify items by type (Rolled vs Bright) and store vs non-store
     all_codes = []
     rolled_codes = []
     bright_codes = []
+    store_codes = []
+    non_store_codes = []
 
     for item in items:
         code = item.name
         all_codes.append(code)
+        if item.custom_store_item:
+            store_codes.append(code)
+        else:
+            non_store_codes.append(code)
         desc = item.custom_desc_code or ""
         if "Bright Bar" in desc:
             bright_codes.append(code)
@@ -85,9 +94,15 @@ def get_item_insight_data(
         all_codes = []
         rolled_codes = []
         bright_codes = []
+        store_codes = []
+        non_store_codes = []
         for item in items:
             code = item.name
             all_codes.append(code)
+            if item.custom_store_item:
+                store_codes.append(code)
+            else:
+                non_store_codes.append(code)
             desc = item.custom_desc_code or ""
             if "Bright Bar" in desc:
                 bright_codes.append(code)
@@ -95,12 +110,17 @@ def get_item_insight_data(
                 rolled_codes.append(code)
 
     # ── Bulk fetch all data (few queries instead of N × 6+) ──
+    # Job Card is the primary production source; Finish Weight / Bright Bar
+    # Production are kept as the fallback for items with no Job Card.
+    job_card_prod_map = _bulk_job_card_production(all_codes, from_date, to_date)
     prod_date_map = _bulk_production_dates(
         rolled_codes, bright_codes, from_date, to_date
     )
     prod_qty_map = _bulk_production_qty(rolled_codes, bright_codes, from_date, to_date)
     sales_map, pending_so_map = _bulk_sales_data(all_codes, from_date, to_date)
-    purchase_map, pending_po_map = _bulk_purchase_data(all_codes, from_date, to_date)
+    purchase_map, pending_po_map = _bulk_purchase_data(
+        non_store_codes, store_codes, from_date, to_date
+    )
     inventory_map = _bulk_inventory_data(all_codes)
 
     # ── Merge results ──
@@ -115,12 +135,21 @@ def get_item_insight_data(
         sd = sales_map.get(ic, {})
         pd = purchase_map.get(ic, {})
 
+        # Date and qty always come from the same source, so they stay consistent.
+        jc = job_card_prod_map.get(ic)
+        if jc:
+            last_production_date = jc.get("date")
+            last_production_quantity = jc.get("qty", 0)
+        else:
+            last_production_date = prod_date_map.get(ic)
+            last_production_quantity = prod_qty_map.get(ic, 0)
+
         item_data = {
             "item_code": item.item_code,
             "item_name": item.item_name or item.item_code,
             # Production
-            "last_production_date": prod_date_map.get(ic),
-            "last_production_quantity": prod_qty_map.get(ic, 0),
+            "last_production_date": last_production_date,
+            "last_production_quantity": last_production_quantity,
             # Sales
             "last_sales_party": sd.get("customer_name"),
             "last_sales_date": sd.get("posting_date"),
@@ -192,7 +221,29 @@ def _get_items_with_transactions(
     )
     params.extend([codes_tuple, from_date, to_date])
 
-    # Finish Weight (rolled bars)
+    # Purchase Invoice (needed for store items whose last purchase comes from PI)
+    parts.append(
+        "SELECT DISTINCT pii.item_code "
+        "FROM `tabPurchase Invoice Item` pii "
+        "INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent "
+        "WHERE pii.item_code IN %s AND pi.docstatus = 1 "
+        "AND IFNULL(pi.is_return, 0) = 0 "
+        "AND pi.posting_date BETWEEN %s AND %s"
+    )
+    params.extend([codes_tuple, from_date, to_date])
+
+    # Job Card (primary production source, both rolled and bright)
+    parts.append(
+        "SELECT DISTINCT jc.production_item AS item_code "
+        "FROM `tabJob Card` jc "
+        "WHERE jc.production_item IN %s AND jc.docstatus = 1 "
+        "AND COALESCE(jc.total_completed_qty, 0) > 0 "
+        "AND COALESCE(DATE(jc.actual_start_date), jc.posting_date) "
+        "BETWEEN %s AND %s"
+    )
+    params.extend([codes_tuple, from_date, to_date])
+
+    # Finish Weight (rolled bars) — fallback production source
     if rolled_codes:
         parts.append(
             "SELECT DISTINCT item_code "
@@ -202,7 +253,7 @@ def _get_items_with_transactions(
         )
         params.extend([tuple(rolled_codes), from_date, to_date])
 
-    # Bright Bar Production (bright bars)
+    # Bright Bar Production (bright bars) — fallback production source
     if bright_codes:
         parts.append(
             "SELECT DISTINCT finished_good AS item_code "
@@ -215,6 +266,54 @@ def _get_items_with_transactions(
     query = " UNION ALL ".join(parts)
     rows = frappe.db.sql(query, tuple(params), as_dict=True)
     return {r.item_code for r in rows}
+
+
+def _bulk_job_card_production(item_codes, from_date, to_date) -> dict:
+    """
+    Get the latest Job Card production per item.
+
+    Production moved onto the Job Card flow, so a submitted Job Card is the
+    primary source for Last Production Date / Qty; Finish Weight (rolled) and
+    Bright Bar Production (bright) stay as the fallback for items last produced
+    before the switch.  Production date follows the same rule as the
+    machine-wise monthly dashboard: actual start date, falling back to the
+    Job Card posting date.  Job Cards with nothing completed are skipped, since
+    they are not a production.
+    Returns {item_code: {"date": date, "qty": qty}}.
+    """
+    if not item_codes:
+        return {}
+
+    query = """
+        SELECT
+            jc.production_item AS item_code,
+            COALESCE(DATE(jc.actual_start_date), jc.posting_date) AS production_date,
+            jc.total_completed_qty AS qty
+        FROM `tabJob Card` jc
+        WHERE jc.production_item IN %s
+            AND jc.docstatus = 1
+            AND COALESCE(jc.total_completed_qty, 0) > 0
+    """
+    params: list = [tuple(item_codes)]
+    if from_date and to_date:
+        query += (
+            " AND COALESCE(DATE(jc.actual_start_date), jc.posting_date)"
+            " BETWEEN %s AND %s"
+        )
+        params.extend([from_date, to_date])
+    query += " ORDER BY production_date DESC, jc.creation DESC"
+
+    rows = frappe.db.sql(query, tuple(params), as_dict=True)
+
+    result = {}
+    for r in rows:
+        if r.item_code not in result:
+            result[r.item_code] = {
+                "date": r.production_date,
+                "qty": flt(r.qty, 2),
+            }
+
+    return result
 
 
 def _bulk_production_dates(rolled_codes, bright_codes, from_date, to_date) -> dict:
@@ -385,61 +484,93 @@ def _bulk_sales_data(item_codes, from_date, to_date) -> dict:
     return sales_map, pending_so_map
 
 
-def _bulk_purchase_data(item_codes, from_date, to_date) -> dict:
+def _bulk_purchase_data(non_store_codes, store_codes, from_date, to_date) -> dict:
     """
-    Bulk-fetch latest Purchase Order data and pending PO qty.
+    Bulk-fetch latest purchase data and pending PO qty.
+
+    Source for last purchase details:
+    - Store items (Item.custom_store_item = 1) → latest submitted Purchase Invoice
+    - All other items → latest submitted Purchase Order
+
+    Pending PO qty is always aggregated from open Purchase Orders for every item.
     Returns (purchase_map, pending_po_map).
     """
     purchase_map: dict = {}
     pending_po_map: dict = {}
 
-    if not item_codes:
-        return purchase_map, pending_po_map
-
-    codes_tuple = tuple(item_codes)
-
-    # Latest Purchase Order per item
-    query = """
-        SELECT poi.item_code, po.supplier_name, poi.qty, poi.rate, po.transaction_date
-        FROM `tabPurchase Order Item` poi
-        INNER JOIN `tabPurchase Order` po ON po.name = poi.parent
-        WHERE poi.item_code IN %s
-            AND po.docstatus = 1
-            AND po.status NOT IN ('Closed', 'Cancelled')
-    """
-    params: list = [codes_tuple]
-    if from_date and to_date:
-        query += " AND po.transaction_date BETWEEN %s AND %s"
-        params.extend([from_date, to_date])
-    query += " ORDER BY po.transaction_date DESC, po.creation DESC"
-
-    rows = frappe.db.sql(query, tuple(params), as_dict=True)
-    for r in rows:
-        if r.item_code not in purchase_map:
-            purchase_map[r.item_code] = {
-                "supplier_name": r.supplier_name,
-                "qty": r.qty,
-                "rate": r.rate,
-                "posting_date": r.transaction_date,  # Keep field name as posting_date for compatibility
-            }
-
-    # Pending PO qty (aggregated per item) - sum of (qty - received_qty) from open Purchase Orders
-    pending_rows = frappe.db.sql(
+    # Latest Purchase Order per non-store item
+    if non_store_codes:
+        codes_tuple = tuple(non_store_codes)
+        query = """
+            SELECT poi.item_code, po.supplier_name, poi.qty, poi.rate, po.transaction_date
+            FROM `tabPurchase Order Item` poi
+            INNER JOIN `tabPurchase Order` po ON po.name = poi.parent
+            WHERE poi.item_code IN %s
+                AND po.docstatus = 1
+                AND po.status NOT IN ('Closed', 'Cancelled')
         """
-        SELECT poi.item_code, SUM(poi.qty - IFNULL(poi.received_qty, 0)) AS pending_qty
-        FROM `tabPurchase Order Item` poi
-        INNER JOIN `tabPurchase Order` po ON po.name = poi.parent
-        WHERE poi.item_code IN %s
-            AND po.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
-            AND po.docstatus = 1
-            AND (poi.qty - IFNULL(poi.received_qty, 0)) > 0
-        GROUP BY poi.item_code
-    """,
-        (codes_tuple,),
-        as_dict=True,
-    )
-    for r in pending_rows:
-        pending_po_map[r.item_code] = flt(r.pending_qty, 2)
+        params: list = [codes_tuple]
+        if from_date and to_date:
+            query += " AND po.transaction_date BETWEEN %s AND %s"
+            params.extend([from_date, to_date])
+        query += " ORDER BY po.transaction_date DESC, po.creation DESC"
+
+        rows = frappe.db.sql(query, tuple(params), as_dict=True)
+        for r in rows:
+            if r.item_code not in purchase_map:
+                purchase_map[r.item_code] = {
+                    "supplier_name": r.supplier_name,
+                    "qty": r.qty,
+                    "rate": r.rate,
+                    "posting_date": r.transaction_date,  # Keep field name as posting_date for compatibility
+                }
+
+    # Latest Purchase Invoice per store item
+    if store_codes:
+        codes_tuple = tuple(store_codes)
+        query = """
+            SELECT pii.item_code, pi.supplier_name, pii.qty, pii.rate, pi.posting_date
+            FROM `tabPurchase Invoice Item` pii
+            INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+            WHERE pii.item_code IN %s
+                AND pi.docstatus = 1
+                AND IFNULL(pi.is_return, 0) = 0
+        """
+        params = [codes_tuple]
+        if from_date and to_date:
+            query += " AND pi.posting_date BETWEEN %s AND %s"
+            params.extend([from_date, to_date])
+        query += " ORDER BY pi.posting_date DESC, pi.creation DESC"
+
+        rows = frappe.db.sql(query, tuple(params), as_dict=True)
+        for r in rows:
+            if r.item_code not in purchase_map:
+                purchase_map[r.item_code] = {
+                    "supplier_name": r.supplier_name,
+                    "qty": r.qty,
+                    "rate": r.rate,
+                    "posting_date": r.posting_date,
+                }
+
+    # Pending PO qty (aggregated per item) - all items, open Purchase Orders only
+    all_codes = list(non_store_codes or []) + list(store_codes or [])
+    if all_codes:
+        pending_rows = frappe.db.sql(
+            """
+            SELECT poi.item_code, SUM(poi.qty - IFNULL(poi.received_qty, 0)) AS pending_qty
+            FROM `tabPurchase Order Item` poi
+            INNER JOIN `tabPurchase Order` po ON po.name = poi.parent
+            WHERE poi.item_code IN %s
+                AND po.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
+                AND po.docstatus = 1
+                AND (poi.qty - IFNULL(poi.received_qty, 0)) > 0
+            GROUP BY poi.item_code
+        """,
+            (tuple(all_codes),),
+            as_dict=True,
+        )
+        for r in pending_rows:
+            pending_po_map[r.item_code] = flt(r.pending_qty, 2)
 
     return purchase_map, pending_po_map
 

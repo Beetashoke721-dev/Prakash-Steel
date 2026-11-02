@@ -6,7 +6,7 @@ import math
 import frappe
 from frappe import _
 
-from prakash_steel.utils.hbt_utils import get_period_months, period_date_range
+from prakash_steel.utils.hbt_utils import get_period_range
 
 
 def _ceil(v) -> int:
@@ -20,11 +20,11 @@ def _ceil_1000(v) -> int:
 
 
 def _get_projection_factor() -> float:
-	"""Projected Qty multiplier = 1 + FOS (factor of safety) from RB Batch Planning Settings.
+	"""Projected Qty multiplier = 1 + FOS (factor of safety) from RB Batch Planning Setting.
 
 	e.g. FOS = 0.3 -> factor 1.3.
 	"""
-	fos = frappe.db.get_single_value("RB Batch Planning Settings", "fos")
+	fos = frappe.db.get_single_value("RB Batch Planning Setting", "fos")
 	return 1 + (fos or 0)
 
 
@@ -33,8 +33,7 @@ MAX_PROD_COLS = 10
 
 def execute(filters: dict | None = None):
 	filters = filters or {}
-	period_months = get_period_months("RB Batch Planning Settings")
-	from_date, to_date = period_date_range(period_months)
+	from_date, to_date = get_period_range("RB Batch Planning Setting")
 
 	data, max_prod_cols = get_data(filters, from_date, to_date)
 	columns = get_columns(max_prod_cols)
@@ -300,8 +299,7 @@ def get_data(filters: dict, from_date, to_date) -> tuple[list[dict], int]:
 @frappe.whitelist()
 def get_item_debug_info(item_code: str) -> dict:
 	"""Return a full calculation breakdown for a single item — used by the Debug button."""
-	period_months = get_period_months("RB Batch Planning Settings")
-	from_date, to_date = period_date_range(period_months)
+	from_date, to_date = get_period_range("RB Batch Planning Setting")
 	period_label = f"{from_date.strftime('%d %b %Y')} – {to_date.strftime('%d %b %Y')}"
 
 	item = frappe.db.get_value(

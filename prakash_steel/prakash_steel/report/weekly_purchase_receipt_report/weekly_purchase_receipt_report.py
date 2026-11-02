@@ -3,6 +3,7 @@
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 
 def execute(filters: dict | None = None):
@@ -54,7 +55,7 @@ def get_columns() -> list[dict]:
 		{
 			"label": _("Accepted Qty"),
 			"fieldname": "stock_qty",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 110,
 		},
 		{
@@ -62,6 +63,18 @@ def get_columns() -> list[dict]:
 			"fieldname": "rate",
 			"fieldtype": "Currency",
 			"width": 110,
+		},
+		{
+			"label": _("Amount"),
+			"fieldname": "amount",
+			"fieldtype": "Currency",
+			"width": 110,
+		},
+		{
+			"label": _("Category Name"),
+			"fieldname": "custom_category_name",
+			"fieldtype": "Data",
+			"width": 150,
 		},
 	]
 
@@ -87,7 +100,7 @@ def get_data(filters: dict | None = None) -> list[dict]:
 
 	where_clause = " and ".join(conditions)
 
-	return frappe.db.sql(
+	data = frappe.db.sql(
 		f"""
 		select
 			pr.posting_date as posting_date,
@@ -95,12 +108,20 @@ def get_data(filters: dict | None = None) -> list[dict]:
 			pr.supplier as supplier,
 			pri.item_code as item_code,
 			pri.stock_qty as stock_qty,
-			pri.rate as rate
+			pri.rate as rate,
+			pri.amount as amount,
+			item.custom_category_name as custom_category_name
 		from `tabPurchase Receipt Item` pri
 		inner join `tabPurchase Receipt` pr on pr.name = pri.parent
+		left join `tabItem` item on item.name = pri.item_code
 		where {where_clause}
-		order by pr.posting_date desc, pr.name desc
+		order by pr.posting_date asc, pr.name asc
 		""",
 		values,
 		as_dict=True,
 	)
+
+	for row in data:
+		row["stock_qty"] = int(flt(row.get("stock_qty", 0)))
+
+	return data

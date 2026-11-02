@@ -8,6 +8,8 @@ from frappe.query_builder import CustomFunction
 from frappe.query_builder.functions import Max
 from frappe.utils import date_diff, flt, getdate
 
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import get_planning_stock_map
+
 
 def execute(filters=None) -> tuple[list, list]:
 	if not filters:
@@ -33,7 +35,7 @@ def validate_filters(filters) -> str:
 
 	if not from_date and to_date:
 		frappe.throw(_("From and To Dates are required."))
-	elif date_diff(to_date, from_date) < 0:
+	elif from_date and to_date and date_diff(to_date, from_date) < 0:
 		frappe.throw(_("To Date cannot be before From Date."))
 
 
@@ -198,21 +200,9 @@ def prepare_data(data, so_elapsed_time, filters) -> list[dict]:
 		if flt(row.get("pending_qty") or 0) > 0 and row.get("status") not in ["Closed", "Cancelled"]
 	]
 
-	# Build stock map: total actual_qty across all warehouses for each item
+	# Build stock map: on-hand stock restricted to Planning Engine Warehouse Setup
 	item_codes = {row.get("item_code") for row in data if row.get("item_code")}
-	stock_map = {}
-	if item_codes:
-		bin_rows = frappe.db.sql(
-			"""
-            SELECT item_code, SUM(actual_qty) as stock
-            FROM `tabBin`
-            WHERE item_code in %(items)s
-            GROUP BY item_code
-            """,
-			{"items": tuple(item_codes)},
-			as_dict=True,
-		)
-		stock_map = {d.item_code: flt(d.stock) for d in bin_rows}
+	stock_map = get_planning_stock_map(list(item_codes)) if item_codes else {}
 
 	# Remaining stock per item for FIFO allocation (start from total stock)
 	remaining_stock = dict(stock_map)
@@ -321,6 +311,12 @@ def prepare_data(data, so_elapsed_time, filters) -> list[dict]:
 
 		# Reduce remaining stock for this item
 		remaining_stock[item_code] = available_qty - allocated
+
+		# Running stock balance for this item AFTER allocating to this line.
+		# With multiple open SO lines for the same item, the "Stock" column keeps
+		# showing the full on-hand qty, so this column makes the FIFO draw-down
+		# visible: how much of this item is left for the next line.
+		row["reducing_stock"] = int(remaining_stock[item_code])
 
 		row["time_taken_to_deliver"] = (
 			so_elapsed_time.get((row.sales_order, row.item_code))
@@ -491,6 +487,12 @@ def get_columns(filters) -> list[dict]:
 			"fieldname": "shortage",
 			"fieldtype": "Int",
 			"width": 100,
+		},
+		{
+			"label": _("Reducing Stock"),
+			"fieldname": "reducing_stock",
+			"fieldtype": "Int",
+			"width": 120,
 		},
 	]
 

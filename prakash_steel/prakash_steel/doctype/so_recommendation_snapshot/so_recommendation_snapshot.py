@@ -59,6 +59,20 @@ def _capture_snapshot(trigger="Scheduled") -> None:
 		)
 		so_extra = {r.name: r for r in rows}
 
+	# fg_item lives on the Sales Order Item line (set for Job Work Service Charges);
+	# report rows carry the line id as "name", so map it per line.
+	soi_names = [row.get("name") for row in (data or []) if row.get("name")]
+	fg_item_map = {}
+	if soi_names:
+		fg_item_map = dict(
+			frappe.get_all(
+				"Sales Order Item",
+				filters={"name": ["in", soi_names], "fg_item": ["is", "set"]},
+				fields=["name", "fg_item"],
+				as_list=True,
+			)
+		)
+
 	snap = frappe.new_doc("SO Recommendation Snapshot")
 	snap.snapshot_date = today()
 	snap.snapshot_time = now_datetime().strftime("%H:%M:%S")
@@ -75,6 +89,7 @@ def _capture_snapshot(trigger="Scheduled") -> None:
 				"so_date": row.get("date"),
 				"customer": row.get("customer"),
 				"item_code": row.get("item_code"),
+				"fg_item": fg_item_map.get(row.get("name")),
 				"status": row.get("status") or "",
 				"qty": row.get("qty") or 0,
 				"rate": row.get("rate") or 0,

@@ -5,6 +5,8 @@ import frappe
 from frappe import _
 from frappe.utils import date_diff, flt, getdate
 
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import get_planning_stock_map
+
 
 def execute(filters=None) -> tuple[list, list]:
 	if not filters:
@@ -172,21 +174,9 @@ def prepare_data(data, filters) -> list[dict]:
 		if flt(row.get("pending_qty") or 0) > 0
 	]
 
-	# Build stock map: total actual_qty across all warehouses for each item
+	# Build stock map: on-hand stock restricted to Planning Engine Warehouse Setup
 	item_codes = {row.get("item_code") for row in data if row.get("item_code")}
-	stock_map = {}
-	if item_codes:
-		bin_rows = frappe.db.sql(
-			"""
-            SELECT item_code, SUM(actual_qty) as stock
-            FROM `tabBin`
-            WHERE item_code in %(items)s
-            GROUP BY item_code
-            """,
-			{"items": tuple(item_codes)},
-			as_dict=True,
-		)
-		stock_map = {d.item_code: flt(d.stock) for d in bin_rows}
+	stock_map = get_planning_stock_map(list(item_codes)) if item_codes else {}
 
 	# Remaining stock per item for FIFO allocation (start from total stock)
 	remaining_stock = dict(stock_map)

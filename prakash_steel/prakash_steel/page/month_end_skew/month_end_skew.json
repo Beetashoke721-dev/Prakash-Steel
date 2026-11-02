@@ -1,0 +1,50 @@
+{
+ "content": null,
+ "creation": "2026-07-31 11:57:14.614049",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-08-04 10:03:44.885314",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "month-end-skew",
+ "owner": "Administrator",
+ "page_name": "month-end-skew",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Administrator"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Manufacturing Manager"
+  },
+  {
+   "role": "Manufacturing User"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Month End Skew"
+}

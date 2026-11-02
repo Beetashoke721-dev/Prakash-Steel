@@ -1,0 +1,66 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-09-18 13:17:22.568959",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "week_start_day",
+  "week_end_day",
+  "column_break_bdts",
+  "column_break_fhpv"
+ ],
+ "fields": [
+  {
+   "fieldname": "week_end_day",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Week End Day",
+   "options": "\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_bdts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_fhpv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "week_start_day",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Week Start Day",
+   "options": "\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-18 16:41:31.913871",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Calendar Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

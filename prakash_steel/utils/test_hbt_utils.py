@@ -68,7 +68,17 @@ class TestAssignHbtLabels(unittest.TestCase):
 		assign_hbt_labels(rows)
 		for row in rows:
 			self.assertAlmostEqual(row["contr_pct"], 0.0)
+			self.assertEqual(row["hbt"], "NS")
+
+	def test_zero_total_is_ns_and_excluded_from_ranking(self):
+		"""A zero-sale row is labelled NS and doesn't consume H/B/T ranking share."""
+		from prakash_steel.utils.hbt_utils import assign_hbt_labels
+		rows = [{"total": 100.0}, {"total": 0.0}]
+		assign_hbt_labels(rows)
 		self.assertEqual(rows[0]["hbt"], "H")
+		self.assertAlmostEqual(rows[0]["contr_pct"], 100.0)
+		self.assertEqual(rows[1]["hbt"], "NS")
+		self.assertAlmostEqual(rows[1]["contr_pct"], 0.0)
 
 	def test_h_b_t_boundaries(self):
 		"""50 rows of 2% each: first 25 = H (50%), next 20 = B (40%), last 5 = T"""
@@ -115,7 +125,7 @@ class TestGetPeriodMonths(unittest.TestCase):
 		from prakash_steel.utils.hbt_utils import get_period_months
 		mock_frappe.get_single.return_value = self._make_settings("FY 2025-2026", "April", "September")
 		mock_frappe.get_doc.return_value = self._make_fy_doc()
-		result = get_period_months()
+		result = get_period_months("RB Batch Planning Settings")
 		self.assertEqual(result, [(2025, 4), (2025, 5), (2025, 6), (2025, 7), (2025, 8), (2025, 9)])
 
 	@patch(MODULE + ".frappe")
@@ -123,7 +133,7 @@ class TestGetPeriodMonths(unittest.TestCase):
 		from prakash_steel.utils.hbt_utils import get_period_months
 		mock_frappe.get_single.return_value = self._make_settings("FY 2025-2026", "January", "March")
 		mock_frappe.get_doc.return_value = self._make_fy_doc()
-		result = get_period_months()
+		result = get_period_months("RB Batch Planning Settings")
 		self.assertEqual(result, [(2026, 1), (2026, 2), (2026, 3)])
 
 	@patch(MODULE + ".frappe")
@@ -136,7 +146,7 @@ class TestGetPeriodMonths(unittest.TestCase):
 		mock_frappe.get_single.return_value = s
 		mock_frappe.throw.side_effect = Exception("Missing config")
 		with self.assertRaises(Exception):
-			get_period_months()
+			get_period_months("RB Batch Planning Settings")
 
 	@patch(MODULE + ".frappe")
 	def test_from_after_to_throws(self, mock_frappe):
@@ -145,7 +155,58 @@ class TestGetPeriodMonths(unittest.TestCase):
 		mock_frappe.get_doc.return_value = self._make_fy_doc()
 		mock_frappe.throw.side_effect = Exception("Invalid range")
 		with self.assertRaises(Exception):
-			get_period_months()
+			get_period_months("RB Batch Planning Settings")
+
+
+class TestGetPeriodRange(unittest.TestCase):
+	def _make_settings(self, from_date="2025-04-01", to_date="2025-09-30"):
+		s = MagicMock()
+		s.from_date = from_date
+		s.to_date = to_date
+		return s
+
+	@patch(MODULE + ".frappe")
+	def test_returns_configured_dates_unrounded(self, mock_frappe):
+		from prakash_steel.utils.hbt_utils import get_period_range
+		mock_frappe.get_single.return_value = self._make_settings("2025-04-15", "2025-09-10")
+		with patch(MODULE + ".getdate", side_effect=lambda d: date.fromisoformat(d) if isinstance(d, str) else d):
+			from_d, to_d = get_period_range()
+		self.assertEqual(from_d, date(2025, 4, 15))
+		self.assertEqual(to_d, date(2025, 9, 10))
+
+	@patch(MODULE + ".frappe")
+	def test_missing_dates_throws(self, mock_frappe):
+		from prakash_steel.utils.hbt_utils import get_period_range
+		mock_frappe.get_single.return_value = self._make_settings(None, "2025-09-10")
+		mock_frappe.throw.side_effect = Exception("Missing config")
+		with self.assertRaises(Exception):
+			get_period_range()
+
+	@patch(MODULE + ".frappe")
+	def test_from_after_to_throws(self, mock_frappe):
+		from prakash_steel.utils.hbt_utils import get_period_range
+		mock_frappe.get_single.return_value = self._make_settings("2025-09-10", "2025-04-15")
+		mock_frappe.throw.side_effect = Exception("Invalid range")
+		with patch(MODULE + ".getdate", side_effect=lambda d: date.fromisoformat(d) if isinstance(d, str) else d):
+			with self.assertRaises(Exception):
+				get_period_range()
+
+
+class TestMonthsSpanning(unittest.TestCase):
+	def test_single_month(self):
+		from prakash_steel.utils.hbt_utils import months_spanning
+		result = months_spanning(date(2025, 6, 5), date(2025, 6, 20))
+		self.assertEqual(result, [(2025, 6)])
+
+	def test_multi_month_same_year(self):
+		from prakash_steel.utils.hbt_utils import months_spanning
+		result = months_spanning(date(2025, 4, 15), date(2025, 7, 3))
+		self.assertEqual(result, [(2025, 4), (2025, 5), (2025, 6), (2025, 7)])
+
+	def test_spans_year_boundary(self):
+		from prakash_steel.utils.hbt_utils import months_spanning
+		result = months_spanning(date(2025, 11, 10), date(2026, 2, 5))
+		self.assertEqual(result, [(2025, 11), (2025, 12), (2026, 1), (2026, 2)])
 
 
 class TestGetCustomerHbtMap(unittest.TestCase):

@@ -8,7 +8,7 @@ import frappe
 from prakash_steel.prakash_steel.report.rolled_bar_batch_recommendation.rolled_bar_batch_recommendation import (
 	execute as _execute_report,
 )
-from prakash_steel.utils.hbt_utils import get_period_months, period_date_range
+from prakash_steel.utils.hbt_utils import get_period_range
 from prakash_steel.utils.whitelist_permissions import require_permission
 
 
@@ -26,11 +26,10 @@ def get_rolled_bar_batch_rec_data(item_code: str | None = None, item_type: str |
 
 	columns, data = _execute_report(filters)
 
-	period_months = get_period_months("RB Batch Planning Settings")
-	from_date, to_date = period_date_range(period_months)
+	from_date, to_date = get_period_range("RB Batch Planning Setting")
 	period_label = f"{from_date.strftime('%d %b %Y')} – {to_date.strftime('%d %b %Y')}"
 
-	fos = frappe.db.get_single_value("RB Batch Planning Settings", "fos") or 0
+	fos = frappe.db.get_single_value("RB Batch Planning Setting", "fos") or 0
 
 	return {"columns": columns, "data": data, "period_label": period_label, "fos": fos}
 

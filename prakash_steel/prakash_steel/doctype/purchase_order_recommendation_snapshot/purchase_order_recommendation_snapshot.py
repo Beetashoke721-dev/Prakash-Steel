@@ -41,6 +41,20 @@ def _capture_snapshot(trigger="Scheduled") -> None:
 		frappe.db.commit()
 		return doc.name
 
+	# fg_item lives on the Purchase Order Item line (set for job work / subcontracting);
+	# report rows carry the line id as "name", so map it per line.
+	poi_names = [row.get("name") for row in (data or []) if row.get("name")]
+	fg_item_map = {}
+	if poi_names:
+		fg_item_map = dict(
+			frappe.get_all(
+				"Purchase Order Item",
+				filters={"name": ["in", poi_names], "fg_item": ["is", "set"]},
+				fields=["name", "fg_item"],
+				as_list=True,
+			)
+		)
+
 	snap = frappe.new_doc("Purchase Order Recommendation Snapshot")
 	snap.snapshot_date = today()
 	snap.snapshot_time = now_datetime().strftime("%H:%M:%S")
@@ -56,6 +70,7 @@ def _capture_snapshot(trigger="Scheduled") -> None:
 			"supplier": row.get("supplier"),
 			"project": row.get("project"),
 			"item_code": row.get("item_code"),
+			"fg_item": fg_item_map.get(row.get("name")),
 			"category_name": row.get("category_name") or "",
 			"rate": row.get("rate") or 0,
 			"cf_lead_time": row.get("cf_lead_time") or 0,

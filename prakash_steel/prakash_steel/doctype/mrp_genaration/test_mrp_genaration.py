@@ -59,5 +59,50 @@ class TestCalculateNetOrderRecommendation(unittest.TestCase):
         self.assertGreaterEqual(self._run(50, moq=200, batch_size=30), 200)
 
 
+class TestGetStockMapForMrp(unittest.TestCase):
+    """MRP stock must come from Planning Engine warehouses only, like the Bright Plan."""
+
+    def test_uses_planning_stock_map(self):
+        from prakash_steel.prakash_steel.doctype.mrp_genaration import mrp_genaration
+
+        with patch.object(
+            mrp_genaration, "get_planning_stock_map", return_value={"BB-1": 8520.0}
+        ) as mock_planning, patch.object(mrp_genaration, "frappe") as mock_frappe:
+            result = mrp_genaration.get_stock_map_for_mrp({"BB-1"})
+
+        self.assertEqual(result, {"BB-1": 8520.0})
+        mock_planning.assert_called_once_with(["BB-1"])
+        # Must not fall back to an all-warehouse tabBin sum (which counts Rejected Warehouse)
+        mock_frappe.db.sql.assert_not_called()
+
+    def test_buffer_item_gets_recommendation_when_rejected_stock_excluded(self):
+        """TOG 10000, planning stock 8520 (2150 sits in Rejected) -> rec 1480, not 0."""
+        from prakash_steel.prakash_steel.doctype.mrp_genaration import mrp_genaration
+
+        with patch.object(mrp_genaration, "get_planning_stock_map", return_value={"BB-1": 8520.0}):
+            stock_map = mrp_genaration.get_stock_map_for_mrp({"BB-1"})
+
+        rec = mrp_genaration.calculate_initial_order_recommendation(
+            "BB-1",
+            item_buffer_map={"BB-1": "Buffer"},
+            item_tog_map={"BB-1": 10000.0},
+            item_sku_type_map={"BB-1": "BBMTA"},
+            stock_map=stock_map,
+            wip_map={},
+            open_so_map={},
+            qualified_demand_map={},
+            open_po_map={},
+        )
+        self.assertEqual(rec, 1480.0)
+        self.assertEqual(mrp_genaration.calculate_net_order_recommendation(rec, 0, 6000), 6000)
+
+    def test_empty_items(self):
+        from prakash_steel.prakash_steel.doctype.mrp_genaration import mrp_genaration
+
+        with patch.object(mrp_genaration, "get_planning_stock_map", return_value={}) as mock_planning:
+            self.assertEqual(mrp_genaration.get_stock_map_for_mrp(set()), {})
+        mock_planning.assert_called_once_with([])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,348 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "autoname": "Format: {from_date} - {to_date}",
+ "creation": "2026-10-12 11:19:38.854783",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_jlfo",
+  "from_date",
+  "column_break_olfh",
+  "to_date",
+  "column_break_stez",
+  "amended_from",
+  "column_break_phxp",
+  "section_break_krgb",
+  "bright_oee",
+  "column_break_syff",
+  "column_break_tsfb",
+  "section_break_lubu",
+  "cdb_16mm",
+  "column_break_ejgl",
+  "oee_cdb_16mm_day",
+  "column_break_dgjj",
+  "oee_cdb_16mm_night",
+  "section_break_ebqd",
+  "cdb_27mm",
+  "column_break_jexj",
+  "oee_cdb_27mm_day",
+  "column_break_eoyf",
+  "oee_cdb_27mm_night",
+  "section_break_bzef",
+  "db_25mm",
+  "column_break_mqgf",
+  "oee_db_25mm_day",
+  "column_break_xets",
+  "oee_db_25mm_night",
+  "section_break_tgmx",
+  "db_40mm",
+  "column_break_kyfm",
+  "oee_db_40mm_day",
+  "column_break_buql",
+  "oee_db_40mm_night",
+  "section_break_jsgg",
+  "db_80mm",
+  "column_break_ngpa",
+  "oee_db_80mm_day",
+  "column_break_lsvh",
+  "oee_db_80mm_night",
+  "section_break_gkvw",
+  "db_100mm",
+  "column_break_nkjt",
+  "oee_db_100mm_day",
+  "column_break_ejrn",
+  "oee_db_100mm_night",
+  "section_break_ruqn",
+  "pl_100mm",
+  "column_break_vlvk",
+  "column_break_iovn"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_jlfo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "OEE",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_olfh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "To Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_stez",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_phxp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_krgb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "bright_oee",
+   "fieldtype": "Percent",
+   "label": "Bright OEE",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_syff",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cdb_16mm",
+   "fieldtype": "Percent",
+   "label": "CDB - 16MM",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_tsfb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cdb_27mm",
+   "fieldtype": "Percent",
+   "label": "CDB - 27MM",
+   "precision": "2"
+  },
+  {
+   "fieldname": "db_25mm",
+   "fieldtype": "Percent",
+   "label": "DB - 25MM",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_bzef",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_mqgf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_25mm_day",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 25MM - Day",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_xets",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_25mm_night",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 25MM - Night"
+  },
+  {
+   "fieldname": "section_break_tgmx",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "db_40mm",
+   "fieldtype": "Percent",
+   "label": "DB - 40MM",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_kyfm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_40mm_day",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 40MM - Day",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_buql",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_40mm_night",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 40MM - Night",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_jsgg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "db_80mm",
+   "fieldtype": "Percent",
+   "label": "DB - 80MM",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_ngpa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_80mm_day",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 80MM - Day",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_lsvh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_80mm_night",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 80MM - Night",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_gkvw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "db_100mm",
+   "fieldtype": "Percent",
+   "label": "DB - 100MM",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_nkjt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_100mm_day",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 100MM - Day",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_ejrn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_db_100mm_night",
+   "fieldtype": "Percent",
+   "label": "OEE DB - 100MM - Night",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_ruqn",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "pl_100mm",
+   "fieldtype": "Percent",
+   "label": "PL - 100MM",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_vlvk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_iovn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_lubu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_ejgl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_cdb_16mm_day",
+   "fieldtype": "Percent",
+   "label": "OEE CDB - 16MM - Day",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_dgjj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_cdb_16mm_night",
+   "fieldtype": "Percent",
+   "label": "OEE CDB - 16MM - Night",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_ebqd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_jexj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_cdb_27mm_day",
+   "fieldtype": "Percent",
+   "label": "OEE CDB - 27MM - Day",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_eoyf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oee_cdb_27mm_night",
+   "fieldtype": "Percent",
+   "label": "OEE CDB - 27MM - Night",
+   "precision": "2"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-15 15:18:31.128756",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "OEE",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

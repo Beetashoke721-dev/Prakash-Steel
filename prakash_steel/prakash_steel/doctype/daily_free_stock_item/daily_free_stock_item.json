@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-10-16 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "sku_type",
+  "free_stock"
+ ],
+ "fields": [
+  {
+   "columns": 5,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item"
+  },
+  {
+   "columns": 2,
+   "fieldname": "sku_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SKU Type"
+  },
+  {
+   "columns": 3,
+   "fieldname": "free_stock",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Free Stock"
+  }
+ ],
+ "grid_page_length": 5000,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-16 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Daily Free Stock Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -128,6 +128,8 @@ def calculate_sku_type_on_validate(doc, method=None) -> None:
 			new_sku_type = "PTA" if is_buffer else "PTO"
 		elif item_type == "Traded":
 			new_sku_type = "TRMTA" if is_buffer else "TRMTO"
+		elif item_type == "CS":
+			new_sku_type = "CSMTA" if is_buffer else "CSMTO"
 
 	doc.custom_sku_type = new_sku_type
 

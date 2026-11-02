@@ -1,7 +1,8 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
- "autoname": "format : {item_code}",
+ "autoname": "Format: {item_code}",
  "creation": "2026-05-15 12:29:39.241020",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -38,6 +39,7 @@
   {
    "fieldname": "item_size",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Item Size",
    "read_only": 1
   },
@@ -117,12 +119,13 @@
   {
    "fieldname": "planned_hrs",
    "fieldtype": "Int",
-   "label": "Planned Hrs"
+   "hidden": 1,
+   "label": "Planned Hrs (Deleted)"
   },
   {
    "fieldname": "final_planned_hrs",
    "fieldtype": "Int",
-   "label": "Final Planned Hrs"
+   "label": "Planned Hrs"
   },
   {
    "fieldname": "no_of_guide_setups",
@@ -141,8 +144,8 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-21 16:32:37.896737",
- "modified_by": "ritika@clapgrow.com",
+ "modified": "2026-08-13 10:17:01.145531",
+ "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Rolling Algo",
  "naming_rule": "Expression",

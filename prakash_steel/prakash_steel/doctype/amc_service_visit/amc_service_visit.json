@@ -1,0 +1,194 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series: [naming_series]",
+ "creation": "2026-09-08 13:13:06.442564",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_y7ox",
+  "naming_series",
+  "estimated_service_date",
+  "service_date",
+  "column_break_ykfb",
+  "amended_from",
+  "service_engineer",
+  "service_type",
+  "column_break_qtyi",
+  "section_break_jffm",
+  "amc_no",
+  "column_break_ftak",
+  "fixed_asset",
+  "column_break_qljy",
+  "supplier",
+  "section_break_fjxb",
+  "overall_equipment_condition",
+  "column_break_ljum",
+  "remarks",
+  "column_break_upzm",
+  "section_break_lpwx",
+  "part_change",
+  "table_wcnt"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_y7ox",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "AMC Service Visit",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Service Visit No",
+   "options": "SER-.FY.-.####"
+  },
+  {
+   "fieldname": "section_break_jffm",
+   "fieldtype": "Section Break",
+   "label": "AMC Details"
+  },
+  {
+   "fieldname": "amc_no",
+   "fieldtype": "Link",
+   "label": "AMC No.",
+   "options": "AMC",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "amc_no.item",
+   "fieldname": "fixed_asset",
+   "fieldtype": "Link",
+   "label": "Fixed Asset",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ftak",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_qljy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "amc_no.supplier",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier",
+   "read_only": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "estimated_service_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Estimated Service Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "service_date",
+   "fieldtype": "Date",
+   "label": "Service Date"
+  },
+  {
+   "fieldname": "column_break_ykfb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "service_engineer",
+   "fieldtype": "Data",
+   "label": "Service Engineer"
+  },
+  {
+   "fieldname": "service_type",
+   "fieldtype": "Link",
+   "label": "Service Type",
+   "options": "AMC Service Type"
+  },
+  {
+   "fieldname": "column_break_qtyi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_fjxb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "overall_equipment_condition",
+   "fieldtype": "Select",
+   "label": "Overall Equipment Condition",
+   "options": "\nGood\nSatisfactory\nBad"
+  },
+  {
+   "fieldname": "column_break_ljum",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_upzm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "section_break_lpwx",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "part_change",
+   "fieldtype": "Check",
+   "label": "Part Change"
+  },
+  {
+   "depends_on": "eval:doc.part_change",
+   "fieldname": "table_wcnt",
+   "fieldtype": "Table",
+   "mandatory_depends_on": "eval:doc.part_change",
+   "options": "AMC Service Part"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-10 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "AMC Service Visit",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

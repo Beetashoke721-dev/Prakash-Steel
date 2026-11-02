@@ -1,0 +1,109 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "Format: {code}",
+ "creation": "2026-08-18 11:58:47.630434",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "code",
+  "subgroup_id",
+  "subgroup_name",
+  "column_break_iejl",
+  "shape",
+  "planned_hrs"
+ ],
+ "fields": [
+  {
+   "fieldname": "subgroup_id",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Subgroup ID",
+   "options": "Sub Group",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "subgroup_id.sub_group_name",
+   "fieldname": "subgroup_name",
+   "fieldtype": "Long Text",
+   "label": "Subgroup Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_iejl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "shape",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Shape",
+   "options": "\nBillet\nFlat\nHex\nIngot\nRound\nSquare\nWire Rod",
+   "reqd": 1
+  },
+  {
+   "fieldname": "planned_hrs",
+   "fieldtype": "Int",
+   "label": "Planned Hrs",
+   "reqd": 1
+  },
+  {
+   "fieldname": "code",
+   "fieldtype": "Data",
+   "label": "Code",
+   "reqd": 1,
+   "unique": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-18 16:13:44.799752",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "Rolling Subgroup Setup",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

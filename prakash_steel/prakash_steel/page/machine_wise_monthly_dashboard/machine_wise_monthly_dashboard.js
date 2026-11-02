@@ -176,12 +176,14 @@ function render_matrix_table(state, machines, rows, fiscal_year) {
     const subHeader = [];
     machines.forEach((machine, idx) => {
         const isLastMachine = idx === machines.length - 1;
-        topHeader.push(`<th colspan="2" style="${th_style(false, !isLastMachine)}">${escape_html(machine)}</th>`);
+        topHeader.push(`<th colspan="3" style="${th_style(false, !isLastMachine)}">${escape_html(machine)}</th>`);
         subHeader.push(`<th style="${th_style(false)}">${__("FG Weight")}</th>`);
+        subHeader.push(`<th style="${th_style(false)}">${__("Rate")}</th>`);
         subHeader.push(`<th style="${th_style(false, !isLastMachine)}">${__("Amount")}</th>`);
     });
-    topHeader.push(`<th colspan="2" style="${th_style(false, false, true)}">${__("Total")}</th>`);
+    topHeader.push(`<th colspan="3" style="${th_style(false, false, true)}">${__("Total")}</th>`);
     subHeader.push(`<th style="${th_style(false, false, true)}">${__("FG Weight")}</th>`);
+    subHeader.push(`<th style="${th_style(false)}">${__("Rate")}</th>`);
     subHeader.push(`<th style="${th_style(false)}">${__("Amount")}</th>`);
 
     const bodyRows = rows.map((row) => {
@@ -192,12 +194,16 @@ function render_matrix_table(state, machines, rows, fiscal_year) {
             const isLastMachine = idx === machines.length - 1;
             const fgWeight = Number(row[`${machine}__fg_weight`] || 0);
             const amount = Number(row[`${machine}__amount`] || 0);
+            const rate = Number(row[`${machine}__rate`] || 0);
             totalFgWeight += Number.isFinite(fgWeight) ? fgWeight : 0;
             totalAmount += Number.isFinite(amount) ? amount : 0;
             tr += `<td style="${td_style(false)}">${format_weight(fgWeight)}</td>`;
+            tr += `<td style="${td_style(false)}">${format_number(rate)}</td>`;
             tr += `<td style="${td_style(false, !isLastMachine)}">${format_number(amount)}</td>`;
         });
+        const totalRate = totalFgWeight ? totalAmount / totalFgWeight : 0;
         tr += `<td style="${td_style(false, false, true)}"><strong>${format_weight(totalFgWeight)}</strong></td>`;
+        tr += `<td style="${td_style(false)}"><strong>${format_number(totalRate)}</strong></td>`;
         tr += `<td style="${td_style(false)}"><strong>${format_number(totalAmount)}</strong></td>`;
         tr += "</tr>";
         return tr;
@@ -228,7 +234,7 @@ function render_matrix_table(state, machines, rows, fiscal_year) {
 function format_number(value) {
     const num = Number(value || 0);
     if (!Number.isFinite(num)) return "0.00";
-    return num.toLocaleString(undefined, {
+    return num.toLocaleString("en-IN", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
@@ -237,7 +243,7 @@ function format_number(value) {
 function format_weight(value) {
     const num = Number(value || 0);
     if (!Number.isFinite(num)) return "0";
-    return Math.round(num).toLocaleString();
+    return Math.round(num).toLocaleString("en-IN");
 }
 
 function escape_html(value) {

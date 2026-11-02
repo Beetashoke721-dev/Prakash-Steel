@@ -1,5 +1,6 @@
 frappe.ui.form.on("Job Card", {
 	refresh(frm) {
+		toggle_time_log_rolled_fields(frm);
 		calculate_total_completed_qty(frm, true);
 
 		if (frm.doc.docstatus === 1) {
@@ -13,7 +14,12 @@ frappe.ui.form.on("Job Card", {
 		calculate_miss_pcs(frm, true);
 		fetch_colour_code_from_production_item(frm, true);
 		set_billet_weight_from_work_order(frm, true);
+		sync_production_type_from_work_order(frm, true);
 		refresh_time_log_billet_cutting_remaining(frm, true);
+	},
+
+	custom_rolled_production(frm) {
+		toggle_time_log_rolled_fields(frm);
 	},
 
 	work_order(frm) {
@@ -21,7 +27,9 @@ frappe.ui.form.on("Job Card", {
 			return;
 		}
 
+		toggle_time_log_rolled_fields(frm);
 		set_billet_weight_from_work_order(frm);
+		sync_production_type_from_work_order(frm);
 		refresh_time_log_billet_cutting_remaining(frm);
 	},
 
@@ -64,6 +72,7 @@ frappe.ui.form.on("Job Card", {
 
 frappe.ui.form.on("Job Card Time Log", {
 	form_render(frm, cdt, cdn) {
+		toggle_time_log_rolled_fields(frm);
 		toggle_time_log_miss_fields(frm, cdt, cdn, frm.doc.docstatus !== 1);
 		calculate_time_log_total(frm, cdt, cdn, frm.doc.docstatus !== 1);
 		if (frm.doc.docstatus !== 1) {
@@ -103,6 +112,38 @@ frappe.ui.form.on("Job Card Time Log", {
 		calculate_miss_pcs(frm);
 	},
 });
+
+const TIME_LOG_ROLLED_FIELDS = [
+	"custom_finish_item",
+	"custom_furnace_temparature",
+	"custom_no_of_passes",
+	"custom_summary_remarks",
+	"custom_miss_roll",
+	"custom_miss_roll_weight",
+	"custom_reason_for_miss_roll",
+	"custom_miss_ingot_or_billet",
+	"custom_miss_ingot_or_billet_weight",
+	"custom_reason_for_miss_ingot_or_billet",
+	"custom_total",
+	"custom_total_billet_cutting",
+];
+
+function toggle_time_log_rolled_fields(frm) {
+	const grid = frm.fields_dict.time_logs?.grid;
+	if (!grid) {
+		return;
+	}
+
+	const show = cint(frm.doc.custom_rolled_production) === 1;
+	TIME_LOG_ROLLED_FIELDS.forEach((fieldname) => {
+		grid.toggle_display(fieldname, show);
+	});
+
+	const open_form = grid.open_grid_row;
+	if (open_form?.layout) {
+		open_form.layout.refresh_dependency();
+	}
+}
 
 function set_form_value(frm, fieldname, value, quiet = false) {
 	if (frm.doc[fieldname] === value) {
@@ -304,6 +345,40 @@ function fetch_colour_code_from_production_item(frm, quiet = false) {
 					set_form_value(frm, "custom_colour_code", colour, quiet);
 				}
 			});
+	});
+}
+
+// Production type is owned by the Work Order; the server overwrites these on validate.
+const PRODUCTION_TYPE_FIELDS = [
+	"custom_bright_production",
+	"custom_rolled_production",
+	"custom_annealing",
+	"custom_straightning",
+	"custom_cutting",
+];
+
+function sync_production_type_from_work_order(frm, quiet = false) {
+	if (frm.doc.docstatus === 1) {
+		return;
+	}
+
+	PRODUCTION_TYPE_FIELDS.forEach((fieldname) => {
+		frm.set_df_property(fieldname, "read_only", 1);
+	});
+
+	if (!frm.doc.work_order) {
+		return;
+	}
+
+	frappe.db.get_value("Work Order", frm.doc.work_order, PRODUCTION_TYPE_FIELDS).then((r) => {
+		const wo = (r && r.message) || {};
+
+		PRODUCTION_TYPE_FIELDS.forEach((fieldname) => {
+			set_form_value(frm, fieldname, cint(wo[fieldname]), quiet);
+		});
+
+		toggle_time_log_rolled_fields(frm);
+		frm.layout && frm.layout.refresh_dependency();
 	});
 }
 

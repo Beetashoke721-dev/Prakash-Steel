@@ -60,6 +60,18 @@ class TestExecute(unittest.TestCase):
         self.assertIsInstance(cols, list)
         self.assertIsInstance(data, list)
 
+    @patch(MOD + ".frappe")
+    def test_receiving_qty_uses_custom_weight_slip_qty(self, mock_frappe):
+        from prakash_steel.prakash_steel.report.transporter_bill_payment.transporter_bill_payment import execute
+
+        mock_frappe.db.sql.return_value = []
+        execute({"invoice_type": "Purchase"})
+
+        # Ensure the report SQL uses Purchase Invoice Item.custom_weight_slip_qty
+        # as the basis for "Receiving Quantity".
+        called_query = mock_frappe.db.sql.call_args[0][0]
+        self.assertIn("SUM(pii.custom_weight_slip_qty)", called_query)
+
 
 if __name__ == "__main__":
     unittest.main()

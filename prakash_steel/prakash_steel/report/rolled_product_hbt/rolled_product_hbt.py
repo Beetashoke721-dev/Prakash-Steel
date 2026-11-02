@@ -11,8 +11,7 @@ from prakash_steel.utils.hbt_utils import (
 	METRIC_COL,
 	assign_hbt_labels,
 	get_customer_hbt_map,
-	get_period_months,
-	period_date_range,
+	get_period_range,
 )
 from prakash_steel.utils.whitelist_permissions import require_permission
 
@@ -30,9 +29,9 @@ def execute(filters: dict | None = None) -> tuple[list[dict], list[dict]]:
 	filters = filters or {}
 	view_by: str = filters.get("view_by") or "Sale Quantity"
 
-	period_months = get_period_months()
+	from_date, to_date = get_period_range()
 	columns = _get_columns(view_by)
-	data = _get_data(period_months, view_by)
+	data = _get_data(from_date, to_date, view_by)
 
 	return columns, data
 
@@ -86,10 +85,7 @@ def _get_columns(view_by: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
-	if not period_months:
-		return []
-
+def _get_data(from_date: date, to_date: date, view_by: str) -> list[dict]:
 	# Sale Value is implemented but temporarily hidden from users
 	if view_by == "Sale Value":
 		return []
@@ -98,7 +94,6 @@ def _get_data(period_months: list[tuple[int, int]], view_by: str) -> list[dict]:
 		frappe.throw(_("{0} is not yet implemented for this report.").format(view_by))
 
 	metric_col = METRIC_COL[view_by]
-	from_date, to_date = period_date_range(period_months)
 
 	# Step 1: item totals + frequency — metric_col from internal constant, safe to interpolate
 	raw_rows: list[dict] = frappe.db.sql(

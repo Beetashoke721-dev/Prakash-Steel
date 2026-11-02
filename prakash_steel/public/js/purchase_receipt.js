@@ -2,25 +2,72 @@
 // For license information, please see license.txt
 
 function update_total_party_billing_qty(frm) {
-    const total = (frm.doc.items || []).reduce((sum, row) => {
-        return sum + (flt(row.custom_party_billing_qty) || 0);
-    }, 0);
+    // Submitted/cancelled docs are immutable; re-setting the total here would
+    // mark the form dirty and fail with "Not allowed to change ... after submission".
+    if (frm.doc.docstatus !== 0) {
+        return;
+    }
 
-    frm.set_value("custom_total_party_billing_qty", total);
+    // Round to the field precision to avoid float noise (3130.3999999999996).
+    const precision = frappe.meta.get_field_precision
+        ? frappe.meta.get_field_precision(frm.fields_dict.custom_total_party_billing_qty.df, frm.doc)
+        : 2;
+    const total = flt(
+        (frm.doc.items || []).reduce((sum, row) => sum + (flt(row.custom_party_billing_qty) || 0), 0),
+        precision
+    );
+
+    if (flt(frm.doc.custom_total_party_billing_qty, precision) !== total) {
+        frm.set_value("custom_total_party_billing_qty", total);
+    }
+}
+
+function toggle_transporter_mandatory(frm) {
+    if (!frm.fields_dict.transporter) {
+        return;
+    }
+
+    const is_psp = frm.doc.custom_freight_payable_by === "PSP";
+    frm.set_df_property("transporter", "reqd", is_psp ? 1 : 0);
+}
+
+function setup_attachment_guard(frm) {
+	prakash_steel.attachment_utils.prevent_attachment_deletion(frm);
 }
 
 frappe.ui.form.on('Purchase Receipt', {
     onload(frm) {
         update_total_party_billing_qty(frm);
+        toggle_transporter_mandatory(frm);
     },
 
     refresh: function (frm) {
+        setup_attachment_guard(frm);
+
         // Clear cancel reason on amended drafts
         if (frm.doc.amended_from && frm.doc.docstatus === 0 && frm.doc.custom_cancel_reason) {
             frm.set_value("custom_cancel_reason", "");
         }
 
         update_total_party_billing_qty(frm);
+        toggle_transporter_mandatory(frm);
+    },
+
+    custom_freight_payable_by(frm) {
+        toggle_transporter_mandatory(frm);
+    },
+
+    validate(frm) {
+        if (frm.doc.custom_freight_payable_by === "PSP") {
+            if (!frm.doc.transporter || (typeof frm.doc.transporter === "string" && !frm.doc.transporter.trim())) {
+                frappe.msgprint({
+                    title: __("Validation Error"),
+                    indicator: "red",
+                    message: __("Transporter is mandatory when Freight Payable By is PSP."),
+                });
+                frappe.validated = false;
+            }
+        }
     },
 
     on_submit: function (frm) {

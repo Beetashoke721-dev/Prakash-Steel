@@ -1,0 +1,44 @@
+{
+ "content": null,
+ "creation": "2026-07-30 11:19:11.464285",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-07-30 11:19:11.464285",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "rolled-critical-spar",
+ "owner": "Administrator",
+ "page_name": "rolled-critical-spar",
+ "roles": [
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Administrator"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Rolled Critical Spares"
+}

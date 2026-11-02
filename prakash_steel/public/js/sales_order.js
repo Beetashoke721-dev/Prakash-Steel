@@ -14,6 +14,38 @@ frappe.ui.form.on("Sales Order", {
         validate_zero_rate_items(frm);
     },
 
+    before_submit(frm) {
+        return new Promise((resolve) => {
+            frappe.call({
+                method: "prakash_steel.utils.sales_order_rate_floor.get_rate_floor_warnings",
+                args: { sales_order: frm.doc },
+                callback(r) {
+                    let warnings = (r.message && r.message.warnings) || [];
+                    if (!warnings.length) {
+                        resolve();
+                        return;
+                    }
+                    frappe.confirm(
+                        __("The following item(s) are priced below the minimum rate:") +
+                            "<br><br>" + warnings.join("<br>") +
+                            "<br><br>" + __("Do you still want to submit?"),
+                        () => resolve(),
+                        () => {
+                            // Cancel: stop the submit, leave the doc in draft
+                            frappe.validated = false;
+                            resolve();
+                        }
+                    );
+                },
+                error() {
+                    // don't block submission on a network/server hiccup here -
+                    // the real floor check still runs server-side on submit
+                    resolve();
+                },
+            });
+        });
+    },
+
     refresh(frm) {
         // Clear cancel reason on amended drafts
         if (frm.doc.amended_from && frm.doc.docstatus === 0 && frm.doc.custom_cancel_reason) {

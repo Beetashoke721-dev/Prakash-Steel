@@ -70,13 +70,11 @@ class TestGetColumns(unittest.TestCase):
 
 
 class TestExecute(unittest.TestCase):
-    @patch(MOD + ".get_period_months")
-    @patch(MOD + ".period_date_range")
+    @patch(MOD + ".get_period_range")
     @patch(MOD + ".frappe")
-    def test_returns_tuple_of_lists(self, mock_frappe, mock_range, mock_period):
+    def test_returns_tuple_of_lists(self, mock_frappe, mock_range):
         from prakash_steel.prakash_steel.report.rolled_bar_batch_recommendation.rolled_bar_batch_recommendation import execute
         from datetime import date
-        mock_period.return_value = [(2026, 1), (2026, 2)]
         mock_range.return_value = (date(2026, 1, 1), date(2026, 2, 28))
         mock_frappe.db.sql.return_value = []
         cols, data = execute({})
@@ -125,7 +123,7 @@ class TestGetData(unittest.TestCase):
             [],  # bright bar production
             [],  # finish weight
         ]
-        # FOS = 0.3 in RB Batch Planning Settings -> projection factor = 1.3
+        # FOS = 0.3 in RB Batch Planning Setting -> projection factor = 1.3
         mock_frappe.db.get_single_value.return_value = 0.3
 
         data, _ = get_data({}, date(2026, 1, 1), date(2026, 3, 31))

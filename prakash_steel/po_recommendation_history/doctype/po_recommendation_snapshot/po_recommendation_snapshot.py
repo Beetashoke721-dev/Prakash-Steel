@@ -64,7 +64,9 @@ def _capture_snapshot(purchase=1, sell=0, buffer_flag=1, sku_type_filter=None, i
 	for row in (data or []):
 		snap.append("items", {
 			"item_code": row.get("item_code"),
+			"machine_name": row.get("machine_name") or "",
 			"sku_type": row.get("sku_type"),
+			"priority": row.get("priority") or "",
 			"requirement": row.get("requirement") or 0,
 			"tog": row.get("tog") or 0,
 			"toy": row.get("toy") or 0,

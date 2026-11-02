@@ -7,11 +7,17 @@ from collections import defaultdict
 
 import frappe
 
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import (
+	get_planning_stock_map,
+)
 from prakash_steel.utils.hbt_utils import (
 	METRIC_COL as _METRIC_COL_MAP,
 	assign_hbt_labels,
 	get_customer_hbt_map,
+	get_default_fos,
+	get_last_fos,
 	get_tog_horizon_range,
+	set_updated_fos,
 )
 from prakash_steel.utils.whitelist_permissions import require_permission
 
@@ -26,24 +32,32 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		view_by = "Sale Quantity"
 	metric_col = _METRIC_COL_MAP[view_by]
 
-	from_date, to_date = get_tog_horizon_range()
+	from_date, to_date = get_tog_horizon_range("RB")
 	period_label = f"{from_date.strftime('%b %Y')} – {to_date.strftime('%b %Y')}"
 
 	raw_rows: list[dict] = frappe.db.sql(
 		f"""
 		SELECT
-			sii.item_code,
-			SUM({metric_col}) AS total,
-			COUNT(DISTINCT YEAR(si.posting_date) * 100 + MONTH(si.posting_date)) AS frequency
-		FROM `tabSales Invoice` si
-		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-		INNER JOIN `tabItem` i ON i.name = sii.item_code
+			i.name AS item_code,
+			COALESCE(s.total, 0) AS total,
+			COALESCE(s.frequency, 0) AS frequency
+		FROM `tabItem` i
+		LEFT JOIN (
+			SELECT
+				sii.item_code,
+				SUM({metric_col}) AS total,
+				COUNT(DISTINCT YEAR(si.posting_date) * 100 + MONTH(si.posting_date)) AS frequency
+			FROM `tabSales Invoice` si
+			INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+			WHERE
+				si.docstatus = 1
+				AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			GROUP BY sii.item_code
+		) s ON s.item_code = i.name
 		WHERE
-			si.docstatus = 1
-			AND i.custom_item_type = 'RB'
+			i.custom_item_type = 'RB'
 			AND i.custom_sku_type IN ('RBMTA', 'RBMTO')
-			AND si.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		GROUP BY sii.item_code
+			AND i.disabled = 0
 		ORDER BY total DESC
 		""",
 		{"from_date": from_date, "to_date": to_date},
@@ -51,7 +65,7 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 	)
 
 	if not raw_rows:
-		return {"data": [], "period_label": period_label}
+		return {"data": [], "period_label": period_label, "default_fos": get_default_fos("RB"), "last_fos": get_last_fos("RB")}
 
 	customer_hbt_map = get_customer_hbt_map(from_date, to_date, metric_col)
 
@@ -108,6 +122,9 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 		as_dict=True,
 	)
 	item_master_map = {r.item_code: r for r in item_master_rows}
+
+	# On Hand Stock — same logic as PO Recommendation for PSP (planning-engine warehouse Bin qty)
+	stock_map = get_planning_stock_map(item_codes)
 
 	# Consumption from Bright Bar Production (both material and raw_material fields)
 	bb_consumption_rows = frappe.db.sql(
@@ -191,6 +208,7 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			"contr_pct": round(float(row.get("contr_pct") or 0), 1),
 			"cumu_pct": round(float(row.get("cumu_pct") or 0), 1),
 			"hbt": row["hbt"],
+			"on_hand_stock": math.ceil(stock_map.get(row["item_code"], 0)),
 			"frequency": int(row["frequency"] or 0),
 			"h": _buckets["H"],
 			"b": _buckets["B"],
@@ -210,20 +228,23 @@ def get_rb_tog_data(view_by: str = "Sale Quantity") -> dict:
 			) if float(item_master_map.get(row["item_code"], {}).get("current_tog") or 0) else None,
 		})
 
-	return {"data": data, "period_label": period_label}
+	return {"data": data, "period_label": period_label, "default_fos": get_default_fos("RB"), "last_fos": get_last_fos("RB")}
 
 
 @frappe.whitelist()
-def save_tog(items):
+def save_tog(items, fos=None):
 	items = json.loads(items) if isinstance(items, str) else items
 	for item in items:
 		frappe.db.set_value("Item", item["item_code"], "custom_last_saved_tog", item["tog"])
+	last_fos = None
+	if fos is not None:
+		last_fos = set_updated_fos("RB", fos)
 	frappe.db.commit()
-	return {"saved": len(items)}
+	return {"saved": len(items), "last_fos": last_fos}
 
 
 @frappe.whitelist()
-def update_tog(items):
+def update_tog(items, fos=None):
 	items = json.loads(items) if isinstance(items, str) else items
 	for item in items:
 		tog = float(item["tog"] or 0)
@@ -236,6 +257,7 @@ def update_tog(items):
 				"safety_stock": tog,
 				"custom_top_of_yellow": math.ceil((2 / 3) * tog),
 				"custom_top_of_red": math.ceil((1 / 3) * tog),
+				"custom_last_saved_tog": tog,
 			})
 		else:
 			frappe.db.set_value("Item", item["item_code"], {
@@ -244,9 +266,13 @@ def update_tog(items):
 				"safety_stock": 0,
 				"custom_top_of_yellow": 0,
 				"custom_top_of_red": 0,
+				"custom_last_saved_tog": 0,
 			})
+	last_fos = None
+	if fos is not None:
+		last_fos = set_updated_fos("RB", fos)
 	frappe.db.commit()
-	return {"updated": len(items)}
+	return {"updated": len(items), "last_fos": last_fos}
 
 
 @frappe.whitelist()
@@ -266,7 +292,7 @@ def export_rb_tog_xlsx(data, filename="RB_TOG"):
 	rows_data = json.loads(data) if isinstance(data, str) else data
 
 	headers = [
-		"SKU Type", "Item Code", "Contr%", "Cumu%", "HBT", "Frequency", "Total Qty",
+		"SKU Type", "Item Code", "Contr%", "Cumu%", "HBT", "On Hand Stock", "Frequency", "Total Qty",
 		"ADU", "LT", "FOS", "TOG", "Current TOG", "Change%",
 		"No of Customers", "Head Customer", "Body Customer", "Tail Customer",
 	]
@@ -277,6 +303,7 @@ def export_rb_tog_xlsx(data, filename="RB_TOG"):
 			r.get("contr_pct") or 0,
 			r.get("cumu_pct") or 0,
 			r.get("hbt") or "",
+			r.get("on_hand_stock") or 0,
 			r.get("frequency") or 0,
 			r.get("total") or 0,
 			r.get("adu") or 0,

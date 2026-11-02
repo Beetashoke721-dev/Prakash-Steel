@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 from prakash_steel.utils.whitelist_permissions import require_permission
 
@@ -35,6 +36,7 @@ def get_columns(sku_type) -> list[dict]:
 
 	if is_buffer:
 		cols += [
+			{"label": _("Machine Name"), "fieldname": "machine_name", "fieldtype": "Data", "width": 140},
 			{"label": _("TOG"), "fieldname": "tog", "fieldtype": "Float", "width": 80},
 			{"label": _("TOY"), "fieldname": "toy", "fieldtype": "Float", "width": 80},
 			{"label": _("TOR"), "fieldname": "tor", "fieldtype": "Float", "width": 80},
@@ -55,6 +57,7 @@ def get_columns(sku_type) -> list[dict]:
 		]
 	else:
 		cols += [
+			{"label": _("Priority"), "fieldname": "priority", "fieldtype": "Data", "width": 110},
 			{"label": _("Requirement"), "fieldname": "requirement", "fieldtype": "Float", "width": 110},
 			{"label": _("Total SO"), "fieldname": "total_so", "fieldtype": "Float", "width": 100},
 			{"label": _("Open SO"), "fieldname": "open_so", "fieldtype": "Float", "width": 100},
@@ -209,6 +212,8 @@ def get_sku_data(sku_type, snapshot_date, item_code=None) -> list[dict]:
 
 	base_fields = [
 		"item_code",
+		"machine_name",
+		"priority",
 		"requirement",
 		"tog",
 		"toy",
@@ -274,10 +279,44 @@ def get_sku_data(sku_type, snapshot_date, item_code=None) -> list[dict]:
 	return {"columns": columns, "data": data}
 
 
+def _fill_missing_fg_item(data, order_field, child_doctype) -> None:
+	"""Backfill fg_item for snapshot rows captured before fg_item was stored.
+
+	Older snapshots don't keep the order line id, so match on (order, item_code, qty),
+	falling back to (order, item_code); when several lines still match, list every FG.
+	"""
+	missing = [r for r in data if not r.get("fg_item") and r.get(order_field)]
+	if not missing:
+		return
+
+	lines = frappe.get_all(
+		child_doctype,
+		filters={"parent": ["in", list({r[order_field] for r in missing})], "fg_item": ["is", "set"]},
+		fields=["parent", "item_code", "qty", "fg_item"],
+		order_by="parent asc, idx asc",
+	)
+	by_item, by_qty = {}, {}
+	for line in lines:
+		for fg_map, key in (
+			(by_item, (line.parent, line.item_code)),
+			(by_qty, (line.parent, line.item_code, flt(line.qty))),
+		):
+			fgs = fg_map.setdefault(key, [])
+			if line.fg_item not in fgs:
+				fgs.append(line.fg_item)
+
+	for row in missing:
+		key = (row[order_field], row.get("item_code"))
+		fgs = by_qty.get((*key, flt(row.get("qty")))) or by_item.get(key)
+		if fgs:
+			row["fg_item"] = ", ".join(fgs)
+
+
 SO_COLUMNS = [
 	{"label": "SO Date", "fieldname": "so_date", "fieldtype": "Date", "width": 100},
 	{"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 160},
 	{"label": "Item Code", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 160},
+	{"label": "Finished Good", "fieldname": "fg_item", "fieldtype": "Link", "options": "Item", "width": 160},
 	{"label": "Order Qty", "fieldname": "qty", "fieldtype": "Float", "width": 90},
 	{"label": "Rate", "fieldname": "rate", "fieldtype": "Currency", "width": 90},
 	{"label": "Payment Terms", "fieldname": "payment_terms_template", "fieldtype": "Data", "width": 140},
@@ -337,6 +376,7 @@ def get_so_data(snapshot_date, item_code=None) -> list[dict]:
 	)
 
 	data = [dict(r) for r in rows]
+	_fill_missing_fg_item(data, "sales_order", "Sales Order Item")
 	return {"columns": SO_COLUMNS, "data": data}
 
 
@@ -399,6 +439,7 @@ OPEN_PO_COLUMNS = [
 	{"label": "PO Date", "fieldname": "po_date", "fieldtype": "Date", "width": 100},
 	{"label": "Supplier", "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 160},
 	{"label": "Item Code", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 160},
+	{"label": "Finished Good", "fieldname": "fg_item", "fieldtype": "Link", "options": "Item", "width": 160},
 	{"label": "Status", "fieldname": "status", "fieldtype": "Data", "width": 110},
 	{"label": "Order Qty", "fieldname": "qty", "fieldtype": "Float", "width": 90},
 	{"label": "Rate", "fieldname": "rate", "fieldtype": "Currency", "width": 100},
@@ -471,6 +512,7 @@ def get_open_po_data(snapshot_date, item_code=None) -> list[dict]:
 		for row in data:
 			row["payment_terms_template"] = terms_map.get(row.get("purchase_order"), "")
 
+	_fill_missing_fg_item(data, "purchase_order", "Purchase Order Item")
 	return {"columns": OPEN_PO_COLUMNS, "data": data}
 
 

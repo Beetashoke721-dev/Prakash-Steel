@@ -1,0 +1,44 @@
+{
+ "content": null,
+ "creation": "2026-09-03 12:13:42.775560",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-09-03 12:13:50.872256",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "rolling-plan",
+ "owner": "Administrator",
+ "page_name": "rolling-plan",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Administrator"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Rolling Plan"
+}

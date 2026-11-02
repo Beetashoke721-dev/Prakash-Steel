@@ -1,67 +1,3 @@
-// // Parent Doctype: Material Request
-// frappe.ui.form.on("Material Request", {
-//     refresh: function(frm) {
-//         console.log("=== Material Request Form Refreshed ===");
-//         console.log("Parent Doc:", frm.doc);
-
-//         // Optional: log existing child table rows on refresh
-//         frm.doc.items.forEach(function(row) {
-//             console.log("Child row on refresh:", row.item_code, row.name);
-//         });
-//     }
-// });
-
-// // Child Table: Material Request Item
-// frappe.ui.form.on('Material Request Item', {
-//     item_code: function(frm, cdt, cdn) {
-//         const row = locals[cdt][cdn];
-
-//         console.log("=== Material Request Item Code Triggered ===");
-//         console.log("Row data:", row);
-//         console.log("CDT:", cdt, "CDN:", cdn);
-
-//         // Check if item_code exists
-//         if (!row.item_code) {
-//             console.log("No Item Code selected. Setting available stock to 0");
-//             frappe.model.set_value(cdt, cdn, 'custom_quantity_available_in_kg', 0);
-//             frm.refresh_field("items");
-//             return;
-//         }
-
-//         console.log("Selected Item Code:", row.item_code);
-//         console.log("Calling Server Script API: get_available_stock");
-
-//         // Call the whitelisted Python method
-//         frappe.call({
-//             method: "prakash_steel.api.get_available_stock.get_available_stock", // Only sending item_code
-//             args: {
-//                 item_code: row.item_code
-//             },
-//             callback: function(res) {
-//                 console.log("Server response:", res);
-
-//                 if (res.message !== undefined) {
-//                     console.log("Available stock received:", res.message);
-//                     frappe.model.set_value(cdt, cdn, 'custom_quantity_available_in_kg', res.message);
-//                 } else {
-//                     console.log("No stock returned from server. Setting 0");
-//                     frappe.model.set_value(cdt, cdn, 'custom_quantity_available_in_kg', 0);
-//                 }
-
-//                 frm.refresh_field("items");
-//             },
-//             error: function(err) {
-//                 console.error("Error fetching stock from server:", err);
-//                 frappe.model.set_value(cdt, cdn, 'custom_quantity_available_in_kg', 0);
-//                 frm.refresh_field("items");
-//             }
-//         });
-//     }
-// });
-
-
-
-
 
 function set_last_rate_for_row(frm, cdt, cdn, item_code) {
     if (!item_code) {
@@ -81,6 +17,23 @@ function set_last_rate_for_row(frm, cdt, cdn, item_code) {
     });
 }
 
+// "Qty to Deliver" total from the Open SO page for the Finished Size item
+function set_open_so_qty_for_row(frm, cdt, cdn, finished_size) {
+    frappe.call({
+        method: "prakash_steel.api.get_open_so_qty.get_open_so_qty",
+        args: {
+            item_code: finished_size,
+            company: frm.doc.company || ""
+        },
+        callback: function (r) {
+            frappe.model.set_value(cdt, cdn, "custom_open_so_qty", r.message || 0);
+        },
+        error: function () {
+            frappe.model.set_value(cdt, cdn, "custom_open_so_qty", 0);
+        }
+    });
+}
+
 frappe.ui.form.on("Material Request", {
     refresh: function (frm) {
         // Clear cancel reason on amended drafts
@@ -94,6 +47,9 @@ frappe.ui.form.on("Material Request", {
         (frm.doc.items || []).forEach(function (row) {
             if (row.item_code) {
                 set_last_rate_for_row(frm, row.doctype, row.name, row.item_code);
+            }
+            if (row.custom_finished_size) {
+                set_open_so_qty_for_row(frm, row.doctype, row.name, row.custom_finished_size);
             }
         });
         frm.refresh_field("items");
@@ -265,5 +221,31 @@ frappe.ui.form.on("Material Request Item", {
                 frm.refresh_field("items");
             }
         });
+    },
+
+    custom_finished_size: function (frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+
+        if (!row.custom_finished_size) {
+            frappe.model.set_value(cdt, cdn, 'custom_quantity_available_finished_size', 0);
+            frappe.model.set_value(cdt, cdn, 'custom_open_so_qty', 0);
+            return;
+        }
+
+        // Same planning-warehouse stock as "Quantity Available", but for the Finished Size item
+        frappe.call({
+            method: "prakash_steel.api.get_available_stock.get_available_stock",
+            args: {
+                item_code: row.custom_finished_size
+            },
+            callback: function (res) {
+                frappe.model.set_value(cdt, cdn, 'custom_quantity_available_finished_size', res.message || 0);
+            },
+            error: function () {
+                frappe.model.set_value(cdt, cdn, 'custom_quantity_available_finished_size', 0);
+            }
+        });
+
+        set_open_so_qty_for_row(frm, cdt, cdn, row.custom_finished_size);
     }
 });

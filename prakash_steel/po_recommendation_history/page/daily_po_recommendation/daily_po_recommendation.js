@@ -492,6 +492,11 @@ class DailyPORecommendation {
 					: "";
 			} else if (col.fieldname === "so_date" || col.fieldname === "delivery_date") {
 				base.format = (value) => value ? this.fmt_date(value) : "";
+			} else if (col.fieldname === "fg_item") {
+				// older snapshots may hold several FGs joined by ", "
+				base.format = (value) => value
+					? String(value).split(", ").map(fg => `<a href="/app/item/${encodeURIComponent(fg)}" style="color:#0077b6;">${fg}</a>`).join(", ")
+					: "";
 			} else if (col.fieldname === "item_code" || col.fieldname === "customer") {
 				const doctype = col.fieldname === "customer" ? "customer" : "item";
 				base.format = (value) => value
@@ -685,7 +690,7 @@ class DailyPORecommendation {
 				resizable: true,
 			};
 
-			if (col.fieldname === "on_hand_colour") {
+			if (col.fieldname === "on_hand_colour" || col.fieldname === "priority") {
 				base.format = (value) => {
 					if (!value) return "";
 					const c = colour_map[value] || {};
@@ -829,6 +834,11 @@ class DailyPORecommendation {
 			} else if (col.fieldname === "item_code") {
 				base.format = (value) => value
 					? `<a href="/app/item/${encodeURIComponent(value)}" style="color:${link_text_black};">${value}</a>`
+					: "";
+			} else if (col.fieldname === "fg_item") {
+				// older snapshots may hold several FGs joined by ", "
+				base.format = (value) => value
+					? String(value).split(", ").map(fg => `<a href="/app/item/${encodeURIComponent(fg)}" style="color:${link_text_black};">${fg}</a>`).join(", ")
 					: "";
 			} else if (col.fieldname === "supplier") {
 				base.format = (value) => value

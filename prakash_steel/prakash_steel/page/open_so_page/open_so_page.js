@@ -132,12 +132,10 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	});
 	let from_date_field = page.add_field({
 		fieldname: "from_date", label: __("From Date"), fieldtype: "Date",
-		default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
 		change() { refresh(); },
 	});
 	let to_date_field = page.add_field({
 		fieldname: "to_date", label: __("To Date"), fieldtype: "Date",
-		default: frappe.datetime.get_today(),
 		change() { refresh(); },
 	});
 	let sales_order_field = page.add_field({
@@ -208,6 +206,8 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 	page.btn_secondary
 		.addClass("so-save-btn")
 		.html(`<span class="so-save-label">${__("Save")}</span>`);
+
+	page.add_inner_button(__("Export to Excel"), () => export_current_tab());
 
 	// ── layout ────────────────────────────────────────────────────────────────
 	let $wrap = $(`<div class="so-page-wrap"></div>`).appendTo(page.main);
@@ -328,6 +328,7 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		{ fieldname: "stock",                  label: "Stock",            width: 80  },
 		{ fieldname: "stock_allocation",       label: "Stock Alloc.",     width: 100 },
 		{ fieldname: "shortage",               label: "Shortage",         width: 80  },
+		{ fieldname: "reducing_stock",         label: "Reducing Stock",   width: 110 },
 		{ fieldname: "line_fullkit",           label: "Line Fullkit",     width: 100 },
 		{ fieldname: "order_fullkit",          label: "Order Fullkit",    width: 100 },
 		{ fieldname: "amount",                 label: "Amount",           width: 100 },
@@ -664,6 +665,39 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 		});
 	}
 
+	// ── export active tab to xlsx ─────────────────────────────────────────────
+	function export_current_tab() {
+		if (!all_data.length) {
+			frappe.show_alert({ message: __("Nothing to export — run the report first."), indicator: "orange" });
+			return;
+		}
+
+		let params = {
+			tab: active_tab,
+			order_status: active_tab === "analysis" ? active_filter_analysis : active_filter_dispatch,
+			filters: JSON.stringify({
+				company:     company_field.get_value(),
+				from_date:   from_date_field.get_value(),
+				to_date:     to_date_field.get_value(),
+				sales_order: sales_order_field.get_value(),
+				customer:    customer_field.get_value(),
+				item_code:   item_code_field.get_value(),
+				warehouse:   warehouse_field.get_value(),
+				status:      status_field.get_value(),
+				group_by_so: group_by_field.get_value(),
+			}),
+		};
+
+		if (active_tab === "dispatch") {
+			params.line_fullkit = JSON.stringify(line_fullkit_field.get_value() || ["Partial", "Full-kit"]);
+		}
+
+		open_url_post(
+			"/api/method/prakash_steel.prakash_steel.page.open_so_page.open_so_page.export_so_tab_xlsx",
+			params
+		);
+	}
+
 	// ── fetch report data ─────────────────────────────────────────────────────
 	function refresh() {
 		let filters = {
@@ -679,8 +713,8 @@ frappe.pages["open-so-page"].on_page_load = function (wrapper) {
 			group_by_so:         group_by_field.get_value(),
 		};
 
-		if (!filters.company || !filters.from_date || !filters.to_date) {
-			frappe.msgprint(__("Please select Company, From Date and To Date."));
+		if (!filters.company) {
+			frappe.msgprint(__("Please select Company."));
 			return;
 		}
 

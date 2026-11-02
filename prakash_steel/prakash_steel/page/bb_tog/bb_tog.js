@@ -47,8 +47,11 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		fieldname: "global_fos",
 		label: __("FOS %"),
 		fieldtype: "Int",
-		default: 25,
-		change() { apply_global_fos(); },
+		change() {
+			const v = parseInt(fos_field.get_value());
+			_active_fos = isNaN(v) ? 30 : v;
+			apply_global_fos();
+		},
 	});
 
 	page.add_inner_button(__("Refresh"), () => load_data());
@@ -72,6 +75,11 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 	};
 
 	function hbt_badge(val) {
+		if (val === "NS") {
+			return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;
+				background:#9e9e9e;color:#ffffff;font-weight:700;font-size:12px;
+				letter-spacing:1px;">NS</span>`;
+		}
 		if (!val || !HBT[val]) return `<span style="color:#ccc;">—</span>`;
 		const c = HBT[val];
 		return `<span style="display:inline-block;padding:2px 10px;border-radius:4px;
@@ -121,9 +129,11 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			style="font-weight:600;color:${color};">${Math.abs(n).toFixed(1)}% ${arrow}</span>`;
 	}
 
+	let _active_fos = 30; // current in-effect FOS%, decoupled from the field's async set_value
+	let _last_fos = 30; // baseline FOS% from TOG Horizon Setting that Reset reverts to
+
 	function get_global_fos() {
-		const v = parseInt(fos_field.get_value());
-		return isNaN(v) ? 25 : v;
+		return _active_fos;
 	}
 
 	function apply_global_fos() {
@@ -145,7 +155,10 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 	let _all_data = [];
 	let _raw_data = [];
 	let _selected = new Set();
-	let _changed_items = new Set();  // item_codes explicitly changed by user
+
+	function update_selected_count() {
+		$("#bbt-selected-count").text(`${__("Selected")}: ${_selected.size} / ${_all_data.length}`);
+	}
 
 	function apply_filter() {
 		const sku = sku_type_field.get_value();
@@ -168,6 +181,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		_selected.clear();
 
 		_all_data.forEach((row, i) => { if (row.sku_type === "BBMTA") _selected.add(i); });
+		update_selected_count();
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 		_dt = new DataTable(document.getElementById("bbt-dt"), {
@@ -214,13 +228,17 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		{
 			name: "Cumu%", id: "cumu_pct", width: 90, align: "center", editable: false,
 			format: (val, _r, _c, d) => {
-				const color = (d && HBT[d.hbt]) ? HBT[d.hbt].bg : "#c0152a";
+				const color = d && d.hbt === "NS" ? "#9e9e9e" : (d && HBT[d.hbt]) ? HBT[d.hbt].bg : "#c0152a";
 				return `<span style="font-weight:600;color:${color};">${fmt_pct(val)}</span>`;
 			},
 		},
 		{
 			name: "HBT", id: "hbt", width: 80, align: "center", editable: false,
 			format: val => hbt_badge(val),
+		},
+		{
+			name: "On Hand Stock", id: "on_hand_stock", width: 120, align: "center", editable: false,
+			format: val => (val !== null && val !== undefined) ? fmt_num(val, 0) : dash(),
 		},
 		{
 			name: "Frequency", id: "frequency", width: 100, align: "center", editable: false,
@@ -240,14 +258,7 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		},
 		{
 			name: "FOS", id: "fos", width: 110, align: "center", editable: false,
-			format: (val, _r, _c, d) =>
-				`<div style="display:flex;align-items:center;gap:2px;">
-					<input type="number" class="bbt-fos-input" data-idx="${d._idx}" min="0" step="1"
-						value="${val !== null && val !== undefined ? val : ""}"
-						style="border:1px solid #d1d8e0;border-radius:3px;padding:3px 6px;
-						font-size:12px;width:calc(100% - 16px);box-sizing:border-box;text-align:center;background:#fffbe6;">
-					<span style="font-size:12px;color:#666;flex-shrink:0;">%</span>
-				</div>`,
+			format: val => (val !== null && val !== undefined) ? `${val}%` : dash(),
 		},
 		{
 			name: "Calc TOG", id: "tog", width: 110, align: "center", editable: false,
@@ -310,6 +321,22 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		},
 	];
 
+	// frappe-datatable caches each cell's rendered HTML in `cell.html` the first time
+	// it's drawn and replays that cache verbatim (rather than re-invoking format())
+	// whenever a row is recycled by virtual scroll — so edits made only to `_all_data`
+	// are lost the moment a row scrolls out of view and back in. Recompute the cell's
+	// HTML now and overwrite that cache so recycled rows pick up the live value.
+	function sync_cell(idx, col_id) {
+		if (!_dt) return;
+		const col_idx = COLS.findIndex(c => c.id === col_id);
+		if (col_idx < 0) return;
+		const cell = _dt.getCell(col_idx, idx);
+		if (!cell) return;
+		const value = _all_data[idx][col_id];
+		cell.content = value;
+		cell.html = COLS[col_idx].format(value, null, null, _all_data[idx]);
+	}
+
 	function apply_row_colors(root_id = "bbt-dt") {
 		const tbody = document.querySelector(`#${root_id} .dt-body`);
 		if (!tbody) return;
@@ -363,43 +390,6 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		_dt_observer.observe(dt_el, { childList: true, subtree: true });
 	}
 
-	function recalc_change_pct(idx) {
-		const row = _all_data[idx];
-		const tog = row.tog;
-		const current_tog = row.current_tog || 0;
-		const change_pct = (tog !== null && tog !== undefined && !Number.isNaN(tog) && current_tog)
-			? Math.round((tog - current_tog) / current_tog * 1000) / 10
-			: null;
-		row.change_pct = change_pct;
-		const html = fmt_change_pct(change_pct, idx);
-		const $el = $(`.bbt-change-pct[data-idx="${idx}"]`);
-		if ($el.length) {
-			$el.replaceWith(html);
-			return;
-		}
-		// Fallback for cells already showing an untagged dash from before the fix
-		const col_idx = COLS.findIndex(c => c.id === "change_pct");
-		const $row = $(`.bbt-calc-tog[data-idx="${idx}"]`).closest(".dt-row");
-		if ($row.length && col_idx >= 0) {
-			$row.find(`.dt-cell--col-${col_idx} .dt-cell__content, .dt-cell--col-${col_idx} .content`)
-				.first()
-				.html(html);
-		}
-	}
-
-	function recalc_tog(idx) {
-		const row = _all_data[idx];
-		const fos = row.fos !== null && row.fos !== undefined ? row.fos : 25;
-		const adu = row.adu || 0;
-		const lt = row.lt || 0;
-		const tog = ceil1000(adu * lt * (1 + fos / 100));
-		row.tog = tog;
-		$(`.bbt-calc-tog[data-idx="${idx}"]`).text(tog);
-		const $nt = $(`.bbt-new-tog-input[data-idx="${idx}"]`);
-		if ($nt.length) $nt.css({"color": new_tog_color($nt.val(), tog), "font-weight": "600"});
-		recalc_change_pct(idx);
-	}
-
 	function _get_selected_rows() {
 		return _all_data.filter((_, i) => _selected.has(i));
 	}
@@ -411,18 +401,19 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			return;
 		}
 		const items = selected
-			.filter(r => _changed_items.has(r.item_code))
-			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog }));
+			.filter(r => r.new_tog != null)
+			.map(r => ({ item_code: r.item_code, tog: r.new_tog }));
 		if (!items.length) {
 			frappe.show_alert({ message: __("No MTA items selected. Only BBMTA items can be saved."), indicator: "orange" });
 			return;
 		}
 		frappe.call({
 			method: "prakash_steel.prakash_steel.page.bb_tog.bb_tog.save_tog",
-			args: { items: JSON.stringify(items) },
+			args: { items: JSON.stringify(items), fos: get_global_fos() },
 			freeze: true,
 			freeze_message: __("Saving TOG values…"),
 			callback(r) {
+				if (r.message && r.message.last_fos != null) _last_fos = r.message.last_fos;
 				if (r.message) {
 					frappe.show_alert({
 						message: __(`${r.message.saved} item(s) saved successfully.`),
@@ -439,18 +430,19 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			return;
 		}
 		const items = selected
-			.filter(r => _changed_items.has(r.item_code))
-			.map(r => ({ item_code: r.item_code, tog: r.new_tog != null ? r.new_tog : r.tog, buffer_flag: r.buffer_flag || "Non-Buffer", sku_type: r.sku_type || "" }));
+			.filter(r => r.new_tog != null || (r.buffer_flag || "Non-Buffer") === "Non-Buffer")
+			.map(r => ({ item_code: r.item_code, tog: r.new_tog ?? 0, buffer_flag: r.buffer_flag || "Non-Buffer", sku_type: r.sku_type || "" }));
 		if (!items.length) {
 			frappe.show_alert({ message: __("No MTA items selected. Only BBMTA items can be updated."), indicator: "orange" });
 			return;
 		}
 		frappe.call({
 			method: "prakash_steel.prakash_steel.page.bb_tog.bb_tog.update_tog",
-			args: { items: JSON.stringify(items) },
+			args: { items: JSON.stringify(items), fos: get_global_fos() },
 			freeze: true,
 			freeze_message: __("Updating TOG…"),
 			callback(r) {
+				if (r.message && r.message.last_fos != null) _last_fos = r.message.last_fos;
 				if (r.message) {
 					frappe.show_alert({
 						message: __(`${r.message.updated} item(s) updated successfully.`),
@@ -461,8 +453,15 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		});
 	}
 	function reset_selected() {
-		_all_data.forEach(row => {
-			if ((row.buffer_flag || "Non-Buffer") === "Buffer") row.new_tog = row.tog;
+		_active_fos = _last_fos;
+		fos_field.set_value(_last_fos);
+		apply_global_fos();
+
+		_all_data.forEach((row, idx) => {
+			if ((row.buffer_flag || "Non-Buffer") === "Buffer") {
+				row.new_tog = row.tog;
+				sync_cell(idx, "new_tog");
+			}
 		});
 		document.querySelectorAll(".bbt-new-tog-input").forEach(input => {
 			const idx = parseInt(input.dataset.idx);
@@ -471,7 +470,24 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			input.value = row.tog != null ? row.tog : "";
 			$(input).css({ color: "inherit", "font-weight": "600" });
 		});
-		frappe.show_alert({ message: __("New TOG reset to Calc TOG for all rows."), indicator: "blue" });
+
+		const items = _all_data
+			.filter(r => (r.buffer_flag || "Non-Buffer") === "Buffer" && r.new_tog != null)
+			.map(r => ({ item_code: r.item_code, tog: r.new_tog }));
+
+		frappe.call({
+			method: "prakash_steel.prakash_steel.page.bb_tog.bb_tog.save_tog",
+			args: { items: JSON.stringify(items), fos: _last_fos },
+			freeze: true,
+			freeze_message: __("Resetting…"),
+			callback(r) {
+				if (r.message && r.message.last_fos != null) _last_fos = r.message.last_fos;
+				frappe.show_alert({
+					message: __(`New TOG reset to Calc TOG and FOS reset to ${_active_fos}% — saved${r.message ? ` for ${r.message.saved} item(s)` : ""}.`),
+					indicator: "blue",
+				});
+			},
+		});
 	}
 
 	function bind_events() {
@@ -480,19 +496,12 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			if (item) window.open(`/app/item/${encodeURIComponent(item)}`, "_blank");
 		});
 
-		$(document).off("input", ".bbt-fos-input").on("input", ".bbt-fos-input", function () {
-			const idx = parseInt($(this).data("idx"));
-			const val = $(this).val();
-			_all_data[idx].fos = val === "" ? 0 : parseInt(val);
-			recalc_tog(idx);
-		});
-
 		$(document).off("input", ".bbt-new-tog-input").on("input", ".bbt-new-tog-input", function () {
 			const idx = parseInt($(this).data("idx"));
 			const val = $(this).val();
 			_all_data[idx].new_tog = val === "" ? null : parseInt(val);
-			_changed_items.add(_all_data[idx].item_code);
 			$(this).css({"color": new_tog_color(val, _all_data[idx].tog), "font-weight": "600"});
+			sync_cell(idx, "new_tog");
 		});
 
 		$(document).off("change", ".bbt-buffer-flag-select").on("change", ".bbt-buffer-flag-select", function () {
@@ -505,7 +514,6 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			_all_data[idx].sku_type = new_sku;
 			$(`.bbt-sku-type[data-idx="${idx}"]`).text(new_sku || "—");
 			if (val === "Buffer") { _selected.add(idx); $(`.bbt-row-check[data-idx="${idx}"]`).prop("checked", true); }
-			_changed_items.add(_all_data[idx].item_code);
 			const raw_row = _raw_data.find(r => r.item_code === _all_data[idx].item_code);
 			if (raw_row) { raw_row.buffer_flag = val; raw_row.sku_type = new_sku; }
 			const $nt = $(`.bbt-new-tog-input[data-idx="${idx}"]`);
@@ -517,6 +525,11 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 				const stored = _all_data[idx].new_tog;
 				$nt.val(stored != null ? stored : "").css("color", new_tog_color(stored, _all_data[idx].tog));
 			}
+			sync_cell(idx, "buffer_flag");
+			sync_cell(idx, "sku_type");
+			sync_cell(idx, "new_tog");
+			sync_cell(idx, "current_tog");
+			update_selected_count();
 		});
 
 		$(document).off("change", "#bbt-select-all").on("change", "#bbt-select-all", function () {
@@ -524,15 +537,16 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 				_all_data.forEach((_, i) => _selected.add(i));
 			} else {
 				_selected.clear();
-		_all_data.forEach((row, i) => { if (row.sku_type === "BBMTA") _selected.add(i); });
 			}
 			$(".bbt-row-check").prop("checked", this.checked);
+			update_selected_count();
 		});
 
 		$(document).off("change", ".bbt-row-check").on("change", ".bbt-row-check", function () {
 			const idx = parseInt($(this).data("idx"));
 			if (this.checked) _selected.add(idx);
 			else _selected.delete(idx);
+			update_selected_count();
 			const total = _all_data.length;
 			$("#bbt-select-all")
 				.prop("indeterminate", _selected.size > 0 && _selected.size < total)
@@ -552,16 +566,16 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 		});
 
 		_selected.clear();
-		_changed_items.clear();
 
 		_all_data.forEach((row, i) => { if (row.sku_type === "BBMTA") _selected.add(i); });
 		if (_dt) { try { _dt.destroy(); } catch (_) {} _dt = null; }
 
 		$("#bbt-root").html(`
-			<div style="font-size:12px;color:#888;margin-bottom:10px;padding-left:2px;">
+			<div style="font-size:12px;color:#888;margin-bottom:4px;padding-left:2px;">
 				Period: <strong>${esc(period_label)}</strong>
 				&nbsp;·&nbsp; ${data.length} items
 			</div>
+			<div id="bbt-selected-count" style="font-size:12px;color:#1565c0;font-weight:600;margin-bottom:10px;padding-left:2px;"></div>
 			<div style="padding:4px 2px 8px;display:flex;align-items:center;gap:8px;">
 				<label style="font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:6px;">
 					<input type="checkbox" id="bbt-select-all">
@@ -570,6 +584,8 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			</div>
 			<div id="bbt-dt" style="overflow-x:auto;"></div>
 		`);
+
+		update_selected_count();
 
 		if (_dt_observer) { _dt_observer.disconnect(); _dt_observer = null; }
 
@@ -636,7 +652,10 @@ frappe.pages["bb-tog"].on_page_load = function (wrapper) {
 			args: { view_by },
 			callback(r) {
 				if (!r.message) return;
-				const { data, period_label } = r.message;
+				const { data, period_label, default_fos, last_fos } = r.message;
+				_last_fos = last_fos ?? 30;
+				_active_fos = default_fos ?? 30;
+				fos_field.set_value(_active_fos);
 				if (!data || !data.length) {
 					$("#bbt-root").html(`
 						<div style="padding:32px;text-align:center;color:#888;">

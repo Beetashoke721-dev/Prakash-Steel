@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
  "creation": "2026-05-08 12:43:38.371628",
  "doctype": "DocType",
@@ -7,8 +8,9 @@
  "engine": "InnoDB",
  "field_order": [
   "machine_group_name",
-  "mt_per_hour_production",
+  "gear",
   "column_break_yzab",
+  "mt_per_hour_production",
   "is_default",
   "column_break_wxvf"
  ],
@@ -46,13 +48,22 @@
   {
    "fieldname": "column_break_wxvf",
    "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "gear",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Gear",
+   "options": "\n1\n2\n3\n4\n5",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-05-09 16:31:05.820955",
+ "modified": "2026-10-13 16:24:52.335989",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Bright Machine Master Table",

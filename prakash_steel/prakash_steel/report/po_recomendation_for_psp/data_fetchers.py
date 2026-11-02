@@ -1,11 +1,3 @@
-# Copyright (c) 2026, Beetashoke Chakraborty and contributors
-# For license information, please see license.txt
-
-"""
-Database query functions for the PO Recommendation report.
-All functions here hit the DB and return pre-built maps used by get_data().
-"""
-
 from collections import defaultdict
 
 import frappe
@@ -14,27 +6,36 @@ from frappe.utils import add_days, flt, today
 from .calculations import _STATUS_PRIORITY, _PRIORITY_TO_COLOUR, _compute_order_status
 
 
-# ---------------------------------------------------------------------------
-# Stock / WIP / PO / SO map builders
-# ---------------------------------------------------------------------------
-
-
 def get_stock_map(item_codes: list[str]) -> dict[str, float]:
-	if not item_codes:
+	# Item stock for planning always comes from Planning Engine Warehouse Setup only.
+	return get_planning_stock_map(item_codes)
+
+
+def get_planning_engine_warehouses() -> list[str]:
+	doc = frappe.get_single("Planning Engine Warehouse Setup")
+	return [row.warehouse for row in doc.table_cmgr if row.warehouse]
+
+
+def get_warehouse_stock_map(item_codes: list[str], warehouses: list[str]) -> dict[str, float]:
+	if not item_codes or not warehouses:
 		return {}
 
 	bin_rows = frappe.db.sql(
 		"""
 		SELECT item_code, SUM(actual_qty) as stock
 		FROM `tabBin`
-		WHERE item_code IN %s
+		WHERE item_code IN %s AND warehouse IN %s
 		GROUP BY item_code
 		""",
-		(tuple(item_codes),),
+		(tuple(item_codes), tuple(warehouses)),
 		as_dict=True,
 	)
 
 	return {d.item_code: flt(d.stock) for d in bin_rows}
+
+
+def get_planning_stock_map(item_codes: list[str]) -> dict[str, float]:
+	return get_warehouse_stock_map(item_codes, get_planning_engine_warehouses())
 
 
 def get_sales_order_qty_map(filters: dict) -> dict[str, float]:
@@ -88,6 +89,19 @@ def get_qualified_demand_map() -> tuple[dict[str, float], dict[str, float]]:
 	spike_map = {item_code: 0.0 for item_code in till_today_map}
 
 	return till_today_map, spike_map
+
+
+def get_draft_wo_map() -> dict[str, float]:
+	rows = frappe.db.sql(
+		"""
+		SELECT production_item AS item_code, SUM(qty) AS draft_wo_qty
+		FROM `tabWork Order`
+		WHERE docstatus = 0
+		GROUP BY production_item
+		""",
+		as_dict=True,
+	)
+	return {r.item_code: flt(r.draft_wo_qty) for r in rows}
 
 
 def get_wip_map() -> dict[str, float]:
@@ -182,7 +196,6 @@ def get_wip_map() -> dict[str, float]:
 				continue
 
 	elif settings.get("from_production_planning"):
-		# WIP from Production Planning (fg_production_qty − produced_qty; closed rows excluded)
 		wip_rows_pp = frappe.db.sql(
 			"""
 			SELECT
@@ -213,7 +226,6 @@ def get_wip_map() -> dict[str, float]:
 
 
 def get_mrq_map() -> dict[str, float]:
-	# Pending Material Requests (submitted, not yet fully ordered)
 	mrq_rows = frappe.db.sql(
 		"""
 		SELECT
@@ -234,7 +246,6 @@ def get_mrq_map() -> dict[str, float]:
 
 	mrq_map = {d.item_code: flt(d.mrq_qty) for d in mrq_rows}
 
-	# Draft Work Orders (docstatus = 0) — also considered as pending demand
 	wo_rows = frappe.db.sql(
 		"""
 		SELECT
@@ -287,11 +298,49 @@ def get_open_po_map() -> dict[str, float]:
 	return open_po_map
 
 
+def get_open_subcon_po_map() -> dict[str, float]:
+	"""Open subcontracted PO qty per finished-good item.
+
+	For every submitted, open subcontracted Purchase Order, the child row's
+	``fg_item`` (not ``item_code``, which is the subcontracting service/raw
+	material line) identifies the finished good being subcontracted. For
+	each such row we take ``fg_item_qty - received_qty``, floored at 0 per
+	row (a doc with received_qty > fg_item_qty contributes 0, not a
+	negative), and sum across docs for that fg_item.
+	"""
+	po_rows = frappe.db.sql(
+		"""
+		SELECT
+			poi.fg_item as item_code,
+			poi.fg_item_qty,
+			IFNULL(poi.received_qty, 0) as received_qty
+		FROM
+			`tabPurchase Order` po
+		INNER JOIN
+			`tabPurchase Order Item` poi ON poi.parent = po.name
+		WHERE
+			po.is_subcontracted = 1
+			AND po.docstatus = 1
+			AND po.status NOT IN ('Cancelled', 'Closed')
+			AND IFNULL(poi.custom_closed, 0) = 0
+			AND poi.fg_item IS NOT NULL
+		""",
+		as_dict=True,
+	)
+
+	open_subcon_po_map = {}
+	for row in po_rows:
+		item_code = row.item_code
+		open_qty = max(0, flt(row.fg_item_qty) - flt(row.received_qty))
+		if item_code in open_subcon_po_map:
+			open_subcon_po_map[item_code] += open_qty
+		else:
+			open_subcon_po_map[item_code] = open_qty
+
+	return open_subcon_po_map
+
+
 def get_open_so_map_for_priority(item_codes: list[str]) -> dict[str, list[dict]]:
-	"""
-	Returns {item_code: [{pending_qty, order_status}, ...]}
-	All open SOs (Total SO), sorted by delivery_date ASC — used for FIFO priority calculation.
-	"""
 	if not item_codes:
 		return {}
 	items_tuple = tuple(item_codes)
@@ -325,11 +374,6 @@ def get_open_so_map_for_priority(item_codes: list[str]) -> dict[str, list[dict]]
 	return so_map
 
 
-# ---------------------------------------------------------------------------
-# Spike calculation
-# ---------------------------------------------------------------------------
-
-
 def calculate_spike_map(
 	item_codes: list[str],
 	item_buffer_map: dict[str, str],
@@ -351,7 +395,6 @@ def calculate_spike_map(
 				"spike_threshold": flt(sm.spike_threshold),
 			}
 
-	# Spike logic ONLY applies to buffer items
 	buffer_items = [
 		item_code for item_code in item_codes if item_buffer_map.get(item_code, "Non-Buffer") == "Buffer"
 	]
@@ -368,7 +411,6 @@ def calculate_spike_map(
 				{"item_code": item_code, "item_type": item_type, "tog": tog}
 			)
 
-	# Group items by item_type for efficient querying
 	items_by_type = {}
 	for item_info in buffer_items_with_details:
 		item_type = item_info["item_type"]

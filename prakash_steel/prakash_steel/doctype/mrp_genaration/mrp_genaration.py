@@ -6,6 +6,18 @@ import math
 from frappe.model.document import Document
 from frappe.utils import flt
 from prakash_steel.utils.lead_time import get_default_bom
+from prakash_steel.utils.mrp_dates import compute_required_by_and_transaction_dates
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import (
+	get_qualified_demand_map as get_qualified_demand_map_psp,
+	calculate_spike_map,
+	get_sales_order_qty_map,
+	get_open_subcon_po_map,
+	get_planning_stock_map,
+)
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.calculations import (
+	get_qualified_demand_for_item,
+	apply_spike_threshold,
+)
 
 
 class MRPGenaration(Document):
@@ -93,7 +105,9 @@ def _generate_mrp_order_recommendations_worker() -> None:
 	# Log job start
 	job_id = None
 	try:
-		job = frappe.get_job()
+		from rq import get_current_job
+
+		job = get_current_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
 	except Exception:
@@ -147,14 +161,33 @@ def _generate_mrp_order_recommendations_worker() -> None:
 	# Get WIP map for all items
 	wip_map = get_wip_map_for_mrp()
 
-	# Get Open SO map for all items (for non-buffer items)
-	open_so_map = get_open_so_map_for_mrp()
+	# Get Open SO map for all items (for non-buffer items) — ALL open SO qty regardless
+	# of delivery date, matching the PSP report's "all-time open SO for non-buffer" logic
+	open_so_map = get_sales_order_qty_map({})
 
-	# Get Qualified Demand map (Open SO with delivery_date <= today) - for buffer items
-	qualified_demand_map = get_qualified_demand_map_for_mrp()
+	# Get Qualified Demand map (till-today + spike) - for buffer items. Sourced from the
+	# same functions as the PO Recommendation for PSP report so the two stay in sync.
+	till_today_map, spike_map = get_qualified_demand_map_psp()
+	spike_master_records = frappe.get_all(
+		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
+	)
+	spike_master_map = {
+		sm.item_type: {"demand_horizon": flt(sm.demand_horizon), "spike_threshold": flt(sm.spike_threshold)}
+		for sm in spike_master_records
+	}
+	spike_map.update(
+		calculate_spike_map(all_item_codes, item_buffer_map, item_type_map, item_tog_map, spike_master_map)
+	)
+	qualified_demand_map = {}
+	for item_code in all_item_codes:
+		qd, _, _ = get_qualified_demand_for_item(item_code, till_today_map, spike_map, item_buffer_map)
+		qualified_demand_map[item_code] = qd
 
 	# Get Open PO map (Purchase Order quantity - received quantity) - for BOTA/PTA buffer items
 	open_po_map = get_open_po_map_for_mrp()
+
+	# Get Open Subcon PO map (subcontracted PO fg_item_qty - received_qty, per fg_item)
+	open_subcon_po_map = get_open_subcon_po_map()
 
 	# Get MRQ map (Material Request Quantity - sum of qty from Material Request Items with status 'Pending')
 	mrq_map = get_mrq_map_for_mrp()
@@ -181,6 +214,7 @@ def _generate_mrp_order_recommendations_worker() -> None:
 		tog = flt(item_tog_map.get(item_code, 0))
 		qualified_demand = flt(qualified_demand_map.get(item_code, 0))
 		open_po = flt(open_po_map.get(item_code, 0))
+		open_subcon_po = flt(open_subcon_po_map.get(item_code, 0))
 		mrq = flt(mrq_map.get(item_code, 0))
 		item_type = item_type_map.get(item_code)
 		sku_type = item_sku_type_map.get(item_code)
@@ -197,6 +231,7 @@ def _generate_mrp_order_recommendations_worker() -> None:
 			"stock": stock,
 			"wip": wip,
 			"open_po": open_po,
+			"open_subcon_po": open_subcon_po,
 			"mrq": mrq,
 			"parent_demands": [],  # List of {parent_item, bom_name, demand_qty}
 			"total_parent_demand": 0,
@@ -215,6 +250,7 @@ def _generate_mrp_order_recommendations_worker() -> None:
 			open_so_map,
 			qualified_demand_map,
 			open_po_map,
+			open_subcon_po_map,
 		)
 		initial_order_recommendations[item_code] = order_rec
 		detailed_info[item_code]["initial_order_rec"] = order_rec
@@ -260,6 +296,7 @@ def _generate_mrp_order_recommendations_worker() -> None:
 			detailed_info,
 			set(),  # visited_items for this traversal (prevents circular references)
 			level=0,
+			open_subcon_po_map=open_subcon_po_map,
 		)
 
 	# Step 3: Calculate final order recommendations for all items
@@ -284,6 +321,9 @@ def _generate_mrp_order_recommendations_worker() -> None:
 			open_po_map,
 			mrq_map,
 			parent_demand_map,
+			item_type_map,
+			spike_master_map,
+			open_subcon_po_map,
 		)
 
 		final_order_recommendations[item_code] = order_rec
@@ -345,6 +385,7 @@ def _generate_mrp_order_recommendations_worker() -> None:
 				detailed_info,
 				global_visited_items,  # Use shared visited_items set
 				level=0,
+				open_subcon_po_map=open_subcon_po_map,
 			)
 
 	# Step 6: Recalculate final order recommendations with updated parent demands
@@ -366,6 +407,9 @@ def _generate_mrp_order_recommendations_worker() -> None:
 			open_po_map,
 			mrq_map,
 			parent_demand_map_net,  # Use updated parent demands
+			item_type_map,
+			spike_master_map,
+			open_subcon_po_map,
 		)
 		final_order_recommendations_updated[item_code] = order_rec
 
@@ -458,6 +502,19 @@ def _generate_mrp_order_recommendations_worker() -> None:
 				"MRP Generation Warning",
 			)
 
+	# Step 6.5: Compute required_by / transaction_date for every item with a net order
+	# recommendation. Buffer items decouple (today + custom_decoupled_lead_time);
+	# non-buffer items inherit from the nearest Open SO delivery date or from whichever
+	# parent(s) need them (earliest wins). See utils/mrp_dates.py for the algorithm.
+	item_dates_map = compute_required_by_and_transaction_dates(
+		net_order_recommendations_final,
+		item_buffer_map,
+	)
+	for item_code, dates in item_dates_map.items():
+		if item_code in detailed_info:
+			detailed_info[item_code]["required_by"] = dates["required_by"]
+			detailed_info[item_code]["transaction_date"] = dates["transaction_date"]
+
 	# Generate detailed log - ensure all items with net_order_rec > 0 are included
 	detailed_log = generate_detailed_log(detailed_info, net_order_recommendations_final)
 
@@ -467,7 +524,9 @@ def _generate_mrp_order_recommendations_worker() -> None:
 	# Get job_id for logging and caching
 	job_id = None
 	try:
-		job = frappe.get_job()
+		from rq import get_current_job
+
+		job = get_current_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
 	except Exception:
@@ -525,11 +584,12 @@ def get_mrp_job_status(job_id) -> dict | list:
 			}
 
 		# Check job status using frappe's job system
-		from rq import get_current_job
 		from rq.job import Job
 
+		from frappe.utils.background_jobs import get_redis_conn
+
 		try:
-			job = Job.fetch(job_id, connection=frappe.utils.redis_conn())
+			job = Job.fetch(job_id, connection=get_redis_conn())
 
 			if job.is_finished:
 				# Job finished, check if result is in cache
@@ -650,7 +710,9 @@ def list_active_mrp_jobs() -> None:
 		try:
 			from rq.job import Job
 
-			job = Job.fetch(mrp_job_id, connection=frappe.utils.redis_conn())
+			from frappe.utils.background_jobs import get_redis_conn
+
+			job = Job.fetch(mrp_job_id, connection=get_redis_conn())
 			active_jobs.append(
 				{
 					"job_id": mrp_job_id,
@@ -676,7 +738,9 @@ def list_active_mrp_jobs() -> None:
 		try:
 			from rq.job import Job
 
-			job = Job.fetch(mr_job_id, connection=frappe.utils.redis_conn())
+			from frappe.utils.background_jobs import get_redis_conn
+
+			job = Job.fetch(mr_job_id, connection=get_redis_conn())
 			active_jobs.append(
 				{
 					"job_id": mr_job_id,
@@ -703,9 +767,15 @@ def list_active_mrp_jobs() -> None:
 
 
 @frappe.whitelist()
-def create_material_request(item_code, qty) -> None:
+def create_material_request(item_code, qty, transaction_date=None, schedule_date=None) -> None:
 	"""
-	Create and submit a Material Request for the given item_code and quantity
+	Create and submit a Material Request for the given item_code and quantity.
+
+	transaction_date/schedule_date are normally computed by the MRP engine
+	(see utils/mrp_dates.py) and passed in by _create_material_requests_worker.
+	When omitted (e.g. a standalone manual call), they're computed here for
+	just this one item using the same rules (buffer item: today + decoupled
+	lead time; non-buffer item with no traceable source: today + lead time).
 	"""
 	if not frappe.has_permission("Material Request", "create") and not frappe.has_permission(
 		"Material Request", "write"
@@ -765,10 +835,18 @@ def create_material_request(item_code, qty) -> None:
 		if conversion_factor == 1.0 and hasattr(item_doc, "uom_conversion_factor"):
 			conversion_factor = flt(item_doc.get("uom_conversion_factor", 1.0))
 
-	# Calculate schedule_date (7 days from now)
-	from frappe.utils import add_days, today
-
-	schedule_date = add_days(today(), 7)
+	# Compute dates if not supplied by the caller (standalone/manual call, no MRP tree context)
+	if not transaction_date or not schedule_date:
+		buffer_flag = item_doc.get("custom_buffer_flag") or "Non-Buffer"
+		item_dates = compute_required_by_and_transaction_dates(
+			{item_code: flt(qty)},
+			{item_code: buffer_flag},
+		)
+		computed = item_dates.get(item_code, {})
+		if not schedule_date:
+			schedule_date = computed.get("required_by")
+		if not transaction_date:
+			transaction_date = computed.get("transaction_date")
 
 	# Set company name
 	company = "Prakash Steel Products Pvt Ltd"
@@ -790,8 +868,8 @@ def create_material_request(item_code, qty) -> None:
 			{
 				"doctype": "Material Request",
 				"company": company,
-				"transaction_date": today(),
-				"schedule_date": schedule_date,
+				"transaction_date": str(transaction_date),
+				"schedule_date": str(schedule_date),
 				"material_request_type": material_request_type,
 				"items": [
 					{
@@ -909,7 +987,9 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 	# Log job start
 	job_id = None
 	try:
-		job = frappe.get_job()
+		from rq import get_current_job
+
+		job = get_current_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
 	except Exception:
@@ -997,16 +1077,32 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 	progress_cache_key = f"mr_creation_progress_{job_id}"
 
 	def update_progress(current, total, current_item=None):
-		"""Update progress in cache"""
+		"""Update progress in cache (polling fallback) and push live via realtime.
+
+		frappe.publish_progress() emits a "progress" socket event to the enqueuing
+		user, which frappe's client already listens for globally (socketio_client.js)
+		and renders via frappe.show_progress() automatically - the same mechanism
+		Frappe's own bulk delete/update dialogs use. No client-side polling needed
+		for the live bar itself; the cache value is kept only as a fallback for
+		get_mr_creation_progress().
+		"""
+		percent = (current / total) * 100 if total > 0 else 0
 		progress = {
 			"current": current,
 			"total": total,
-			"percent": int((current / total) * 100) if total > 0 else 0,
+			"percent": int(percent),
 			"current_item": current_item,
 			"success_count": success_count,
 			"error_count": error_count,
 		}
 		frappe.cache().set_value(progress_cache_key, progress, expires_in_sec=1800)
+
+		if current_item:
+			description = f"Creating Material Request for {current_item} ({current}/{total}) - Success: {success_count}, Failed: {error_count}"
+		else:
+			description = f"Processing... ({current}/{total})"
+
+		frappe.publish_progress(percent=percent, title="Creating Material Requests", description=description)
 
 	# Initialize progress at start
 	update_progress(0, total_items, None)
@@ -1021,10 +1117,14 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 			continue
 
 		try:
-			# Get batch_size for this item
+			# Get batch_size and MRP-computed dates for this item
 			batch_size = 0
+			item_transaction_date = None
+			item_schedule_date = None
 			if item_code in detailed_info:
 				batch_size = flt(detailed_info[item_code].get("batch_size", 0))
+				item_transaction_date = detailed_info[item_code].get("transaction_date")
+				item_schedule_date = detailed_info[item_code].get("required_by")
 			else:
 				# Fallback: get from item doctype
 				item_doc = frappe.get_doc("Item", item_code)
@@ -1039,7 +1139,9 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 
 				# Create Material Requests, each with batch_size quantity
 				for i in range(num_requests):
-					result = create_material_request(item_code, batch_size)
+					result = create_material_request(
+						item_code, batch_size, item_transaction_date, item_schedule_date
+					)
 					if result.get("error"):
 						error_count += 1
 						errors.append(f"{item_code} (MR #{i + 1} of {num_requests}): {result.get('error')}")
@@ -1053,7 +1155,9 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 				remainder = flt(net_qty) % flt(batch_size)
 				if remainder > 0:
 					# Create one more Material Request with the remainder
-					result = create_material_request(item_code, remainder)
+					result = create_material_request(
+						item_code, remainder, item_transaction_date, item_schedule_date
+					)
 					if result.get("error"):
 						error_count += 1
 						errors.append(f"{item_code} (Remainder {remainder}): {result.get('error')}")
@@ -1062,7 +1166,9 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 						material_requests.append(result.get("material_request"))
 			else:
 				# No batch_size - create single Material Request with full quantity
-				result = create_material_request(item_code, net_qty)
+				result = create_material_request(
+					item_code, net_qty, item_transaction_date, item_schedule_date
+				)
 				if result.get("error"):
 					error_count += 1
 					errors.append(f"{item_code}: {result.get('error')}")
@@ -1093,7 +1199,9 @@ def _create_material_requests_worker(net_order_recommendations=None) -> None:
 	# Store result in cache for retrieval using job_id
 	job_id = None
 	try:
-		job = frappe.get_job()
+		from rq import get_current_job
+
+		job = get_current_job()
 		if job and hasattr(job, "id"):
 			job_id = job.id
 	except Exception:
@@ -1123,7 +1231,8 @@ def calculate_net_order_recommendation(base_order_rec, moq, batch_size) -> float
 	Calculate net order recommendation by applying MOQ/Batch Size logic.
 
 	Logic:
-	- If base_order_rec <= 0: return 0 (no order needed, ignore MOQ/Batch Size)
+	- If base_order_rec < 1: return 0 (no order needed; sub-unit residue is float/BOM-ratio
+	  noise, not real demand — ignore MOQ/Batch Size)
 	- If MOQ > 0:
 	  - If MOQ < base_order_rec: use base_order_rec
 	  - If MOQ >= base_order_rec: use MOQ
@@ -1136,9 +1245,11 @@ def calculate_net_order_recommendation(base_order_rec, moq, batch_size) -> float
 	moq = flt(moq)
 	batch_size = flt(batch_size)
 
-	# If base order recommendation is 0 or negative, return 0
-	# Don't apply MOQ/Batch Size for negative or zero demand
-	if base_order_rec <= 0:
+	# Anything under a whole unit is floating-point/BOM-yield-ratio residue (chained BOM
+	# ratios like 0.95/0.917 through multiple levels never land on exact numbers), not real
+	# demand — without this, a razor-thin leftover like 0.02 would create a real Material
+	# Request for essentially nothing even when supply fully covers demand.
+	if base_order_rec < 1:
 		return 0
 
 	if moq > 0:
@@ -1169,46 +1280,31 @@ def calculate_initial_order_recommendation(
 	open_so_map,
 	qualified_demand_map,
 	open_po_map,
+	open_subcon_po_map=None,
 ) -> float:
 	"""
 	Calculate initial order recommendation for a single item (before BOM traversal).
-	- Buffer: TOG + Qualified Demand - Stock - WIP/Open PO
-	  - For BOTA/PTA: TOG + Qualified Demand - Stock - WIP - Open PO
-	  - For others: TOG + Qualified Demand - Stock - WIP
-	- Non-buffer: Open SO - Stock - WIP
+	- Buffer (BBMTA/RBMTA/BOTA/PTA/TRMTA): TOG + Qualified Demand - Stock - WIP - Open PO - Open Subcon PO
+	- Non-buffer (BBMTO/RBMTO/PTO/BOTO/TRMTO): Open SO - Stock - WIP - Open PO - Open Subcon PO
+	All SKU types are treated the same way.
 	"""
 	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
 	is_buffer = buffer_flag == "Buffer"
 
 	stock = flt(stock_map.get(item_code, 0))
 	wip = flt(wip_map.get(item_code, 0))
+	open_po = flt(open_po_map.get(item_code, 0))
+	open_subcon_po = flt((open_subcon_po_map or {}).get(item_code, 0))
 
 	if is_buffer:
-		# Buffer item: Order recommendation = TOG + Qualified Demand - Stock - WIP/Open PO
+		# Buffer item: Order recommendation = TOG + Qualified Demand - Stock - WIP - Open PO - Open Subcon PO
 		tog = flt(item_tog_map.get(item_code, 0))
 		qualified_demand = flt(qualified_demand_map.get(item_code, 0))
-		sku_type = item_sku_type_map.get(item_code)
-		open_po = flt(open_po_map.get(item_code, 0))
-
-		if sku_type in ["BOTA", "PTA"]:
-			# For BOTA/PTA: TOG + Qualified Demand - Stock - WIP - Open PO
-			order_rec = max(0, tog + qualified_demand - stock - wip - open_po)
-		else:
-			# For other buffer items: TOG + Qualified Demand - Stock - WIP
-			order_rec = max(0, tog + qualified_demand - stock - wip)
+		order_rec = max(0, tog + qualified_demand - stock - wip - open_po - open_subcon_po)
 	else:
-		# Non-buffer item: Order recommendation = max(0, Open SO - Stock - WIP)
-		# For PTO and BOTO (purchase items): also subtract Open PO
+		# Non-buffer item: Order recommendation = max(0, Open SO - Stock - WIP - Open PO - Open Subcon PO)
 		open_so = flt(open_so_map.get(item_code, 0))
-		sku_type = item_sku_type_map.get(item_code)
-		open_po = flt(open_po_map.get(item_code, 0))
-
-		if sku_type in ["PTO", "BOTO"]:
-			# For PTO/BOTO: Open SO - Stock - WIP - Open PO
-			order_rec = max(0, open_so - stock - wip - open_po)
-		else:
-			# For other non-buffer items: Open SO - Stock - WIP
-			order_rec = max(0, open_so - stock - wip)
+		order_rec = max(0, open_so - stock - wip - open_po - open_subcon_po)
 
 	return order_rec
 
@@ -1225,14 +1321,20 @@ def calculate_final_order_recommendation(
 	open_po_map,
 	mrq_map,
 	parent_demand_map,
+	item_type_map=None,
+	spike_master_map=None,
+	open_subcon_po_map=None,
 ) -> float:
 	"""
 	Calculate final order recommendation for a single item (after BOM traversal).
-	- Buffer: TOG + (Qualified Demand + Parent Demand) - Stock - WIP/Open PO - MRQ
-	  - For BOTA/PTA: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO - MRQ
-	  - For others: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - MRQ
-	- Non-buffer: max(0, (Open SO + Parent Demand) - Stock - WIP - MRQ)
-	  - For PTO/BOTO: max(0, (Open SO + Parent Demand) - Stock - WIP - Open PO - MRQ)
+	- Buffer (BBMTA/RBMTA/BOTA/PTA/TRMTA):
+	    TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO - Open Subcon PO - MRQ
+	  - The combined (Qualified Demand + Parent Demand) total is run through the same
+	    spike threshold as the PO Recommendation for PSP report (see apply_spike_threshold):
+	    zeroed out if it doesn't clear TOG x spike_threshold% for the item's type.
+	- Non-buffer (BBMTO/RBMTO/PTO/BOTO/TRMTO):
+	    max(0, (Open SO + Parent Demand) - Stock - WIP - Open PO - Open Subcon PO - MRQ)
+	All SKU types are treated the same way.
 	"""
 	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
 	is_buffer = buffer_flag == "Buffer"
@@ -1240,42 +1342,32 @@ def calculate_final_order_recommendation(
 	stock = flt(stock_map.get(item_code, 0))
 	wip = flt(wip_map.get(item_code, 0))
 	mrq = flt(mrq_map.get(item_code, 0))
+	open_po = flt(open_po_map.get(item_code, 0))
+	open_subcon_po = flt((open_subcon_po_map or {}).get(item_code, 0))
 
 	if is_buffer:
-		# Buffer item: Order recommendation = TOG + (Qualified Demand + Parent Demand) - Stock - WIP/Open PO - MRQ
+		# Buffer item: Order recommendation = TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO - Open Subcon PO - MRQ
 		tog = flt(item_tog_map.get(item_code, 0))
 		qualified_demand = flt(qualified_demand_map.get(item_code, 0))
 		parent_demand = flt(parent_demand_map.get(item_code, 0))
-		# Add parent demand to qualified demand for buffer items
+		# Add parent demand to qualified demand for buffer items, then apply the
+		# spike threshold to the combined total (same as PSP report's calculate_total_demand)
 		total_demand = qualified_demand + parent_demand
-		sku_type = item_sku_type_map.get(item_code)
-		open_po = flt(open_po_map.get(item_code, 0))
+		item_type = (item_type_map or {}).get(item_code)
+		total_demand = apply_spike_threshold(total_demand, tog, item_type, spike_master_map)
 
-		if sku_type in ["BOTA", "PTA"]:
-			# For BOTA/PTA: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO - MRQ
-			base_order_rec = tog + total_demand - stock - wip - open_po
-		else:
-			# For other buffer items: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - MRQ
-			base_order_rec = tog + total_demand - stock - wip
+		base_order_rec = tog + total_demand - stock - wip - open_po - open_subcon_po
 
 		# Subtract MRQ from base order recommendation
 		order_rec = max(0, base_order_rec - mrq)
 	else:
-		# Non-buffer item: Order recommendation = max(0, Requirement - Stock - WIP - MRQ)
+		# Non-buffer item: Order recommendation = max(0, Requirement - Stock - WIP - Open PO - Open Subcon PO - MRQ)
 		# Requirement = Open SO + sum of all parent BOM demands
-		# For PTO and BOTO (purchase items): also subtract Open PO
 		open_so = flt(open_so_map.get(item_code, 0))
 		parent_demand = flt(parent_demand_map.get(item_code, 0))
 		requirement = open_so + parent_demand
-		sku_type = item_sku_type_map.get(item_code)
-		open_po = flt(open_po_map.get(item_code, 0))
 
-		if sku_type in ["PTO", "BOTO"]:
-			# For PTO/BOTO: Requirement - Stock - WIP - Open PO - MRQ
-			base_order_rec = requirement - stock - wip - open_po
-		else:
-			# For other non-buffer items: Requirement - Stock - WIP - MRQ
-			base_order_rec = requirement - stock - wip
+		base_order_rec = requirement - stock - wip - open_po - open_subcon_po
 
 		# Subtract MRQ from base order recommendation
 		order_rec = max(0, base_order_rec - mrq)
@@ -1300,6 +1392,7 @@ def traverse_bom_for_mrp(
 	detailed_info,
 	visited_items,
 	level=0,
+	open_subcon_po_map=None,
 ) -> None:
 	"""
 	Recursively traverse BOM to calculate parent demands for child items.
@@ -1312,6 +1405,8 @@ def traverse_bom_for_mrp(
 	        detailed_info: Dict to store detailed information for each item
 	        visited_items: Set of visited items in current traversal (to prevent circular references)
 	"""
+	open_subcon_po_map = open_subcon_po_map or {}
+
 	if parent_item_code in visited_items:
 		return
 
@@ -1357,6 +1452,7 @@ def traverse_bom_for_mrp(
 					"stock": flt(stock_map.get(child_item_code, 0)),
 					"wip": flt(wip_map.get(child_item_code, 0)),
 					"open_po": flt(open_po_map.get(child_item_code, 0)),
+					"open_subcon_po": flt(open_subcon_po_map.get(child_item_code, 0)),
 					"mrq": flt(mrq_map.get(child_item_code, 0)),
 					"parent_demands": [],
 					"total_parent_demand": 0,
@@ -1402,14 +1498,19 @@ def traverse_bom_for_mrp(
 				child_wip = flt(wip_map.get(child_item_code, 0))
 				child_sku_type = item_sku_type_map.get(child_item_code)
 				child_open_po = flt(open_po_map.get(child_item_code, 0))
+				child_open_subcon_po = flt(open_subcon_po_map.get(child_item_code, 0))
 				child_mrq = flt(mrq_map.get(child_item_code, 0))
 
-				if child_sku_type in ["BOTA", "PTA"]:
-					base_child_order_rec = (
-						child_tog + child_qualified_demand - child_stock - child_wip - child_open_po
-					)
-				else:
-					base_child_order_rec = child_tog + child_qualified_demand - child_stock - child_wip
+				# All buffer SKU types (BOTA/PTA/BBMTA/RBMTA/TRMTA) net off Open PO,
+				# Open Subcon PO and WIP the same way.
+				base_child_order_rec = (
+					child_tog
+					+ child_qualified_demand
+					- child_stock
+					- child_wip
+					- child_open_po
+					- child_open_subcon_po
+				)
 
 				# Subtract MRQ from base order recommendation
 				child_order_rec = max(0, base_child_order_rec - child_mrq)
@@ -1434,6 +1535,7 @@ def traverse_bom_for_mrp(
 						detailed_info,
 						visited_items.copy(),  # New set for this branch
 						level + 1,
+						open_subcon_po_map,
 					)
 			else:
 				# Non-buffer child: Add parent demand to requirement
@@ -1467,14 +1569,14 @@ def traverse_bom_for_mrp(
 				child_wip = flt(wip_map.get(child_item_code, 0))
 				child_sku_type = item_sku_type_map.get(child_item_code)
 				child_open_po = flt(open_po_map.get(child_item_code, 0))
+				child_open_subcon_po = flt(open_subcon_po_map.get(child_item_code, 0))
 				child_mrq = flt(mrq_map.get(child_item_code, 0))
 
-				if child_sku_type in ["PTO", "BOTO"]:
-					# For PTO/BOTO: Requirement - Stock - WIP - Open PO - MRQ
-					base_child_order_rec = child_requirement - child_stock - child_wip - child_open_po
-				else:
-					# For other non-buffer items: Requirement - Stock - WIP - MRQ
-					base_child_order_rec = child_requirement - child_stock - child_wip
+				# All non-buffer SKU types (PTO/BOTO/BBMTO/RBMTO/TRMTO) net off Open PO,
+				# Open Subcon PO and WIP the same way.
+				base_child_order_rec = (
+					child_requirement - child_stock - child_wip - child_open_po - child_open_subcon_po
+				)
 
 				# Subtract MRQ from base order recommendation
 				child_order_rec = max(0, base_child_order_rec - child_mrq)
@@ -1499,6 +1601,7 @@ def traverse_bom_for_mrp(
 						detailed_info,
 						visited_items.copy(),  # New set for this branch
 						level + 1,
+						open_subcon_po_map,
 					)
 
 	except Exception as e:
@@ -1527,12 +1630,15 @@ def traverse_bom_for_mrp_with_net_rec(
 	detailed_info,
 	visited_items,
 	level=0,
+	open_subcon_po_map=None,
 ) -> None:
 	"""
 	Recursively traverse BOM using net_order_recommendations (after MOQ/Batch Size).
 	This ensures children get the adjusted values from their parents.
 	Similar to traverse_bom_for_mrp but uses net_order_recommendation values.
 	"""
+	open_subcon_po_map = open_subcon_po_map or {}
+
 	if parent_item_code in visited_items:
 		return
 
@@ -1626,12 +1732,14 @@ def traverse_bom_for_mrp_with_net_rec(
 				child_wip = flt(wip_map.get(child_item_code, 0))
 				child_sku_type = item_sku_type_map.get(child_item_code)
 				child_open_po = flt(open_po_map.get(child_item_code, 0))
+				child_open_subcon_po = flt(open_subcon_po_map.get(child_item_code, 0))
 				child_mrq = flt(mrq_map.get(child_item_code, 0))
 
-				if child_sku_type in ["PTO", "BOTO"]:
-					base_child_order_rec = child_requirement - child_stock - child_wip - child_open_po
-				else:
-					base_child_order_rec = child_requirement - child_stock - child_wip
+				# All non-buffer SKU types (PTO/BOTO/BBMTO/RBMTO/TRMTO) net off Open PO,
+				# Open Subcon PO and WIP the same way.
+				base_child_order_rec = (
+					child_requirement - child_stock - child_wip - child_open_po - child_open_subcon_po
+				)
 
 				# Subtract MRQ from base order recommendation
 				child_base_order_rec = max(0, base_child_order_rec - child_mrq)
@@ -1664,6 +1772,7 @@ def traverse_bom_for_mrp_with_net_rec(
 						detailed_info,
 						visited_items.copy(),
 						level + 1,
+						open_subcon_po_map,
 					)
 
 	except Exception as e:
@@ -1674,27 +1783,10 @@ def traverse_bom_for_mrp_with_net_rec(
 
 
 def get_stock_map_for_mrp(item_codes) -> dict:
-	"""Get stock map for all items"""
-	if not item_codes:
-		return {}
-
-	if len(item_codes) == 1:
-		item_codes_tuple = (next(iter(item_codes)),)
-	else:
-		item_codes_tuple = tuple(item_codes)
-
-	bin_rows = frappe.db.sql(
-		"""
-		SELECT item_code, SUM(actual_qty) as stock
-		FROM `tabBin`
-		WHERE item_code IN %s
-		GROUP BY item_code
-		""",
-		(item_codes_tuple,),
-		as_dict=True,
-	)
-
-	return {d.item_code: flt(d.stock) for d in bin_rows}
+	"""Get stock map for all items, counting only Planning Engine warehouses
+	(same source as the Bright Plan / PSP report / TOG pages), so stock in
+	e.g. Rejected Warehouse does not suppress a recommendation."""
+	return get_planning_stock_map(list(item_codes or []))
 
 
 def get_wip_map_for_mrp() -> dict:
@@ -1899,398 +1991,6 @@ def get_wip_map_for_mrp() -> dict:
 	return wip_map
 
 
-def get_open_so_map_for_mrp() -> dict:
-	"""Get Open SO map - sum of max(0, qty - delivered_qty) from Sales Order Items
-	IMPORTANT: This calculates OPEN SO (qty - delivered_qty), NOT total SO (qty).
-	Open SO = Sales Orders with delivery_date <= today (only those with delivery date today or in the past).
-	Total SO = All Sales Orders regardless of delivery date (not used here).
-	For each Sales Order Item, if delivered_qty >= qty (over-delivered), treat as 0.
-	This ensures over-delivery on one SO doesn't reduce open quantity of another SO.
-	"""
-	from frappe.utils import today
-
-	today_date = today()
-
-	so_rows = frappe.db.sql(
-		"""
-		SELECT
-			soi.item_code,
-			SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0))) as so_qty
-		FROM
-			`tabSales Order` so
-		INNER JOIN
-			`tabSales Order Item` soi ON soi.parent = so.name
-		WHERE
-			so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
-			AND so.docstatus = 1
-			AND IFNULL(soi.delivery_date, '1900-01-01') <= %s
-			AND IFNULL(soi.custom_closed, 0) = 0
-		GROUP BY
-			soi.item_code
-		""",
-		(today_date,),
-		as_dict=True,
-	)
-
-	return {d.item_code: flt(d.so_qty) for d in so_rows}
-
-
-def get_qualified_demand_map_for_mrp() -> tuple:
-	"""Get qualified demand map for ALL items (same logic as PO Recommendation report)
-
-	Qualified Demand logic:
-	- Base till_today = Open SO quantity where delivery_date <= today
-	  - Open SO (per SO line) = max(0, qty - delivered_qty) (quantity left to deliver)
-	  - For each Sales Order Item, if delivered_qty >= qty (over-delivered), treat as 0.
-	    This ensures over-delivery on one SO doesn't reduce open quantity of another SO.
-	- Spike:
-	  - Applies ONLY to buffer items
-	  - Calculated using Spike Master configuration (demand_horizon, spike_threshold)
-	  - Looks at SOs in future horizon and picks MAX qualifying spike quantity
-	- For non-buffer items:
-	  - spike is always 0
-
-	Final Qualified Demand per item:
-	- Non-buffer items: qualified_demand = till_today (spike = 0, no final threshold check)
-	- Buffer items:
-	  - qualified_demand = till_today + spike
-	  - If qualified_demand < (TOG * spike_threshold / 100), then qualified_demand = 0
-
-	This mirrors the qualified demand logic used in
-	`po_recomendation_for_psp.py` so MRP and the PSP report stay in sync.
-	"""
-	from frappe.utils import today
-
-	today_date = today()
-
-	# Step 1: Build till_today map (Open SO where delivery_date <= today)
-	# Use max(0, qty - delivered_qty) per SO line to avoid negative open quantities
-	so_rows = frappe.db.sql(
-		"""
-		SELECT
-			soi.item_code,
-			SUM(GREATEST(0, soi.qty - IFNULL(soi.delivered_qty, 0))) as so_qty
-		FROM
-			`tabSales Order` so
-		INNER JOIN
-			`tabSales Order Item` soi ON soi.parent = so.name
-		WHERE
-			so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
-			AND so.docstatus = 1
-			AND IFNULL(soi.delivery_date, '1900-01-01') <= %s
-			AND IFNULL(soi.custom_closed, 0) = 0
-		GROUP BY
-			soi.item_code
-		""",
-		(today_date,),
-		as_dict=True,
-	)
-
-	till_today_map = {d.item_code: flt(d.so_qty) for d in so_rows}
-
-	# Step 2: Build item maps (buffer flag, item type, TOG) for ALL items
-	# This is needed for spike calculation and final threshold checks
-	items_details_all = frappe.db.sql(
-		"""
-		SELECT
-			i.name as item_code,
-			i.custom_buffer_flag as buffer_flag,
-			i.custom_item_type as item_type,
-			i.safety_stock as tog
-		FROM
-			`tabItem` i
-		WHERE
-			i.disabled = 0
-		""",
-		as_dict=True,
-	)
-
-	item_buffer_map_all = {}
-	item_type_map_all = {}
-	item_tog_map_all = {}
-	all_item_codes = set()
-
-	for item in items_details_all:
-		item_code = item.item_code
-		all_item_codes.add(item_code)
-		item_buffer_map_all[item_code] = item.buffer_flag or "Non-Buffer"
-		item_type_map_all[item_code] = item.item_type
-		item_tog_map_all[item_code] = flt(item.tog or 0)
-
-	# Step 3: Calculate spike map for buffer items based on Spike Master (same logic as report)
-	spike_map = calculate_spike_map(all_item_codes, item_buffer_map_all, item_type_map_all, item_tog_map_all)
-
-	# Step 4: Build Spike Master map for final threshold checks in get_qualified_demand_for_item
-	spike_master_records = frappe.get_all(
-		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
-	)
-	spike_master_map = {}
-	for sm in spike_master_records:
-		spike_master_map[sm.item_type] = {
-			"demand_horizon": flt(sm.demand_horizon),
-			"spike_threshold": flt(sm.spike_threshold),
-		}
-
-	# Step 5: Combine till_today and spike into final qualified_demand_map for ALL relevant items
-	all_item_codes_for_demand = all_item_codes | set(till_today_map.keys()) | set(spike_map.keys())
-	qualified_demand_map = {}
-
-	for item_code in all_item_codes_for_demand:
-		qualified_demand, _, _ = get_qualified_demand_for_item(
-			item_code,
-			till_today_map,
-			spike_map,
-			item_buffer_map_all,
-			item_tog_map_all,
-			item_type_map_all,
-			spike_master_map,
-		)
-		qualified_demand_map[item_code] = qualified_demand
-
-	return qualified_demand_map
-
-
-def calculate_spike_map(item_codes, item_buffer_map, item_type_map, item_tog_map) -> dict[str, float]:
-	"""Calculate spike map for buffer items based on Spike Master configuration
-
-	Logic (same as PSP PO Recommendation report):
-	1. For each buffer item, get its custom_item_type
-	2. Look up Spike Master for that item_type to get demand_horizon and spike_threshold
-	3. Calculate date range:
-	   - If demand_horizon > 0: tomorrow to (today + demand_horizon days)
-	   - If demand_horizon == 0 or empty: ALL future SOs (delivery_date > today)
-	4. Get sales orders in that date range
-	5. For each SO, check if qty >= (TOG * spike_threshold / 100)
-	6. Take SUM of all qualifying sales orders (all spikes within horizon)
-	7. If no SO qualifies, spike = 0
-
-	For non-buffer items, spike is always 0.
-	"""
-	from frappe.utils import today, add_days
-
-	today_date = today()
-	spike_map = {}
-
-	# Get all Spike Master records
-	spike_master_records = frappe.get_all(
-		"Spike Master", fields=["item_type", "demand_horizon", "spike_threshold"]
-	)
-
-	# Create a map of item_type -> spike master config
-	spike_master_map = {}
-	for sm in spike_master_records:
-		spike_master_map[sm.item_type] = {
-			"demand_horizon": flt(sm.demand_horizon),
-			"spike_threshold": flt(sm.spike_threshold),
-		}
-
-	# Spike logic ONLY applies to buffer items
-	buffer_items = [
-		item_code for item_code in item_codes if item_buffer_map.get(item_code, "Non-Buffer") == "Buffer"
-	]
-
-	if not buffer_items:
-		# No buffer items, return empty spike_map (all items will get spike = 0)
-		return spike_map
-
-	# Get item details for buffer items (item_type and TOG)
-	buffer_items_with_details = []
-	for item_code in buffer_items:
-		item_type = item_type_map.get(item_code)
-		tog = flt(item_tog_map.get(item_code, 0))
-		if item_type and tog > 0:
-			buffer_items_with_details.append(
-				{
-					"item_code": item_code,
-					"item_type": item_type,
-					"tog": tog,
-				}
-			)
-
-	# Group items by item_type for efficient querying
-	items_by_type = {}
-	for item_info in buffer_items_with_details:
-		item_type = item_info["item_type"]
-		if item_type not in items_by_type:
-			items_by_type[item_type] = []
-		items_by_type[item_type].append(item_info)
-
-	# Calculate spike for each item_type group
-	for item_type, items_list in items_by_type.items():
-		# Get spike master config for this item_type
-		spike_config = spike_master_map.get(item_type)
-		if not spike_config:
-			# No spike master config for this item_type, set spike = 0 for all items
-			for item_info in items_list:
-				spike_map[item_info["item_code"]] = 0.0
-			continue
-
-		demand_horizon = spike_config["demand_horizon"]
-
-		# If demand_horizon is 0, spike is disabled for this item type
-		if not demand_horizon or demand_horizon <= 0:
-			for item_info in items_list:
-				spike_map[item_info["item_code"]] = 0.0
-			continue
-
-		start_date = add_days(today_date, 1)  # Tomorrow
-		end_date = add_days(today_date, demand_horizon)  # Today + demand_horizon
-
-		# Get item codes for this item_type
-		item_codes_for_type = [item["item_code"] for item in items_list]
-		if not item_codes_for_type:
-			continue
-
-		# Build SQL query for items in this type
-		if len(item_codes_for_type) == 1:
-			item_codes_tuple = (item_codes_for_type[0],)
-		else:
-			item_codes_tuple = tuple(item_codes_for_type)
-
-		# Get sales orders in spike date range for these items
-		# If demand_horizon > 0 → tomorrow (start_date) to (today + demand_horizon) (end_date)
-		# If demand_horizon is 0/empty → ALL future SOs (delivery_date > today)
-		if end_date:
-			# Bounded future window
-			so_rows = frappe.db.sql(
-				"""
-				SELECT
-					soi.item_code,
-					soi.qty - IFNULL(soi.delivered_qty, 0) as so_qty,
-					IFNULL(soi.delivery_date, '1900-01-01') as delivery_date,
-					so.name as sales_order_name
-				FROM
-					`tabSales Order` so
-				INNER JOIN
-					`tabSales Order Item` soi ON soi.parent = so.name
-				WHERE
-					so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
-					AND so.docstatus = 1
-					AND soi.item_code IN %s
-					AND IFNULL(soi.delivery_date, '1900-01-01') >= %s
-					AND IFNULL(soi.delivery_date, '1900-01-01') <= %s
-					AND IFNULL(soi.custom_closed, 0) = 0
-				""",
-				(item_codes_tuple, start_date, end_date),
-				as_dict=True,
-			)
-		else:
-			# All future SOs (no upper bound)
-			so_rows = frappe.db.sql(
-				"""
-				SELECT
-					soi.item_code,
-					soi.qty - IFNULL(soi.delivered_qty, 0) as so_qty,
-					IFNULL(soi.delivery_date, '1900-01-01') as delivery_date,
-					so.name as sales_order_name
-				FROM
-					`tabSales Order` so
-				INNER JOIN
-					`tabSales Order Item` soi ON soi.parent = so.name
-				WHERE
-					so.status NOT IN ('Stopped', 'On Hold', 'Closed', 'Cancelled', 'Completed')
-					AND so.docstatus = 1
-					AND soi.item_code IN %s
-					AND IFNULL(soi.delivery_date, '1900-01-01') > %s
-					AND IFNULL(soi.custom_closed, 0) = 0
-				""",
-				(item_codes_tuple, today_date),
-				as_dict=True,
-			)
-
-		# Group sales orders by item_code (store both qty and delivery_date for debugging)
-		so_by_item = {}
-		for row in so_rows:
-			item_code = row.item_code
-			so_qty = flt(row.so_qty)
-			if so_qty > 0:  # Only consider positive quantities
-				if item_code not in so_by_item:
-					so_by_item[item_code] = []
-				so_by_item[item_code].append(
-					{
-						"qty": so_qty,
-						"delivery_date": row.delivery_date,
-						"sales_order": row.sales_order_name,
-					}
-				)
-
-		# Calculate spike for each item
-		for item_info in items_list:
-			item_code = item_info["item_code"]
-
-			# Get sales orders for this item
-			so_data_list = so_by_item.get(item_code, [])
-
-			if not so_data_list:
-				# No sales orders in spike range, spike = 0
-				spike_map[item_code] = 0.0
-				continue
-
-			# Sum ALL future SO qty within demand horizon
-			# No threshold check here - combined (till_today + spike) is compared against threshold in get_qualified_demand_for_item
-			total_future_qty = sum(so_data["qty"] for so_data in so_data_list)
-			spike_map[item_code] = total_future_qty
-
-	# IMPORTANT: Set spike = 0 for all non-buffer items (safety)
-	for item_code in item_codes:
-		if item_buffer_map.get(item_code, "Non-Buffer") != "Buffer":
-			spike_map[item_code] = 0.0
-
-	return spike_map
-
-
-def get_qualified_demand_for_item(
-	item_code,
-	till_today_map,
-	spike_map,
-	item_buffer_map,
-	item_tog_map=None,
-	item_type_map=None,
-	spike_master_map=None,
-) -> tuple:
-	"""Get qualified demand for a single item (same logic as PSP PO Recommendation)
-
-	Qualified Demand = till_today + spike
-
-	IMPORTANT: Spike logic ONLY applies to buffer items
-	- For non-buffer items: spike is always 0, no spike calculation or final check
-	- For buffer items: spike is calculated from Spike Master, and final check applies
-
-	Additional logic for buffer items only:
-	- After calculating qualified_demand = till_today + spike
-	- If qualified_demand < (TOG * spike_threshold / 100), set qualified_demand = 0
-	"""
-	till_today = flt(till_today_map.get(item_code, 0))
-
-	# Spike logic ONLY applies to buffer items
-	buffer_flag = item_buffer_map.get(item_code, "Non-Buffer")
-	if buffer_flag != "Buffer":
-		spike = 0.0  # Non-buffer items always have spike = 0 (no spike logic)
-		qualified_demand = till_today + spike
-		return qualified_demand, till_today, spike
-
-	# Buffer items only: calculate spike from Spike Master
-	spike = flt(spike_map.get(item_code, 0))  # Buffer items can have spike
-	qualified_demand = till_today + spike
-
-	# Additional check for buffer items ONLY: if qualified_demand < (TOG * spike_threshold / 100), set to 0
-	if item_tog_map and item_type_map and spike_master_map:
-		tog = flt(item_tog_map.get(item_code, 0))
-		item_type = item_type_map.get(item_code)
-
-		if tog > 0 and item_type:
-			spike_config = spike_master_map.get(item_type)
-			if spike_config:
-				spike_threshold_pct = flt(spike_config.get("spike_threshold", 0))
-				spike_threshold_qty = tog * spike_threshold_pct / 100
-
-				# If qualified_demand < spike_threshold_qty, set to 0
-				if qualified_demand < spike_threshold_qty:
-					qualified_demand = 0.0
-
-	return qualified_demand, till_today, spike
-
-
 def get_mrq_map_for_mrp() -> dict:
 	"""Get MRQ (Material Request Quantity) map - sum of (qty - ordered_qty) from Material Request Items
 	for all items (only Material Requests with status 'Pending' or 'Partially Ordered'),
@@ -2392,6 +2092,7 @@ def build_calculation_breakdown(info, parent_demand_map) -> str:
 	stock = info["stock"]
 	wip = info["wip"]
 	open_po = info.get("open_po", 0)
+	open_subcon_po = info.get("open_subcon_po", 0)
 	mrq = info.get("mrq", 0)
 	moq = info.get("moq", 0)
 	batch_size = info.get("batch_size", 0)
@@ -2433,28 +2134,21 @@ def build_calculation_breakdown(info, parent_demand_map) -> str:
 		lines.append(f"  Stock: {stock}")
 		lines.append(f"  WIP: {wip}")
 		lines.append(f"  Open PO: {open_po}")
+		lines.append(f"  Open Subcon PO: {open_subcon_po}")
 		lines.append(f"  MRQ: {mrq}")
 
-		if sku_type in ["BOTA", "PTA"]:
-			base_calc = tog + total_demand - stock - wip - open_po
-			lines.append(
-				"  Base Calculation: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO"
-			)
-			lines.append(
-				f"                    = {tog} + ({qualified_demand} + {total_parent_demand}) - {stock} - {wip} - {open_po}"
-			)
-			lines.append(f"                    = {tog} + {total_demand} - {stock} - {wip} - {open_po}")
-			lines.append(f"                    = {base_calc}")
-			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
-		else:
-			base_calc = tog + total_demand - stock - wip
-			lines.append("  Base Calculation: TOG + (Qualified Demand + Parent Demand) - Stock - WIP")
-			lines.append(
-				f"                    = {tog} + ({qualified_demand} + {total_parent_demand}) - {stock} - {wip}"
-			)
-			lines.append(f"                    = {tog} + {total_demand} - {stock} - {wip}")
-			lines.append(f"                    = {base_calc}")
-			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
+		base_calc = tog + total_demand - stock - wip - open_po - open_subcon_po
+		lines.append(
+			"  Base Calculation: TOG + (Qualified Demand + Parent Demand) - Stock - WIP - Open PO - Open Subcon PO"
+		)
+		lines.append(
+			f"                    = {tog} + ({qualified_demand} + {total_parent_demand}) - {stock} - {wip} - {open_po} - {open_subcon_po}"
+		)
+		lines.append(
+			f"                    = {tog} + {total_demand} - {stock} - {wip} - {open_po} - {open_subcon_po}"
+		)
+		lines.append(f"                    = {base_calc}")
+		lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
 
 		# Show MOQ/Batch Size logic
 		if final_order_rec <= 0:
@@ -2489,6 +2183,7 @@ def build_calculation_breakdown(info, parent_demand_map) -> str:
 		lines.append(f"  Stock: {stock}")
 		lines.append(f"  WIP: {wip}")
 		lines.append(f"  Open PO: {open_po}")
+		lines.append(f"  Open Subcon PO: {open_subcon_po}")
 		lines.append(f"  Total Parent Demand: {total_parent_demand}")
 
 		if total_parent_demand > 0:
@@ -2505,24 +2200,14 @@ def build_calculation_breakdown(info, parent_demand_map) -> str:
 
 		requirement = open_so + total_parent_demand
 
-		if sku_type in ["PTO", "BOTO"]:
-			base_calc = requirement - stock - wip - open_po
-			lines.append(
-				f"  Requirement: Open SO + Parent Demand = {open_so} + {total_parent_demand} = {requirement}"
-			)
-			lines.append("  Base Calculation: Requirement - Stock - WIP - Open PO")
-			lines.append(f"                    = {requirement} - {stock} - {wip} - {open_po}")
-			lines.append(f"                    = {base_calc}")
-			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
-		else:
-			base_calc = requirement - stock - wip
-			lines.append(
-				f"  Requirement: Open SO + Parent Demand = {open_so} + {total_parent_demand} = {requirement}"
-			)
-			lines.append("  Base Calculation: Requirement - Stock - WIP")
-			lines.append(f"                    = {requirement} - {stock} - {wip}")
-			lines.append(f"                    = {base_calc}")
-			lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
+		base_calc = requirement - stock - wip - open_po - open_subcon_po
+		lines.append(
+			f"  Requirement: Open SO + Parent Demand = {open_so} + {total_parent_demand} = {requirement}"
+		)
+		lines.append("  Base Calculation: Requirement - Stock - WIP - Open PO - Open Subcon PO")
+		lines.append(f"                    = {requirement} - {stock} - {wip} - {open_po} - {open_subcon_po}")
+		lines.append(f"                    = {base_calc}")
+		lines.append(f"  After MRQ: Base - MRQ = {base_calc} - {mrq} = {final_order_rec}")
 
 		# Show MOQ/Batch Size logic
 		if final_order_rec <= 0:

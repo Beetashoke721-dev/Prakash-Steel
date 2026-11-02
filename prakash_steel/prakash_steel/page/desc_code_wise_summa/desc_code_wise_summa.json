@@ -1,0 +1,44 @@
+{
+ "content": null,
+ "creation": "2026-08-17 12:02:11.970854",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-08-17 12:02:11.970854",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "desc-code-wise-summa",
+ "owner": "Administrator",
+ "page_name": "desc-code-wise-summa",
+ "roles": [
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Administrator"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Desc Code Wise Summary"
+}

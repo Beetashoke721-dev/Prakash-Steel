@@ -28,7 +28,7 @@ frappe.query_reports["Transporter Bill Payment"] = {
 			fieldname: "invoice_type",
 			label: __("Type"),
 			fieldtype: "Select",
-			options: "\nPurchase\nSale",
+			options: "\nPurchase\nSale\nSubcontracting Receipt\nSubcontracting Delivery\nInternal Transfer",
 			default: "Purchase",
 			reqd: 1,
 			on_change: function (report) {
@@ -92,7 +92,23 @@ frappe.query_reports["Transporter Bill Payment"] = {
 		},
 	],
 
+	// Force the DataTable's fixed footer total row for this report only,
+	// independent of the "Add Total Row" report field. The footer renders
+	// outside the scrollable/sortable body, so it stays pinned to the
+	// bottom regardless of sorting, scrolling, or pagination.
+	get_datatable_options: function (datatable_options) {
+		datatable_options.showTotalRow = true;
+		return datatable_options;
+	},
+
 	formatter: function (value, row, column, data, default_formatter) {
+		// The Total row has no data object; suppress the forced "0.00" that
+		// Frappe's default formatter renders for Currency/Float columns we
+		// intentionally excluded from the total (via disable_total).
+		if (!data && column.disable_total) {
+			return "";
+		}
+
 		value = default_formatter(value, row, column, data);
 
 		if (column.fieldname === "approval_status" && value === "Approved") {

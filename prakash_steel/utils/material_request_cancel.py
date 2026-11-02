@@ -13,6 +13,7 @@ def validate_cancel_reason(doc, method=None) -> None:
             _("Please enter Cancel Reason before cancelling this Material Request."),
             title=_("Cancel Reason Required"),
         )
+    # pass
 
 
 @frappe.whitelist()

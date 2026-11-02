@@ -149,6 +149,35 @@ class TestGetData(unittest.TestCase):
         self.assertFalse(data[0]["is_default"])
 
 
+    @patch(MOD + ".frappe")
+    def test_item_types_come_from_item_master_not_bom(self, mock_frappe):
+        """BOM-stored item type goes stale after an Item type change; report must show the Item's."""
+        from prakash_steel.prakash_steel.report.bom_details.bom_details import get_data
+
+        bom = {
+            "name": "BOM-004",
+            "parent_item_code": "ITEM-D",
+            "parent_item_name": "Item D",
+            "parent_item_type": "AS",  # stale value a BOM query might return
+            "parent_qty": 1.0,
+            "parent_uom": "Nos",
+            "is_active": 1,
+            "is_default": 1,
+        }
+        children = [{"child_item_code": "RM-004", "child_item_name": "Raw Mat 4",
+                     "child_item_type": "AS", "child_qty": 1.0, "child_uom": "Kg"}]
+        mock_frappe.get_all.side_effect = [[bom], children]
+        item_types = {"ITEM-D": "RB", "RM-004": "BO"}
+        mock_frappe.get_cached_value.side_effect = (
+            lambda dt, name, field: item_types.get(name) if field == "custom_item_type" else ""
+        )
+
+        data = get_data({})
+        self.assertEqual(data[0]["parent_item_type"], "RB")
+        self.assertEqual(data[0]["child_item_type"], "BO")
+        bom_fields = mock_frappe.get_all.call_args_list[0][1]["fields"]
+        self.assertFalse(any("custom_item_type" in f for f in bom_fields))
+
 class TestFilterFunctions(unittest.TestCase):
     @patch(MOD + ".frappe")
     def test_get_bom_items_for_filter_parses_string_filters(self, mock_frappe):

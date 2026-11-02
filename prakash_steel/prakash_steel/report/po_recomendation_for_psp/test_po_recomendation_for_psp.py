@@ -298,7 +298,7 @@ class TestNonBufferPriority(unittest.TestCase):
 			]
 		}
 		result = _non_buffer_priority("ITEM-001", 200, so_map)
-		self.assertEqual(result, "Green")
+		self.assertEqual(result, "GREEN")
 
 	def test_shortage_returns_worst_shortage_colour(self):
 		# level=0, SO needs 100 → shortage → colour based on order_status
@@ -308,7 +308,7 @@ class TestNonBufferPriority(unittest.TestCase):
 			]
 		}
 		result = _non_buffer_priority("ITEM-001", 0, so_map)
-		self.assertEqual(result, "Red")
+		self.assertEqual(result, "RED")
 
 	def test_multiple_sos_fifo_allocation_worst_shortage(self):
 		# level=50, SO1=60 (RED-shortage), SO2=40 (GREEN-no-shortage after SO1)
@@ -322,7 +322,7 @@ class TestNonBufferPriority(unittest.TestCase):
 		# SO1: needs 60, available 50 → shortage 10 → RED
 		# SO2: available 0, needs 40 → shortage 40 → GREEN (priority 2 < RED priority 4)
 		# worst shortage = RED
-		self.assertEqual(result, "Red")
+		self.assertEqual(result, "RED")
 
 	def test_black_is_highest_priority(self):
 		so_map = {
@@ -332,7 +332,7 @@ class TestNonBufferPriority(unittest.TestCase):
 			]
 		}
 		result = _non_buffer_priority("ITEM-001", 0, so_map)
-		self.assertEqual(result, "Black")
+		self.assertEqual(result, "BLACK")
 
 
 # ---------------------------------------------------------------------------
@@ -590,6 +590,7 @@ class TestGetDataCharacterization(unittest.TestCase):
 		so_qty_map=None,
 		wip_map=None,
 		open_po_map=None,
+		open_subcon_po_map=None,
 		mrq_map=None,
 		till_today_map=None,
 		so_priority_map=None,
@@ -601,6 +602,7 @@ class TestGetDataCharacterization(unittest.TestCase):
 		so_qty_map = so_qty_map or {}
 		wip_map = wip_map or {}
 		open_po_map = open_po_map or {}
+		open_subcon_po_map = open_subcon_po_map or {}
 		mrq_map = mrq_map or {}
 		till_today_map = till_today_map or {}
 		so_priority_map = so_priority_map or {}
@@ -634,6 +636,9 @@ class TestGetDataCharacterization(unittest.TestCase):
 			stack.enter_context(patch(MODULE + ".get_wip_map", return_value=dict(wip_map)))
 			stack.enter_context(patch(MODULE + ".get_mrq_map", return_value=dict(mrq_map)))
 			stack.enter_context(patch(MODULE + ".get_open_po_map", return_value=dict(open_po_map)))
+			stack.enter_context(
+				patch(MODULE + ".get_open_subcon_po_map", return_value=dict(open_subcon_po_map))
+			)
 			stack.enter_context(
 				patch(MODULE + ".get_open_so_map_for_priority", return_value=dict(so_priority_map))
 			)
@@ -772,6 +777,99 @@ class TestGetDataCharacterization(unittest.TestCase):
 		self.assertEqual(row["child_stock_shortage"], 140)
 		self.assertEqual(row["child_full_kit_status"], "Partial")
 		self.assertEqual(row["child_wip_open_po_full_kit_status"], "Pending")
+
+	def test_buffer_item_net_flow_includes_open_subcon_po(self):
+		"""
+		A buffer PTA item with zero own qualified demand, zero stock/wip/open_po
+		but an open subcontracted PO qty of 500 (already floored/summed by
+		get_open_subcon_po_map) must have that 500 flow straight into net_flow:
+		net_flow = stock + wip + open_po + open_subcon_po - qualified_demand
+			     = 0 + 0 + 0 + 500 - 0 = 500.
+		order_recommendation is untouched by open_subcon_po (it is not part of
+		that formula): ceil(max(0, tog + total_demand - stock - wip - open_po))
+		= ceil(max(0, 0)) = 0.
+		"""
+		data = self._run_get_data(
+			filters={"purchase": 1, "buffer_flag": 1},
+			item_rows={
+				"ITEM-SUBCON": {
+					"buffer_flag": "Buffer",
+					"item_type": "RM",
+					"tog": 0,
+					"moq": 0,
+					"batch_size": 0,
+					"item_name": "Subcon Item",
+					"toy": 0,
+					"tor": 0,
+				}
+			},
+			bin_stock={"ITEM-SUBCON": 0},
+			open_subcon_po_map={"ITEM-SUBCON": 500},
+		)
+
+		self.assertEqual(len(data), 1)
+		row = data[0]
+		self.assertEqual(row["item_code"], "ITEM-SUBCON")
+		self.assertEqual(row["sku_type"], "PTA")
+		self.assertEqual(row["open_subcon_po"], 500)
+		self.assertEqual(row["net_flow"], 500)
+		self.assertEqual(row["order_recommendation"], 0)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for data_fetchers.get_open_subcon_po_map() — DB call mocked
+# ---------------------------------------------------------------------------
+
+DATA_FETCHERS_MODULE = (
+	"prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers"
+)
+
+
+class TestGetOpenSubconPoMap(unittest.TestCase):
+	"""
+	get_open_subcon_po_map() groups by fg_item (the finished good, not the
+	subcontracting service item_code) and, per row, floors
+	fg_item_qty - received_qty at 0 before summing — a doc that has already
+	over-received must contribute 0 to that item, never a negative.
+	"""
+
+	def _run(self, sql_rows):
+		with patch(DATA_FETCHERS_MODULE + ".frappe") as mock_frappe:
+			mock_frappe.db.sql.return_value = sql_rows
+
+			from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import (
+				get_open_subcon_po_map,
+			)
+
+			return get_open_subcon_po_map()
+
+	def test_sums_open_qty_across_docs_for_same_fg_item(self):
+		result = self._run(
+			[
+				_row(item_code="FG-001", fg_item_qty=72000, received_qty=69210),
+				_row(item_code="FG-001", fg_item_qty=76000, received_qty=52090),
+			]
+		)
+		self.assertEqual(result, {"FG-001": 2790 + 23910})
+
+	def test_over_received_row_contributes_zero_not_negative(self):
+		result = self._run(
+			[
+				_row(item_code="FG-002", fg_item_qty=5000, received_qty=5560),
+			]
+		)
+		self.assertEqual(result, {"FG-002": 0})
+
+	def test_over_received_row_does_not_offset_other_docs(self):
+		"""One doc over-received (would be -560) and one still open (2000):
+		the over-received doc must floor to 0, not net off the open one."""
+		result = self._run(
+			[
+				_row(item_code="FG-003", fg_item_qty=5000, received_qty=5560),
+				_row(item_code="FG-003", fg_item_qty=10000, received_qty=8000),
+			]
+		)
+		self.assertEqual(result, {"FG-003": 2000})
 
 
 if __name__ == "__main__":

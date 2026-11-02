@@ -14,6 +14,7 @@ from prakash_steel.prakash_steel.report.rolled_plan.rolled_plan import (
 	get_parent_bom_map,
 	get_rbmto_so_detail_map,
 )
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import get_planning_stock_map
 
 
 def execute(filters=None) -> tuple[list, list]:
@@ -87,7 +88,7 @@ def get_data(filters) -> list[dict]:
 			mri.item_code,
 			mri.description,
 			ROUND(mri.qty) AS qty,
-			ROUND(IFNULL(mri.ordered_qty, 0)) AS completed_qty
+			ROUND(mri.qty - IFNULL(mri.ordered_qty, 0)) AS completed_qty
 		FROM
 			`tabMaterial Request` mr
 		INNER JOIN
@@ -95,7 +96,7 @@ def get_data(filters) -> list[dict]:
 		WHERE
 			mr.material_request_type = 'Purchase'
 			AND mr.docstatus = 1
-			AND mr.status NOT IN ('Ordered', 'Received')
+			AND mr.status NOT IN ('Ordered', 'Received', 'Stopped')
 			AND IFNULL(mri.ordered_qty, 0) < mri.qty
 		ORDER BY
 			mr.transaction_date DESC, mr.name
@@ -247,19 +248,7 @@ def _compute_order_status(delivery_date, transaction_date) -> str | None:
 
 
 def get_stock_map(item_codes) -> dict:
-	if not item_codes:
-		return {}
-	result = frappe.db.sql(
-		"""
-		SELECT item_code, SUM(actual_qty) AS stock
-		FROM `tabBin`
-		WHERE item_code IN %s
-		GROUP BY item_code
-		""",
-		(item_codes,),
-		as_dict=True,
-	)
-	return {r.item_code: flt(r.stock) for r in result}
+	return get_planning_stock_map(item_codes)
 
 
 # ---------------------------------------------------------------------------
@@ -599,7 +588,7 @@ def get_previous_mr_qty_map(rows) -> dict:
 		INNER JOIN `tabMaterial Request Item` mri ON mri.parent = mr.name
 		WHERE mr.material_request_type = 'Purchase'
 		  AND mr.docstatus = 1
-		  AND mr.status NOT IN ('Ordered', 'Received')
+		  AND mr.status NOT IN ('Ordered', 'Received', 'Stopped')
 		  AND mri.item_code IN %s
 		""",
 		(item_codes,),
@@ -647,7 +636,7 @@ def get_item_breakdown(mr_name) -> list[dict]:
 		"""
 		SELECT item_code, description,
 		       ROUND(qty) AS qty,
-		       ROUND(IFNULL(ordered_qty, 0)) AS completed_qty
+		       ROUND(qty - IFNULL(ordered_qty, 0)) AS completed_qty
 		FROM `tabMaterial Request Item`
 		WHERE parent = %s
 		""",

@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 from collections import defaultdict
+from datetime import date
 
 import frappe
 from frappe import _
@@ -9,9 +10,9 @@ from frappe import _
 from prakash_steel.utils.hbt_utils import (
 	METRIC_COL,
 	MONTH_SHORT,
-	get_period_months,
+	get_period_range,
 	month_key,
-	period_date_range,
+	months_spanning,
 )
 from prakash_steel.utils.whitelist_permissions import require_permission
 
@@ -25,9 +26,10 @@ def execute(filters: dict | None = None) -> tuple[list[dict], list[dict]]:
 	require_permission("Sales Invoice", "read")
 
 	filters = filters or {}
-	period_months = get_period_months()
+	from_date, to_date = get_period_range()
+	period_months = months_spanning(from_date, to_date)
 	columns = _get_columns(period_months)
-	data = _get_data(filters, period_months)
+	data = _get_data(filters, from_date, to_date, period_months)
 
 	return columns, data
 
@@ -66,7 +68,7 @@ def _get_columns(period_months: list[tuple[int, int]]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]:
+def _get_data(filters: dict, from_date: date, to_date: date, period_months: list[tuple[int, int]]) -> list[dict]:
 	if not period_months:
 		return []
 
@@ -80,7 +82,6 @@ def _get_data(filters: dict, period_months: list[tuple[int, int]]) -> list[dict]
 		frappe.throw(_("{0} is not yet implemented for this report.").format(view_by))
 
 	metric_col = METRIC_COL[view_by]
-	from_date, to_date = period_date_range(period_months)
 
 	# metric_col is sourced from METRIC_COL (internal constant) — safe to interpolate
 	raw_rows: list[dict] = frappe.db.sql(

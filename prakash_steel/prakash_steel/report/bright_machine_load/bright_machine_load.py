@@ -16,10 +16,10 @@ from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendatio
 	calculate_net_order_recommendation,
 	calculate_spike_map,
 	get_mrq_map,
+	get_planning_stock_map,
 	get_qualified_demand_for_item,
 	get_qualified_demand_map,
 	get_sales_order_qty_map,
-	get_stock_map,
 	get_wip_map,
 )
 from prakash_steel.utils.whitelist_permissions import require_any_permission
@@ -120,7 +120,7 @@ def get_machine_breakdown(machine_group_name) -> list | dict:
 
 	item_codes, item_buffer_map, item_type_map, item_tog_map, moq_map, batch_size_map = _build_item_maps(bb_items)
 
-	stock_map = get_stock_map(item_codes)
+	stock_map = get_planning_stock_map(item_codes)
 	wip_map = get_wip_map()
 	mrq_map = get_mrq_map()
 	till_today_map, spike_map = get_qualified_demand_map()
@@ -154,19 +154,22 @@ def get_machine_breakdown(machine_group_name) -> list | dict:
 		qualified_demand, _, _ = get_qualified_demand_for_item(
 			item_code, till_today_map, spike_map, item_buffer_map
 		)
-		qualified_demand = flt(qualified_demand)
+		raw_qualified_demand = flt(qualified_demand)
+		qualified_demand = raw_qualified_demand
 		if is_buffer:
 			qualified_demand = apply_spike_threshold(
-				qualified_demand, tog, item_type_map.get(item_code), spike_master_map
+				raw_qualified_demand, tog, item_type_map.get(item_code), spike_master_map
 			)
 
 		if is_buffer:
 			base_order_rec = max(0.0, tog + qualified_demand - stock - wip - mrq)
 		else:
-			base_order_rec = max(0.0, qualified_demand - stock - wip - mrq)
+			base_order_rec = max(0.0, flt(open_so_qty_map.get(item_code, 0)) - stock - wip - mrq)
 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 
-		display_open_so = qualified_demand if is_buffer else flt(open_so_qty_map.get(item_code, 0))
+		# Buffer: Open SO is qualified demand before the spike threshold, same as
+		# PO Recommendation / Manual Bright Plan.
+		display_open_so = raw_qualified_demand if is_buffer else flt(open_so_qty_map.get(item_code, 0))
 		order_req = max(0.0, display_open_so - stock)
 
 		prod_hours = round(net_order_rec / kg_per_hour, 4) if kg_per_hour else 0
@@ -303,7 +306,7 @@ def get_data() -> list[dict]:
 	item_codes, item_buffer_map, item_type_map, item_tog_map, moq_map, batch_size_map = _build_item_maps(bb_items)
 
 	# 5. Fetch shared maps (same as bright_plan)
-	stock_map = get_stock_map(item_codes)
+	stock_map = get_planning_stock_map(item_codes)
 	wip_map = get_wip_map()
 	mrq_map = get_mrq_map()
 	till_today_map, spike_map = get_qualified_demand_map()
@@ -324,7 +327,7 @@ def get_data() -> list[dict]:
 	open_so_qty_map = get_sales_order_qty_map({})
 
 	# 6. For each item, compute process hours per machine
-	# prod hours = net_order_rec / kg_per_hour  (production order rec based)
+	# prod hours = net_order_rec / kg_per_hour  (production order rec based; non-buffer uses all open SO, as in bright_plan)
 	# order hours = (open_so - stock) / kg_per_hour  (open so based)
 	machine_prod_hours_map = {m.machine_group_name: 0.0 for m in machines}
 	machine_order_hours_map = {m.machine_group_name: 0.0 for m in machines}
@@ -349,22 +352,25 @@ def get_data() -> list[dict]:
 		qualified_demand, _, _ = get_qualified_demand_for_item(
 			item_code, till_today_map, spike_map, item_buffer_map
 		)
-		qualified_demand = flt(qualified_demand)
+		raw_qualified_demand = flt(qualified_demand)
+		qualified_demand = raw_qualified_demand
 		if is_buffer:
 			qualified_demand = apply_spike_threshold(
-				qualified_demand, tog, item_type_map.get(item_code), spike_master_map
+				raw_qualified_demand, tog, item_type_map.get(item_code), spike_master_map
 			)
 
 		# Prod hours: net order rec / kg_per_hour
 		if is_buffer:
 			base_order_rec = max(0.0, tog + qualified_demand - stock - wip - mrq)
 		else:
-			base_order_rec = max(0.0, qualified_demand - stock - wip - mrq)
+			base_order_rec = max(0.0, flt(open_so_qty_map.get(item_code, 0)) - stock - wip - mrq)
 		net_order_rec = calculate_net_order_recommendation(base_order_rec, moq, batch_size)
 		machine_prod_hours_map[machine_group] += net_order_rec / kg_per_hour
 
 		# Order hours: (open_so - stock) / kg_per_hour
-		display_open_so = qualified_demand if is_buffer else flt(open_so_qty_map.get(item_code, 0))
+		# Buffer: Open SO is qualified demand before the spike threshold, same as
+		# PO Recommendation / Manual Bright Plan.
+		display_open_so = raw_qualified_demand if is_buffer else flt(open_so_qty_map.get(item_code, 0))
 		order_req = max(0.0, display_open_so - stock)
 		machine_order_hours_map[machine_group] += order_req / kg_per_hour
 

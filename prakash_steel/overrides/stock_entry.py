@@ -20,6 +20,11 @@ class CustomStockEntry(StockEntry):
     rows, then throw once with a combined message.
     """
 
+    def before_submit(self):
+        from prakash_steel.utils.attachment_validation import validate_mandatory_attachment
+
+        validate_mandatory_attachment(self)
+
     def validate(self):
         """Override validate to check stock availability on save (docstatus 0) as well."""
         # Call parent validate first
@@ -52,14 +57,22 @@ class CustomStockEntry(StockEntry):
 
         self.validate_stock_availability()
 
-    def get_basic_rate_for_manufactured_item(self, finished_item_qty, outgoing_items_cost=0) -> float:
+    def get_basic_rate_for_manufactured_item(
+        self, finished_item_qty, outgoing_items_cost=0, *args, **kwargs
+    ) -> float:
         """Prevent negative FG rate when RM cost is zero but scrap has existing valuation.
 
         ERPNext formula: (outgoing_items_cost - scrap_items_cost) / finished_item_qty
         When RM cost = 0 and scrap has value, the result goes negative.
         We zero the scrap cost so FG rate = RM cost / FG qty, floored at 0.
+
+        ``*args``/``**kwargs`` are forwarded verbatim so this override keeps working
+        as ERPNext evolves the parent signature (e.g. ``has_consumption_basis`` added
+        in v16.28).
         """
-        rate = super().get_basic_rate_for_manufactured_item(finished_item_qty, outgoing_items_cost)
+        rate = super().get_basic_rate_for_manufactured_item(
+            finished_item_qty, outgoing_items_cost, *args, **kwargs
+        )
         if rate < 0:
             rate = flt((outgoing_items_cost) / finished_item_qty) if finished_item_qty else 0
         return max(flt(rate), 0.0)

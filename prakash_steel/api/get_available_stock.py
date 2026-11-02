@@ -1,12 +1,14 @@
 import frappe
 from frappe import _
 
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import get_planning_stock_map
+
 
 @frappe.whitelist()
 def get_available_stock(item_code) -> float:
     """
-    Fetch total available stock from Bin table for the given item
-    across ALL warehouses.
+    Fetch total available stock from Bin table for the given item,
+    restricted to Planning Engine Warehouse Setup's configured warehouses.
 
     Returns available quantity in KG.
     """
@@ -14,21 +16,7 @@ def get_available_stock(item_code) -> float:
         frappe.throw(_("Not permitted to access stock information."), frappe.PermissionError)
 
     try:
-        total_qty = frappe.db.sql(
-            """
-            SELECT SUM(actual_qty) AS qty
-            FROM `tabBin`
-            WHERE item_code=%s
-        """,
-            (item_code,),
-            as_dict=True,
-        )
-
-        # total_qty will be a list with one dict; handle None safely
-        available_qty = (
-            total_qty[0].get("qty") if total_qty and total_qty[0] else 0
-        ) or 0
-        return available_qty
+        return get_planning_stock_map([item_code]).get(item_code, 0)
 
     except Exception:
         frappe.log_error(frappe.get_traceback(), "get_available_stock_error")

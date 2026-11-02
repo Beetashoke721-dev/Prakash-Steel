@@ -40,6 +40,56 @@ MOD = "prakash_steel.overrides.stock_entry"
 _flt_mock = lambda v, p=None: float(v) if v is not None else 0.0
 
 
+class TestGetBasicRateForManufacturedItem(unittest.TestCase):
+    """The override must forward whatever extra args ERPNext's parent expects
+    (e.g. has_consumption_basis added in v16.28) and floor the rate at 0."""
+
+    @patch(MOD + ".flt", side_effect=_flt_mock)
+    def test_forwards_extra_positional_args_to_super(self, mock_flt):
+        se = _make_se_instance()
+        with patch(
+            "erpnext.stock.doctype.stock_entry.stock_entry.StockEntry."
+            "get_basic_rate_for_manufactured_item",
+            return_value=42.0,
+        ) as mock_super:
+            rate = se.get_basic_rate_for_manufactured_item(10.0, 100.0, True)
+        mock_super.assert_called_once_with(10.0, 100.0, True)
+        self.assertEqual(rate, 42.0)
+
+    @patch(MOD + ".flt", side_effect=_flt_mock)
+    def test_forwards_extra_kwargs_to_super(self, mock_flt):
+        se = _make_se_instance()
+        with patch(
+            "erpnext.stock.doctype.stock_entry.stock_entry.StockEntry."
+            "get_basic_rate_for_manufactured_item",
+            return_value=5.0,
+        ) as mock_super:
+            se.get_basic_rate_for_manufactured_item(10.0, 100.0, has_consumption_basis=True)
+        mock_super.assert_called_once_with(10.0, 100.0, has_consumption_basis=True)
+
+    @patch(MOD + ".flt", side_effect=_flt_mock)
+    def test_negative_rate_is_recomputed_from_outgoing_cost(self, mock_flt):
+        se = _make_se_instance()
+        with patch(
+            "erpnext.stock.doctype.stock_entry.stock_entry.StockEntry."
+            "get_basic_rate_for_manufactured_item",
+            return_value=-3.0,
+        ):
+            rate = se.get_basic_rate_for_manufactured_item(10.0, 50.0)
+        self.assertEqual(rate, 5.0)  # 50 / 10, floored at 0
+
+    @patch(MOD + ".flt", side_effect=_flt_mock)
+    def test_negative_rate_with_zero_outgoing_cost_floors_at_zero(self, mock_flt):
+        se = _make_se_instance()
+        with patch(
+            "erpnext.stock.doctype.stock_entry.stock_entry.StockEntry."
+            "get_basic_rate_for_manufactured_item",
+            return_value=-3.0,
+        ):
+            rate = se.get_basic_rate_for_manufactured_item(10.0, 0.0)
+        self.assertEqual(rate, 0.0)
+
+
 class TestValidateStockAvailability(unittest.TestCase):
 
     @patch(MOD + ".flt", side_effect=_flt_mock)

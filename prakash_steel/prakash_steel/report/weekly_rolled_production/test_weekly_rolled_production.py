@@ -95,6 +95,30 @@ class TestGetData(unittest.TestCase):
 		self.assertEqual(result, [])
 		query = mock_frappe.db.sql.call_args[0][0]
 		self.assertIn("fw.docstatus = 1", query)
+		self.assertIn("wo.docstatus = 1", query)
+		self.assertIn("wo.custom_rolled_production = 1", query)
+
+	def test_work_order_is_default_source(self):
+		_, mock_frappe = self._get_data({}, [])
+		query = mock_frappe.db.sql.call_args[0][0]
+		self.assertIn("from `tabWork Order` wo", query)
+		self.assertIn("wo.production_item as item_code", query)
+		self.assertIn("wo.produced_qty as actual_qty", query)
+		self.assertIn("date(wo.actual_start_date) as production_date", query)
+		self.assertIn("wo.name as production_plan", query)
+		self.assertIn("'Work Order' as production_plan_type", query)
+		self.assertIn("union all", query)
+
+	def test_work_order_vendor_name_comes_from_sales_order_customer(self):
+		_, mock_frappe = self._get_data({}, [])
+		query = mock_frappe.db.sql.call_args[0][0]
+		self.assertIn("left join `tabSales Order` so on so.name = wo.sales_order", query)
+		self.assertIn("coalesce(so.customer_name, '') as vendor_name", query)
+
+	def test_work_order_item_code_filter_applied_when_given(self):
+		_, mock_frappe = self._get_data({"item_code": "60mm Round C4"}, [])
+		query = mock_frappe.db.sql.call_args[0][0]
+		self.assertIn("wo.production_item = %(item_code)s", query)
 
 	def test_rolled_plan_filter_always_applied(self):
 		_, mock_frappe = self._get_data({}, [])

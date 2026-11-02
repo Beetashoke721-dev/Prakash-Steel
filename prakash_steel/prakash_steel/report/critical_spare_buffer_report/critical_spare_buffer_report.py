@@ -5,9 +5,10 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 from prakash_steel.prakash_steel.report.po_recomendation_for_psp.po_recomendation_for_psp import (
+	_round_up_2dp,
 	get_mrq_map,
 	get_open_po_map,
-	get_stock_map,
+	get_planning_stock_map,
 )
 
 
@@ -105,7 +106,7 @@ def get_data() -> list[dict]:
 		return []
 
 	item_codes = {d.item_code for d in items}
-	stock_map = get_stock_map(item_codes)
+	stock_map = get_planning_stock_map(item_codes)
 	open_po_map = get_open_po_map()
 	mrq_map = get_mrq_map()
 
@@ -117,7 +118,7 @@ def get_data() -> list[dict]:
 		on_order = flt(open_po_map.get(item_code, 0))
 		mrq = flt(mrq_map.get(item_code, 0))
 		order_recommendation = max(0, tog - on_hand_stock - on_order - mrq)
-		on_hand_status_value = round((on_hand_stock / tog) * 100, 2) if tog else 0
+		on_hand_status_value = _round_up_2dp((on_hand_stock / tog) * 100) if tog else 0
 		on_hand_status = f"{on_hand_status_value:.2f}%"
 		moq = flt(item.moq)
 		net_order_recommendation = max(order_recommendation, moq)

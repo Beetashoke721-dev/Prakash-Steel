@@ -10,7 +10,8 @@
   "warehouse",
   "top_of_green",
   "top_of_yellow",
-  "top_of_red"
+  "top_of_red",
+  "last_saved_tog"
  ],
  "fields": [
   {
@@ -43,13 +44,20 @@
    "in_list_view": 1,
    "label": "Warehouse",
    "options": "Warehouse"
+  },
+  {
+   "description": "Last TOG saved from the CS Bright / Rolled TOG page for this warehouse",
+   "fieldname": "last_saved_tog",
+   "fieldtype": "Int",
+   "label": "Last Saved TOG",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-18 12:01:10.855201",
+ "modified": "2026-10-23 11:30:00.000000",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "CS Tog table",

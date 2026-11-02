@@ -175,7 +175,11 @@ class CustomSalesInvoice(SalesInvoice):
 			)
 
 	def before_submit(self):
-		"""Run stock-entry (conditional) before submit."""
+		"""Validate attachment, then run stock-entry (conditional) before submit."""
+		from prakash_steel.utils.attachment_validation import validate_mandatory_attachment
+
+		validate_mandatory_attachment(self)
+
 		custom_field_value = self.get("custom_stock_in_for_weight_variance")
 
 		if custom_field_value and custom_field_value not in [None, "", 0, "0", "No"]:

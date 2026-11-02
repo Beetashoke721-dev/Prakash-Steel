@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
  "autoname": "format: {unsecured_loan} / {financial_year}",
  "creation": "2026-03-02 14:33:52.403266",
@@ -15,8 +16,7 @@
   "column_break_pztt",
   "to_date",
   "period_per_annum_interest__section",
-  "interest_percent",
-  "amount"
+  "table_yqep"
  ],
  "fields": [
   {
@@ -68,26 +68,19 @@
    "label": "Period Per Annum (Interest %)"
   },
   {
-   "fieldname": "interest_percent",
-   "fieldtype": "Percent",
-   "label": "Interest % Per Annum",
-   "precision": "3"
-  },
-  {
-   "fieldname": "amount",
-   "fieldtype": "Currency",
-   "hidden": 1,
-   "label": "Amount"
+   "fieldname": "table_yqep",
+   "fieldtype": "Table",
+   "options": "Unsecured loan table"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-19 10:42:36.516606",
+ "modified": "2026-07-27 15:55:39.662369",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "Unsecured Loans and Transaction",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

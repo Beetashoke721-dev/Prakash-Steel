@@ -1,0 +1,35 @@
+{
+ "content": null,
+ "creation": "2026-09-18 11:29:43.058120",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-09-29 15:46:30.718132",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "manual-bright-plan-p",
+ "owner": "Administrator",
+ "page_name": "manual-bright-plan-p",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Manufacturing Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Sales Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Manual Bright Plan"
+}

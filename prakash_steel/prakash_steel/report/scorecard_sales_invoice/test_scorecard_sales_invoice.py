@@ -16,7 +16,7 @@ class TestGetColumns(unittest.TestCase):
 
     def test_column_count(self):
         from prakash_steel.prakash_steel.report.scorecard_sales_invoice.scorecard_sales_invoice import get_columns
-        self.assertEqual(len(get_columns()), 11)
+        self.assertEqual(len(get_columns()), 12)
 
     def test_required_fieldnames(self):
         from prakash_steel.prakash_steel.report.scorecard_sales_invoice.scorecard_sales_invoice import get_columns
@@ -67,6 +67,15 @@ class TestGetData(unittest.TestCase):
         self.assertIn("si.docstatus = 1", query)
 
     @patch(MOD + ".frappe")
+    def test_always_excludes_items_without_item_type(self, mock_frappe):
+        from prakash_steel.prakash_steel.report.scorecard_sales_invoice.scorecard_sales_invoice import get_data
+        mock_frappe.db.sql.return_value = []
+        get_data({})
+        call_args = mock_frappe.db.sql.call_args
+        query = call_args[0][0]
+        self.assertIn("COALESCE(i.custom_item_type, '') != ''", query)
+
+    @patch(MOD + ".frappe")
     def test_from_date_filter_appended(self, mock_frappe):
         from prakash_steel.prakash_steel.report.scorecard_sales_invoice.scorecard_sales_invoice import get_data
         mock_frappe.db.sql.return_value = []
@@ -105,8 +114,8 @@ class TestGetData(unittest.TestCase):
         get_data({})
         query = mock_frappe.db.sql.call_args[0][0]
         # Only the mandatory docstatus=1 condition should be present
-        self.assertNotIn("si.customer", query)
-        self.assertNotIn("si.company", query)
+        self.assertNotIn("si.customer = %(customer)s", query)
+        self.assertNotIn("si.company = %(company)s", query)
 
     @patch(MOD + ".frappe")
     def test_item_code_filter_appended(self, mock_frappe):

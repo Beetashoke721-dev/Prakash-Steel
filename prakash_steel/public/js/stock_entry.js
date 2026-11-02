@@ -3,6 +3,7 @@
 
 frappe.ui.form.on('Stock Entry', {
     refresh: function (frm) {
+        setup_attachment_guard(frm);
         // Toggle vehicle_no mandatory status based on stock_entry_type
         toggle_vehicle_no_mandatory(frm);
     },
@@ -33,6 +34,10 @@ frappe.ui.form.on('Stock Entry', {
         }
     }
 });
+
+function setup_attachment_guard(frm) {
+	prakash_steel.attachment_utils.prevent_attachment_deletion(frm);
+}
 
 function toggle_vehicle_no_mandatory(frm) {
     // Get stock_entry_type (could be stock_entry_type or purpose field)

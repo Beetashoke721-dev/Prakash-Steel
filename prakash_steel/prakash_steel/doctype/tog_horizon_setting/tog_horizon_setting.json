@@ -1,45 +1,392 @@
 {
  "actions": [],
- "allow_bulk_edit": 1,
- "allow_rename": 1,
  "creation": "2026-07-16 16:50:27.461108",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "from_month",
+  "bb_section",
+  "item_type",
   "column_break_zyeh",
-  "to_month",
-  "column_break_itzv"
+  "bb_from_date",
+  "column_break_itzv",
+  "bb_to_date",
+  "column_break_ypmo",
+  "bb_last_fos",
+  "column_break_nwuq",
+  "bb_updated_fos",
+  "section_break_stng",
+  "item_type_2",
+  "column_break_vsim",
+  "rb_from_date",
+  "column_break_phcw",
+  "rb_to_date",
+  "column_break_lszp",
+  "rb_last_fos",
+  "column_break_daxp",
+  "rb_updated_fos",
+  "bo_section",
+  "item_type_3",
+  "column_break_pjhz",
+  "bo_from_date",
+  "column_break_gurm",
+  "bo_to_date",
+  "column_break_svno",
+  "bo_last_fos",
+  "column_break_lbzx",
+  "bo_updated_fos",
+  "rm_section",
+  "item_type_4",
+  "column_break_dzep",
+  "rm_from_date",
+  "column_break_erng",
+  "rm_to_date",
+  "column_break_rvid",
+  "rm_last_fos",
+  "column_break_yiyi",
+  "rm_updated_fos",
+  "traded_section",
+  "item_type_5",
+  "column_break_teyy",
+  "traded_from_date",
+  "column_break_coqe",
+  "traded_to_date",
+  "column_break_qvou",
+  "traded_last_fos",
+  "column_break_vylb",
+  "traded_updated_fos",
+  "cs_section",
+  "item_type_6",
+  "column_break_jabn",
+  "cs_from_date",
+  "column_break_mocg",
+  "cs_to_date",
+  "column_break_kpds",
+  "cs_last_fos",
+  "column_break_eaaz",
+  "cs_updated_fos"
  ],
  "fields": [
-  {
-   "fieldname": "from_month",
-   "fieldtype": "Date",
-   "in_list_view": 1,
-   "label": "From Date",
-   "reqd": 1
-  },
   {
    "fieldname": "column_break_zyeh",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "to_month",
-   "fieldtype": "Date",
-   "in_list_view": 1,
-   "label": "To Date",
+   "fieldname": "column_break_itzv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ypmo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_stng",
+   "fieldtype": "Section Break",
+   "label": "RB"
+  },
+  {
+   "fieldname": "column_break_vsim",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_phcw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_lszp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_type",
+   "fieldtype": "Select",
+   "label": "Item Type",
+   "options": "BB",
    "reqd": 1
   },
   {
-   "fieldname": "column_break_itzv",
+   "fieldname": "bb_from_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "BB From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bb_to_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "BB To Date",
+   "reqd": 1
+  },
+  {
+   "default": "30",
+   "fieldname": "bb_last_fos",
+   "fieldtype": "Int",
+   "label": "BB Last FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_nwuq",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bb_updated_fos",
+   "fieldtype": "Int",
+   "label": "BB Updated FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_type_2",
+   "fieldtype": "Select",
+   "label": "Item Type",
+   "options": "RB",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rb_from_date",
+   "fieldtype": "Date",
+   "label": "RB From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rb_to_date",
+   "fieldtype": "Date",
+   "label": "RB To Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rb_last_fos",
+   "fieldtype": "Int",
+   "label": "RB Last FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_daxp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rb_updated_fos",
+   "fieldtype": "Int",
+   "label": "RB Updated FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bb_section",
+   "fieldtype": "Section Break",
+   "label": "BB"
+  },
+  {
+   "fieldname": "bo_section",
+   "fieldtype": "Section Break",
+   "label": "BO"
+  },
+  {
+   "fieldname": "item_type_3",
+   "fieldtype": "Select",
+   "label": "Item Type",
+   "options": "BO",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_pjhz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bo_from_date",
+   "fieldtype": "Date",
+   "label": "BO From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_gurm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bo_to_date",
+   "fieldtype": "Date",
+   "label": "BO To Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_svno",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bo_last_fos",
+   "fieldtype": "Int",
+   "label": "BO Last FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_lbzx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bo_updated_fos",
+   "fieldtype": "Int",
+   "label": "BO Updated FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rm_section",
+   "fieldtype": "Section Break",
+   "label": "RM"
+  },
+  {
+   "fieldname": "item_type_4",
+   "fieldtype": "Select",
+   "label": "Item Type",
+   "options": "RM",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_dzep",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rm_from_date",
+   "fieldtype": "Date",
+   "label": "RM From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_erng",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rm_to_date",
+   "fieldtype": "Date",
+   "label": "RM To Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_rvid",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rm_last_fos",
+   "fieldtype": "Int",
+   "label": "RM Last FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_yiyi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rm_updated_fos",
+   "fieldtype": "Int",
+   "label": "RM Updated FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "traded_section",
+   "fieldtype": "Section Break",
+   "label": "Traded"
+  },
+  {
+   "fieldname": "item_type_5",
+   "fieldtype": "Select",
+   "label": "Item Type",
+   "options": "Traded",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_teyy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "traded_from_date",
+   "fieldtype": "Date",
+   "label": "Traded From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_coqe",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "traded_to_date",
+   "fieldtype": "Date",
+   "label": "Traded To Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_qvou",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "traded_last_fos",
+   "fieldtype": "Int",
+   "label": "Traded Last FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_vylb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "traded_updated_fos",
+   "fieldtype": "Int",
+   "label": "Traded Updated FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cs_section",
+   "fieldtype": "Section Break",
+   "label": "CS"
+  },
+  {
+   "fieldname": "item_type_6",
+   "fieldtype": "Select",
+   "label": "Item Type",
+   "options": "CS",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_jabn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cs_from_date",
+   "fieldtype": "Date",
+   "label": "CS From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_mocg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cs_to_date",
+   "fieldtype": "Date",
+   "label": "CS To Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_kpds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cs_last_fos",
+   "fieldtype": "Int",
+   "label": "CS Last FOS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_eaaz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cs_updated_fos",
+   "fieldtype": "Int",
+   "label": "CS Updated FOS",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-16 16:51:31.293718",
+ "modified": "2026-10-27 11:46:38.285380",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "TOG Horizon Setting",

@@ -79,11 +79,48 @@ def get_machine_wise_monthly_data(fiscal_year=None, machine_name=None) -> list[d
         as_dict=True,
     )
 
+    # Bright Bar Production above covers the documents entered before the Job
+    # Card flow went live; those keep their own fg_weight. From the point Job
+    # Cards started being used, finished weight comes off the Job Card instead,
+    # so both sources are summed together (they hold different records, not
+    # duplicates of each other). Job Card `workstation` carries the machine.
+    job_card_conditions = ""
+    job_card_params = {
+        "from_date": fiscal_year_doc.year_start_date,
+        "to_date": fiscal_year_doc.year_end_date,
+    }
+    if machine_name:
+        job_card_conditions = "AND jc.workstation = %(machine_name)s"
+        job_card_params["machine_name"] = machine_name
+
+    job_card_rows = frappe.db.sql(
+        f"""
+        SELECT
+            COALESCE(DATE(jc.actual_start_date), jc.posting_date) AS production_date,
+            MONTH(COALESCE(DATE(jc.actual_start_date), jc.posting_date)) AS month_number,
+            jc.workstation AS machine_name,
+            jc.total_completed_qty AS fg_weight
+        FROM `tabJob Card` jc
+        WHERE jc.docstatus = 1
+          AND jc.custom_bright_production = 1
+          AND COALESCE(DATE(jc.actual_start_date), jc.posting_date)
+              BETWEEN %(from_date)s AND %(to_date)s
+          AND jc.workstation IS NOT NULL
+          AND jc.workstation != ''
+          {job_card_conditions}
+        ORDER BY production_date ASC
+        """,
+        job_card_params,
+        as_dict=True,
+    )
+
+    production_rows = production_rows + job_card_rows
+
     used_machines = []
     for row in production_rows:
-        machine_name = row.get("machine_name")
-        if machine_name and machine_name not in used_machines:
-            used_machines.append(machine_name)
+        row_machine = row.get("machine_name")
+        if row_machine and row_machine not in used_machines:
+            used_machines.append(row_machine)
 
     for machine in used_machines:
         if machine not in machine_names:
@@ -91,13 +128,21 @@ def get_machine_wise_monthly_data(fiscal_year=None, machine_name=None) -> list[d
 
     matrix = {
         period["month_number"]: {
-            machine: {"fg_weight": 0, "amount": 0}
+            machine: {"fg_weight": 0, "amount": 0, "rate": 0}
             for machine in machine_names
         }
         for period in month_periods
     }
 
     rate_lookup = _build_machine_rate_lookup(machine_names)
+
+    for period in month_periods:
+        month_no = period["month_number"]
+        for machine in machine_names:
+            matrix[month_no][machine]["rate"] = _get_rate_for_date(
+                rate_lookup.get(machine, []), period["end_date"]
+            )
+
     for row in production_rows:
         month_number = cint(row.get("month_number"))
         machine_name = row.get("machine_name")
@@ -114,6 +159,7 @@ def get_machine_wise_monthly_data(fiscal_year=None, machine_name=None) -> list[d
         row = {"month": period["label"], "month_number": month_no}
         for machine in machine_names:
             row[f"{machine}__fg_weight"] = matrix[month_no][machine]["fg_weight"]
+            row[f"{machine}__rate"] = matrix[month_no][machine]["rate"]
             row[f"{machine}__amount"] = matrix[month_no][machine]["amount"]
         data.append(row)
 
@@ -161,13 +207,15 @@ def _get_fiscal_month_periods(fiscal_year_doc) -> list:
     periods = []
     current = fiscal_year_doc.year_start_date
     for _ in range(12):
+        next_month = frappe.utils.add_months(current, 1)
         periods.append(
             {
                 "month_number": current.month,
                 "label": current.strftime("%b-%Y"),
+                "end_date": frappe.utils.add_days(next_month, -1),
             }
         )
-        current = frappe.utils.add_months(current, 1)
+        current = next_month
     return periods
 
 
@@ -213,6 +261,17 @@ def _get_rate_for_date(rate_rows, production_date) -> float:
     return applicable_rate
 
 
+def _format_indian(value, decimals=2) -> str:
+    """Group digits the Indian way: 12,34,567.89 — a 3-digit tail, then 2-digit groups."""
+    num = flt(value, decimals)
+    sign = "-" if num < 0 else ""
+    whole, _sep, frac = f"{abs(num):.{decimals}f}".partition(".")
+    if len(whole) > 3:
+        head, tail = whole[:-3], whole[-3:]
+        whole = re.sub(r"(?<=\d)(?=(\d{2})+$)", ",", head) + "," + tail
+    return sign + whole + (f".{frac}" if frac else "")
+
+
 def _safe_export_filename_part(value) -> str:
     return re.sub(r"[^\w\-.]+", "_", (value or "") or "")[:120] or "export"
 
@@ -221,8 +280,9 @@ def _build_flat_sheet_rows(machines, rows) -> list[dict]:
     header = [_("Month")]
     for machine in machines:
         header.append(f"{machine} — {_('FG Weight')}")
+        header.append(f"{machine} — {_('Rate')}")
         header.append(f"{machine} — {_('Amount')}")
-    header.extend([_("Total FG Weight"), _("Total Amount")])
+    header.extend([_("Total FG Weight"), _("Total Rate"), _("Total Amount")])
 
     data_rows = []
     for row in rows:
@@ -232,10 +292,12 @@ def _build_flat_sheet_rows(machines, rows) -> list[dict]:
         for machine in machines:
             fg = flt(row.get(f"{machine}__fg_weight"))
             amt = flt(row.get(f"{machine}__amount"))
+            rate = flt(row.get(f"{machine}__rate"), 2)
             total_fg += fg
             total_amt += amt
-            out.extend([fg, amt])
-        out.extend([flt(total_fg), flt(total_amt, 2)])
+            out.extend([fg, rate, amt])
+        total_rate = flt(total_amt / total_fg, 2) if total_fg else 0.0
+        out.extend([flt(total_fg), total_rate, flt(total_amt, 2)])
         data_rows.append(out)
 
     return header, data_rows
@@ -289,11 +351,14 @@ def export_machine_wise_monthly_pdf(fiscal_year=None, machine_name=None) -> dict
     for idx, machine in enumerate(machines):
         border_right = "border-right:2px solid #555;" if idx < len(machines) - 1 else ""
         top_cells.append(
-            f'<th colspan="2" style="border:1px solid #333;padding:6px;background:#e9ecef;{border_right}">'
+            f'<th colspan="3" style="border:1px solid #333;padding:6px;background:#e9ecef;{border_right}">'
             f"{escape_html(machine)}</th>"
         )
         sub_cells.append(
             f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;">{escape_html(_("FG Weight"))}</th>'
+        )
+        sub_cells.append(
+            f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;">{escape_html(_("Rate"))}</th>'
         )
         sub_cells.append(
             f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;{border_right}">'
@@ -301,12 +366,15 @@ def export_machine_wise_monthly_pdf(fiscal_year=None, machine_name=None) -> dict
         )
 
     top_cells.append(
-        f'<th colspan="2" style="border:1px solid #333;padding:6px;background:#e9ecef;border-left:2px solid #555;">'
+        f'<th colspan="3" style="border:1px solid #333;padding:6px;background:#e9ecef;border-left:2px solid #555;">'
         f"{escape_html(_('Total'))}</th>"
     )
     sub_cells.append(
         '<th style="border:1px solid #333;padding:4px;background:#f1f3f5;border-left:2px solid #555;">'
         f"{escape_html(_('FG Weight'))}</th>"
+    )
+    sub_cells.append(
+        f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;">{escape_html(_("Rate"))}</th>'
     )
     sub_cells.append(
         f'<th style="border:1px solid #333;padding:4px;background:#f1f3f5;">{escape_html(_("Amount"))}</th>'
@@ -323,24 +391,34 @@ def export_machine_wise_monthly_pdf(fiscal_year=None, machine_name=None) -> dict
         for idx, machine in enumerate(machines):
             fg = flt(row.get(f"{machine}__fg_weight"))
             amt = flt(row.get(f"{machine}__amount"))
+            rate = flt(row.get(f"{machine}__rate"), 2)
             total_fg += fg
             total_amt += amt
             border_right = "border-right:2px solid #555;" if idx < len(machines) - 1 else ""
             cells.append(
-                f'<td style="border:1px solid #ccc;padding:4px;text-align:center;{border_right}">'
-                f"{escape_html(str(int(round(fg))))}</td>"
+                f'<td style="border:1px solid #ccc;padding:4px;text-align:center;">'
+                f"{escape_html(_format_indian(fg, 0))}</td>"
+            )
+            cells.append(
+                f'<td style="border:1px solid #ccc;padding:4px;text-align:right;">'
+                f"{escape_html(_format_indian(rate))}</td>"
             )
             cells.append(
                 f'<td style="border:1px solid #ccc;padding:4px;text-align:right;{border_right}">'
-                f"{escape_html(f'{flt(amt, 2):,.2f}')}</td>"
+                f"{escape_html(_format_indian(amt))}</td>"
             )
+        total_rate = flt(total_amt / total_fg, 2) if total_fg else 0.0
         cells.append(
             '<td style="border:1px solid #ccc;padding:4px;text-align:center;border-left:2px solid #555;font-weight:600;">'
-            f"{escape_html(str(int(round(total_fg))))}</td>"
+            f"{escape_html(_format_indian(total_fg, 0))}</td>"
         )
         cells.append(
             '<td style="border:1px solid #ccc;padding:4px;text-align:right;font-weight:600;">'
-            f"{escape_html(f'{flt(total_amt, 2):,.2f}')}</td>"
+            f"{escape_html(_format_indian(total_rate))}</td>"
+        )
+        cells.append(
+            '<td style="border:1px solid #ccc;padding:4px;text-align:right;font-weight:600;">'
+            f"{escape_html(_format_indian(total_amt))}</td>"
         )
         body_html.append(f"<tr>{''.join(cells)}</tr>")
 

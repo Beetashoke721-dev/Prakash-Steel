@@ -5,6 +5,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, today
 
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import get_planning_stock_map
+
 
 def calculate_sku_type(buffer_flag, item_type) -> str | None:
 	"""Calculate SKU type based on buffer flag and item type"""
@@ -189,26 +191,8 @@ def get_data(filters=None) -> list[dict]:
 	# Get item codes
 	item_codes = [item.item_code for item in items]
 
-	# Get stock for all items (sum across all warehouses)
-	if item_codes:
-		stock_data = frappe.db.sql(
-			"""
-			SELECT
-				item_code,
-				SUM(actual_qty) as stock
-			FROM
-				`tabBin`
-			WHERE
-				item_code IN %s
-			GROUP BY
-				item_code
-			""",
-			(tuple(item_codes),),
-			as_dict=True,
-		)
-		stock_map = {d.item_code: flt(d.stock) for d in stock_data}
-	else:
-		stock_map = {}
+	# Get stock for all items, restricted to Planning Engine Warehouse Setup
+	stock_map = get_planning_stock_map(item_codes) if item_codes else {}
 
 	# Get qualified demand map (open SO quantity)
 	qualified_demand_map = get_qualified_demand_map(filters)

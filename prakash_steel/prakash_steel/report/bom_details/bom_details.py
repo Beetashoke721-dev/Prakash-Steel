@@ -104,12 +104,12 @@ def get_columns() -> list[dict]:
 		{"label": _("Parent Item Type"), "fieldname": "parent_item_type", "fieldtype": "Data", "width": 90},
 		{"label": _("Parent Item Code"), "fieldname": "parent_item_code", "fieldtype": "Link", "options": "Item", "width": 180},
 		{"label": _("Parent Item Name"), "fieldname": "parent_item_name", "fieldtype": "Data", "width": 200},
-		{"label": _("Qty"), "fieldname": "parent_qty", "fieldtype": "Float", "width": 80},
+		{"label": _("Qty"), "fieldname": "parent_qty", "fieldtype": "Float", "precision": 4, "width": 80},
 		{"label": _("UOM"), "fieldname": "parent_uom", "fieldtype": "Data", "width": 80},
 		{"label": _("Child Item Type"), "fieldname": "child_item_type", "fieldtype": "Data", "width": 90},
 		{"label": _("Child Item Code"), "fieldname": "child_item_code", "fieldtype": "Link", "options": "Item", "width": 180},
 		{"label": _("Child Item Name"), "fieldname": "child_item_name", "fieldtype": "Data", "width": 200},
-		{"label": _("Qty (Items)"), "fieldname": "child_qty", "fieldtype": "Float", "width": 80},
+		{"label": _("Qty (Items)"), "fieldname": "child_qty", "fieldtype": "Float", "precision": 4, "width": 80},
 		{"label": _("UOM (Items)"), "fieldname": "child_uom", "fieldtype": "Data", "width": 80},
 		{"label": _("Is Active"), "fieldname": "is_active", "fieldtype": "Check", "width": 70},
 		{"label": _("Is Default"), "fieldname": "is_default", "fieldtype": "Check", "width": 70},
@@ -166,7 +166,6 @@ def get_data(filters: Optional[dict]) -> list[dict]:
 			"name",
 			"item as parent_item_code",
 			"item_name as parent_item_name",
-			"custom_item_type as parent_item_type",
 			"quantity as parent_qty",
 			"uom as parent_uom",
 			"is_active",
@@ -183,15 +182,19 @@ def get_data(filters: Optional[dict]) -> list[dict]:
 		children = frappe.get_all(
 			"BOM Item",
 			filters={"parent": bom["name"]},
-			fields=["item_code as child_item_code", "item_name as child_item_name", "custom_item_type as child_item_type", "qty as child_qty", "uom as child_uom"],
+			fields=["item_code as child_item_code", "item_name as child_item_name", "qty as child_qty", "uom as child_uom"],
 			order_by="idx",
 		)
+
+		# Item type comes from the Item master, not the BOM's fetched copy: the BOM value is
+		# only fetched at creation and goes stale when the Item's type is changed later.
+		parent_item_type = frappe.get_cached_value("Item", bom.get("parent_item_code"), "custom_item_type") or ""
 
 		if not children:
 			data.append(
 				{
 					"bom_name": bom["name"],
-					"parent_item_type": bom.get("parent_item_type") or "",
+					"parent_item_type": parent_item_type,
 					"parent_item_code": bom.get("parent_item_code") or "",
 					"parent_item_name": frappe.get_cached_value("Item", bom.get("parent_item_code"), "item_name") or bom.get("parent_item_name") or "",
 					"parent_qty": bom.get("parent_qty") or 0,
@@ -210,12 +213,12 @@ def get_data(filters: Optional[dict]) -> list[dict]:
 				data.append(
 					{
 						"bom_name": bom["name"],
-						"parent_item_type": bom.get("parent_item_type") or "",
+						"parent_item_type": parent_item_type,
 						"parent_item_code": bom.get("parent_item_code") or "",
 						"parent_item_name": frappe.get_cached_value("Item", bom.get("parent_item_code"), "item_name") or bom.get("parent_item_name") or "",
 						"parent_qty": bom.get("parent_qty") or 0,
 						"parent_uom": bom.get("parent_uom") or "",
-						"child_item_type": child.get("child_item_type") or "",
+						"child_item_type": frappe.get_cached_value("Item", child.get("child_item_code"), "custom_item_type") or "",
 						"child_item_code": child.get("child_item_code") or "",
 						"child_item_name": frappe.get_cached_value("Item", child.get("child_item_code"), "item_name") or child.get("child_item_name") or "",
 						"child_qty": child.get("child_qty") or 0,

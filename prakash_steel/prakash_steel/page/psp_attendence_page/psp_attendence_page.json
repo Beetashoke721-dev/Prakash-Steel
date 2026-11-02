@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-06-11 11:37:47.146345",
+ "modified": "2026-08-24 16:54:55.288681",
  "modified_by": "Administrator",
  "module": "Prakash Steel",
  "name": "psp-attendence-page",
@@ -31,5 +31,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 1,
- "title": "Psp Attendence Summary"
+ "title": "PSP Attendance Summary"
 }

@@ -14,6 +14,10 @@ from prakash_steel.prakash_steel.report.rolled_plan.rolled_plan import (
 	get_parent_bom_map,
 	get_rbmto_so_detail_map,
 )
+from prakash_steel.prakash_steel.report.po_recomendation_for_psp.data_fetchers import (
+	get_planning_stock_map,
+	get_wip_map as get_psp_wip_map,
+)
 
 
 def execute(filters=None) -> tuple[list, list]:
@@ -95,7 +99,7 @@ def get_data(filters) -> list[dict]:
 		WHERE
 			mr.material_request_type = 'Manufacture'
 			AND mr.docstatus = 1
-			AND mr.status NOT IN ('Ordered', 'Received')
+			AND mr.status NOT IN ('Ordered', 'Received', 'Stopped')
 			AND IFNULL(mri.ordered_qty, 0) < mri.qty
 		ORDER BY
 			mr.transaction_date DESC, mr.name
@@ -250,28 +254,17 @@ def _compute_order_status(delivery_date, transaction_date) -> str | None:
 
 
 def get_stock_map(item_codes) -> dict:
-	if not item_codes:
-		return {}
-	result = frappe.db.sql(
-		"""
-		SELECT item_code, SUM(actual_qty) AS stock
-		FROM `tabBin`
-		WHERE item_code IN %s
-		GROUP BY item_code
-		""",
-		(item_codes,),
-		as_dict=True,
-	)
-	return {r.item_code: flt(r.stock) for r in result}
+	return get_planning_stock_map(item_codes)
 
 
 # ---------------------------------------------------------------------------
-# WIP  (static 0 until logic is confirmed)
+# WIP  (same logic as PO Recomendation for PSP)
 # ---------------------------------------------------------------------------
 
 
 def get_wip_map(item_codes) -> dict:
-	return {item: 0.0 for item in item_codes}
+	wip_map = get_psp_wip_map()
+	return {item: flt(wip_map.get(item, 0)) for item in item_codes}
 
 
 # ---------------------------------------------------------------------------
@@ -558,7 +551,7 @@ def get_open_so_map(item_codes) -> dict:
 def get_previous_mr_qty_map(rows) -> dict:
 	"""
 	Returns {(mr_no, item_code): previous_pending_qty}.
-	Only counts MRs whose status is not Ordered or Received.
+	Only counts MRs whose status is not Ordered, Received, or Stopped.
 	"""
 	item_codes = list({r.item_code for r in rows})
 	if not item_codes:
@@ -575,7 +568,7 @@ def get_previous_mr_qty_map(rows) -> dict:
 		INNER JOIN `tabMaterial Request Item` mri ON mri.parent = mr.name
 		WHERE mr.material_request_type = 'Manufacture'
 		  AND mr.docstatus = 1
-		  AND mr.status NOT IN ('Ordered', 'Received')
+		  AND mr.status NOT IN ('Ordered', 'Received', 'Stopped')
 		  AND mri.item_code IN %s
 		""",
 		(item_codes,),
@@ -653,7 +646,7 @@ def get_item_breakdown(mr_name) -> list[dict]:
 		INNER JOIN `tabMaterial Request Item` mri ON mri.parent = mr.name
 		WHERE mr.material_request_type = 'Manufacture'
 		  AND mr.docstatus = 1
-		  AND mr.status NOT IN ('Ordered', 'Received')
+		  AND mr.status NOT IN ('Ordered', 'Received', 'Stopped')
 		  AND mri.item_code IN %s
 		""",
 		(item_codes,),

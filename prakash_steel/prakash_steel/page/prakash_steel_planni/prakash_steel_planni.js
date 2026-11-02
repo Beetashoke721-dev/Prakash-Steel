@@ -79,8 +79,8 @@ function load_all_charts(page, $chartsContainer) {
 
 			const skuData = (skuRes && skuRes.message) ? skuRes.message : {};
 
-			// 1) BBMTA → RBMTA → BOTA → RMTA → TRMTA
-			['BBMTA', 'RBMTA', 'BOTA', 'RMTA', 'TRMTA'].forEach((sku) => {
+			// 1) BBMTA → RBMTA → RMTA → BOTA → TRMTA
+			['BBMTA', 'RBMTA', 'RMTA', 'BOTA', 'TRMTA'].forEach((sku) => {
 				if (skuData[sku] && skuData[sku].colours && skuData[sku].colours.length) {
 					const $card = createChartCard(sku, skuData[sku], colorMap);
 					$chartsContainer.append($card);

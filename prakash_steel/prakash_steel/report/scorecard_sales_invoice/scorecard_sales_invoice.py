@@ -87,11 +87,17 @@ def get_columns() -> list[dict]:
 			"width": 120,
 			"align": "left",
 		},
+		{
+			"label": "Expected Delivery Date",
+			"fieldname": "expected_delivery_date",
+			"fieldtype": "Date",
+			"width": 160,
+		},
 	]
 
 
 def get_data(filters) -> list[dict]:
-	conditions = ["si.docstatus = 1"]
+	conditions = ["si.docstatus = 1", "COALESCE(i.custom_item_type, '') != ''"]
 
 	if filters.get("company"):
 		conditions.append("si.company = %(company)s")
@@ -135,7 +141,8 @@ def get_data(filters) -> list[dict]:
 			sii.item_code,
 			sii.item_name,
 			ROUND(sii.qty, 0) AS qty,
-			sii.rate AS item_price
+			sii.rate AS item_price,
+			sii.expected_delivery_date AS expected_delivery_date
 		FROM `tabSales Invoice` si
 		INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
 		LEFT JOIN `tabCustomer` cust ON cust.name = si.customer

@@ -1,0 +1,309 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series: [naming_series]",
+ "creation": "2026-09-10 10:29:33.307862",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_pcep",
+  "amended_from",
+  "status",
+  "naming_series",
+  "posting_date",
+  "column_break_mkdd",
+  "column_break_wvpb",
+  "section_break_unrj",
+  "fixed_asset",
+  "make_model",
+  "serial_no",
+  "column_break_vgjj",
+  "item",
+  "asset_value",
+  "column_break_gtzj",
+  "installation_date",
+  "location",
+  "section_break_zotb",
+  "supplier",
+  "amc_provider",
+  "amc_type",
+  "estimated_service_date",
+  "column_break_cnrt",
+  "amc_start_date",
+  "amc_end_date",
+  "column_break_omin",
+  "amc_charges",
+  "contract_period",
+  "section_break_cywi",
+  "total_services_available",
+  "column_break_thmt",
+  "services_availed",
+  "column_break_usvs",
+  "services_remaining"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_pcep",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "AMC",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_mkdd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_unrj",
+   "fieldtype": "Section Break",
+   "label": "Asset Details"
+  },
+  {
+   "fieldname": "column_break_vgjj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_gtzj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fixed_asset",
+   "fieldtype": "Link",
+   "label": "Fixed Asset",
+   "options": "Asset",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "fixed_asset.asset_name",
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fetch_from": "fixed_asset.total_asset_cost",
+   "fieldname": "asset_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Asset Value",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "fixed_asset.available_for_use_date",
+   "fieldname": "installation_date",
+   "fieldtype": "Date",
+   "label": "Installation Date",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "fixed_asset.location",
+   "fieldname": "location",
+   "fieldtype": "Link",
+   "label": "Location",
+   "options": "Location",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_zotb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_cnrt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amc_start_date",
+   "fieldtype": "Date",
+   "label": "AMC Start Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amc_end_date",
+   "fieldtype": "Date",
+   "label": "AMC End Date"
+  },
+  {
+   "fieldname": "column_break_omin",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amc_charges",
+   "fieldtype": "Currency",
+   "label": "AMC Charges",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_cywi",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_services_available",
+   "fieldtype": "Int",
+   "label": "Total Services Available",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_thmt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_usvs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "services_availed",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Services Availed",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "services_remaining",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Services Remaining",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Status",
+   "options": "\nDraft\nActive\nExpired\nClosed"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "AMC-.FY.-.####"
+  },
+  {
+   "fieldname": "amc_type",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "AMC Type",
+   "options": "\nWeekly\nMonthly\nYearly"
+  },
+  {
+   "fieldname": "serial_no",
+   "fieldtype": "Data",
+   "label": "Serial No."
+  },
+  {
+   "fieldname": "make_model",
+   "fieldtype": "Data",
+   "label": "Make / Model"
+  },
+  {
+   "description": "In Days",
+   "fieldname": "contract_period",
+   "fieldtype": "Int",
+   "label": "Contract Period"
+  },
+  {
+   "fieldname": "column_break_wvpb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date"
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "amc_provider",
+   "fieldtype": "Link",
+   "label": "AMC Provider",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "estimated_service_date",
+   "fieldtype": "Date",
+   "label": "Estimated Service date"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-15 14:28:28.514123",
+ "modified_by": "Administrator",
+ "module": "Prakash Steel",
+ "name": "AMC",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Maintenance User",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Maintenance Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "search_fields": "item,serial_no",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

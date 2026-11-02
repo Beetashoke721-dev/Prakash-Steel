@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, today
+from frappe.utils import add_days, flt, today
 
 from prakash_steel.utils.whitelist_permissions import require_permission
 
@@ -59,7 +59,7 @@ def get_columns() -> list[dict]:
 		{
 			"label": _("Actual Qty"),
 			"fieldname": "actual_qty",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"width": 100,
 		},
 		{
@@ -70,9 +70,10 @@ def get_columns() -> list[dict]:
 			"width": 90,
 		},
 		{
-			"label": _("Production Plan"),
+			"label": _("Production Plan/Work Order"),
 			"fieldname": "production_plan",
-			"fieldtype": "Data",
+			"fieldtype": "Dynamic Link",
+			"options": "production_plan_type",
 			"width": 180,
 		},
 		{
@@ -85,25 +86,55 @@ def get_columns() -> list[dict]:
 
 
 def get_data(filters: dict) -> list[dict]:
-	"""Return data for the report."""
+	"""Return data for the report.
+
+	Work Order (flagged custom_rolled_production) is the default source of
+	production data. Finish Weight entries linked to a Rolled Production
+	Plan or Production Planning are unioned in alongside it.
+	"""
 	from_date = filters.get("from_date") or add_days(today(), -6)
 	to_date = filters.get("to_date") or today()
 
-	conditions = [
+	values = {"from_date": from_date, "to_date": to_date}
+
+	wo_conditions = [
+		"wo.docstatus = 1",
+		"wo.custom_rolled_production = 1",
+		"date(wo.actual_start_date) between %(from_date)s and %(to_date)s",
+	]
+	fw_conditions = [
 		"fw.docstatus = 1",
 		"fw.posting_date between %(from_date)s and %(to_date)s",
 		"(fw.production_planning like 'Rolled%%' or fw.production_plan like 'Rolled%%')",
 	]
-	values = {"from_date": from_date, "to_date": to_date}
 
 	if filters.get("item_code"):
-		conditions.append("fw.item_code = %(item_code)s")
 		values["item_code"] = filters["item_code"]
+		wo_conditions.append("wo.production_item = %(item_code)s")
+		fw_conditions.append("fw.item_code = %(item_code)s")
 
-	where_clause = " and ".join(conditions)
+	wo_where_clause = " and ".join(wo_conditions)
+	fw_where_clause = " and ".join(fw_conditions)
 
-	return frappe.db.sql(
+	data = frappe.db.sql(
 		f"""
+		select
+			date(wo.actual_start_date) as production_date,
+			wo.production_item as item_code,
+			i.item_name as item_name,
+			i.custom_category_name as item_group,
+			wo.produced_qty as actual_qty,
+			i.stock_uom as uom,
+			wo.name as production_plan,
+			'Work Order' as production_plan_type,
+			coalesce(so.customer_name, '') as vendor_name
+		from `tabWork Order` wo
+		left join `tabItem` i on i.name = wo.production_item
+		left join `tabSales Order` so on so.name = wo.sales_order
+		where {wo_where_clause}
+
+		union all
+
 		select
 			fw.posting_date as production_date,
 			fw.item_code as item_code,
@@ -112,12 +143,22 @@ def get_data(filters: dict) -> list[dict]:
 			fw.finish_weight as actual_qty,
 			i.stock_uom as uom,
 			coalesce(fw.production_planning, fw.production_plan) as production_plan,
+			case
+				when fw.production_planning is not null then 'Production Planning'
+				else 'Production Plan'
+			end as production_plan_type,
 			'Rolling Mill Production' as vendor_name
 		from `tabFinish Weight` fw
 		left join `tabItem` i on i.name = fw.item_code
-		where {where_clause}
-		order by fw.posting_date desc, fw.name desc
+		where {fw_where_clause}
+
+		order by production_date asc, production_plan_type = 'Work Order' desc
 		""",
 		values,
 		as_dict=True,
 	)
+
+	for row in data:
+		row["actual_qty"] = int(flt(row.get("actual_qty", 0)))
+
+	return data

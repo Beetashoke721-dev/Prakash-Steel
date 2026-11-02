@@ -250,7 +250,7 @@ function generate_mrp_order_recommendations(frm) {
             disable_mr_generation_button(frm);
 
             // Show progress
-            frappe.show_progress(__("Generating MRP Order Recommendations"), 0, __("Queuing job..."));
+            frappe.show_progress(__("Generating MRP Order Recommendations"), 0, 100, __("Queuing job..."));
 
             // Call the API to enqueue the calculation job
             frappe.call({
@@ -272,7 +272,8 @@ function generate_mrp_order_recommendations(frm) {
                             frappe.show_progress(
                                 __("Generating MRP Order Recommendations"),
                                 0,
-                                __("Job queued (ID: {0}). Starting background calculation...", [jobId])
+                                100,
+                                __("Starting background calculation...")
                             );
 
                             // Show initial notification
@@ -336,16 +337,12 @@ function poll_mrp_job_status(jobId, frm) {
                             indicator: "red",
                         });
                     } else if (status === "running") {
-                        // Update progress message with job ID
-                        const progressMsg = __("Processing... (Job ID: {0})", [jobId]);
-                        frappe.show_progress(__("Generating MRP Order Recommendations"), 0, progressMsg);
+                        frappe.show_progress(__("Generating MRP Order Recommendations"), 0, 100, __("Processing..."));
                     } else if (status === "queued") {
-                        // Update progress message with job ID
-                        const progressMsg = __("Queued. Waiting to start... (Job ID: {0})", [jobId]);
-                        frappe.show_progress(__("Generating MRP Order Recommendations"), 0, progressMsg);
+                        frappe.show_progress(__("Generating MRP Order Recommendations"), 0, 100, __("Queued. Waiting to start..."));
                     } else {
                         // Unknown status
-                        frappe.show_progress(__("Generating MRP Order Recommendations"), 0, __("Status: {0}", [status]));
+                        frappe.show_progress(__("Generating MRP Order Recommendations"), 0, 100, __("Status: {0}", [status]));
                     }
                 }
             },
@@ -537,7 +534,7 @@ function create_material_requests_automatically(frm, net_order_recommendations) 
 	}
 
 	// Show progress
-	frappe.show_progress(__("Creating Material Requests"), 0, __("Queuing job..."));
+	frappe.show_progress(__("Creating Material Requests"), 0, 100, __("Queuing job..."));
 
 	// Call the API to enqueue Material Request creation as background job
 	frappe.call({
@@ -560,9 +557,10 @@ function create_material_requests_automatically(frm, net_order_recommendations) 
 					// Job queued successfully, start polling
 					const jobId = r.message.job_id;
 					frappe.show_progress(
-						__("Creating Material Requests"), 
-						0, 
-						__("Job queued (ID: {0}). Starting background process...", [jobId])
+						__("Creating Material Requests"),
+						0,
+						100,
+						__("Creating Material Requests...")
 					);
 
 					// Show initial notification
@@ -672,58 +670,20 @@ function poll_mr_creation_job_status(jobId, frm) {
                             indicator: "red",
                         });
                     } else if (status === "running") {
-                        // Show progress bar immediately
-                        frappe.show_progress(__("Creating Material Requests"), 0, __("Processing..."));
-
-                        // Fetch progress details
-                        frappe.call({
-                            method: "prakash_steel.prakash_steel.doctype.mrp_genaration.mrp_genaration.get_mr_creation_progress",
-                            args: {
-                                job_id: jobId,
-                            },
-                            callback: function (progressR) {
-                                if (progressR.message && progressR.message.total > 0) {
-                                    const progress = progressR.message;
-                                    const percent = Math.max(0, Math.min(100, progress.percent || 0)); // Ensure 0-100
-                                    const current = progress.current || 0;
-                                    const total = progress.total || 0;
-                                    const currentItem = progress.current_item || "";
-                                    const successCount = progress.success_count || 0;
-                                    const errorCount = progress.error_count || 0;
-
-                                    // Show progress bar with item name (similar to deletion dialog)
-                                    let progressMsg = "";
-                                    if (currentItem) {
-                                        progressMsg = __("Creating Material Request for {0}", [currentItem]);
-                                    } else {
-                                        progressMsg = __("Processing...");
-                                    }
-
-                                    // Show progress with percentage - ensure percent is between 0 and 100
-                                    // Use at least 1% to ensure progress bar is visible (Frappe shows bar at 1%+)
-                                    const displayPercent = Math.max(1, percent);
-                                    frappe.show_progress(
-                                        __("Creating Material Requests"),
-                                        displayPercent,
-                                        progressMsg + ` (${current}/${total}) - Success: ${successCount}, Failed: ${errorCount}`
-                                    );
-                                } else {
-                                    // Fallback if progress not available yet
-                                    frappe.show_progress(__("Creating Material Requests"), 0, __("Processing... (Job ID: {0})", [jobId]));
-                                }
-                            },
-                        });
+                        // Live progress is pushed by the server via frappe.publish_progress() as each
+                        // Material Request is created, which frappe's client already listens for
+                        // globally (socket "progress" event -> frappe.show_progress()) - the same
+                        // mechanism the built-in bulk delete/update dialogs use. Nothing to do here;
+                        // calling show_progress from the poll loop too would just fight the live updates.
                     } else if (status === "queued") {
-                        // Update progress message
-                        const progressMsg = __("Queued. Waiting to start... (Job ID: {0})", [jobId]);
-                        frappe.show_progress(__("Creating Material Requests"), 0, progressMsg);
+                        frappe.show_progress(__("Creating Material Requests"), 0, 100, __("Queued. Waiting to start..."));
                     } else {
                         // Unknown status, keep showing progress
-                        frappe.show_progress(__("Creating Material Requests"), 0, __("Status: {0}", [status]));
+                        frappe.show_progress(__("Creating Material Requests"), 0, 100, __("Status: {0}", [status]));
                     }
                 } else {
                     // No message, keep polling
-                    frappe.show_progress(__("Creating Material Requests"), 0, __("Checking status... ({0})", [pollCount]));
+                    frappe.show_progress(__("Creating Material Requests"), 0, 100, __("Checking status... ({0})", [pollCount]));
                 }
             },
             error: function (r) {
@@ -748,7 +708,7 @@ function poll_mr_creation_job_status(jobId, frm) {
         enable_mr_generation_button(frm);
         frappe.msgprint({
             title: __("Timeout"),
-            message: __("Job is taking longer than expected. Please check the 'RQ Job' list (Job ID: {0}) to see the current status.", [jobId]),
+            message: __("Job is taking longer than expected. Please check the job status manually."),
             indicator: "orange",
         });
     }, 1800000); // 30 minutes timeout
